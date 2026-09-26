@@ -41,7 +41,7 @@ Upstream = "https://github.com/sandsower/memento-vault"
 version = { file = "VERSION" }
 
 [tool.setuptools.packages.find]
-include = ["memento*"]
+include = ["almanac*", "memento*"]
 exclude = ["tests*", "hooks*", "scripts*", "tools*", "benchmark*", "docs*", "skills*", "agents*"]
 
 [tool.ruff]

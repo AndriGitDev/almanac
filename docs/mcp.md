@@ -62,8 +62,8 @@ Hookless or tool-limited agents can still route through the same production sear
 ```bash
 almanac search "what did we decide about cache invalidation" --limit 5
 almanac recall "how should we store bearer tokens that appear in URLs"
-python3 -m memento search "MEMENTO_VAULT_PATH" --concrete auto
-python3 -m memento reindex
+python3 -m almanac search "MEMENTO_VAULT_PATH" --concrete auto
+python3 -m almanac reindex
 ```
 
 `search` returns the explicit search envelope, including backend/index metadata.
@@ -72,7 +72,7 @@ python3 -m memento reindex
 Run the MCP server manually:
 
 ```bash
-python -m memento
+python -m almanac
 ```
 
 `memento_capture` is the MCP equivalent of the SessionEnd hook.
@@ -87,7 +87,7 @@ For Claude Code, register with the CLI:
 
 ```bash
 claude mcp add memento-vault -s user -e PYTHONPATH="$HOME/.claude/hooks" \
-  -- python3 -m memento
+  -- python3 -m almanac
 ```
 
 For Codex, register with the CLI:
@@ -95,7 +95,7 @@ For Codex, register with the CLI:
 ```bash
 codex mcp add memento-vault \
   --env PYTHONPATH="$HOME/.claude/hooks" \
-  -- python3 -m memento
+  -- python3 -m almanac
 ```
 
 For other MCP-compatible agents (Cursor, Windsurf, OpenCode, etc.), add to your agent's MCP config:

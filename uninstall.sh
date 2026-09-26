@@ -91,6 +91,7 @@ done
 
 # Remove the installed Python package copied under Claude hooks.
 remove_dir "$CLAUDE_DIR/hooks/memento"
+remove_dir "$CLAUDE_DIR/hooks/almanac"
 
 # Remove Claude skills installed by install.sh (stable + experimental).
 for skill in memento memento-defrag start-fresh continue-work inception orra-init; do
@@ -119,6 +120,18 @@ if [ -L "$cli_dest" ]; then
     fi
 elif [ -e "$cli_dest" ]; then
     warn "Leaving CLI at $cli_dest (not an installer-created symlink)"
+fi
+
+almanac_cli_dest="${MEMENTO_CLI_BIN_DIR:-$HOME/.local/bin}/almanac"
+if [ -L "$almanac_cli_dest" ]; then
+    cli_target=$(readlink "$almanac_cli_dest" || true)
+    if [ "$cli_target" = "$SCRIPT_DIR/bin/almanac" ]; then
+        remove_file "$almanac_cli_dest"
+    else
+        warn "Leaving CLI symlink at $almanac_cli_dest (points to $cli_target)"
+    fi
+elif [ -e "$almanac_cli_dest" ]; then
+    warn "Leaving CLI at $almanac_cli_dest (not an installer-created symlink)"
 fi
 
 # Remove installer-owned shell warmup blocks while preserving user shell config.

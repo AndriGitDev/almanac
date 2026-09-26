@@ -43,7 +43,7 @@ gates:
   - name: ruff-format-check
     command: .venv/bin/python -m ruff format --check .
   - name: python-compileall
-    command: .venv/bin/python -m compileall -q memento hooks scripts
+    command: .venv/bin/python -m compileall -q almanac memento hooks scripts
   - name: targeted-tests
     command: .venv/bin/python -m pytest tests/test_llm_backends.py tests/test_lifecycle.py tests/test_triage.py tests/test_store.py tests/test_frontmatter_schema.py tests/test_script_harnesses.py tests/test_beislid_workflow_gates.py
     timeout_ms: 600000

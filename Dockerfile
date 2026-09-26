@@ -15,6 +15,7 @@ WORKDIR /app
 
 # Copy project files
 COPY memento/ ./memento/
+COPY almanac/ ./almanac/
 COPY hooks/ ./hooks/
 COPY pyproject.toml ./
 
@@ -64,4 +65,4 @@ key = os.environ.get('MEMENTO_API_KEY', ''); \
 req.add_header('Authorization', f'Bearer {key}') if key else None; \
 urlopen(req, timeout=4)" || exit 1
 
-ENTRYPOINT ["python", "-m", "memento"]
+ENTRYPOINT ["python", "-m", "almanac"]

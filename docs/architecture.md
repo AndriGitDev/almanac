@@ -1,6 +1,6 @@
 # Architecture
 
-The `memento/` package is agent-agnostic.
+The `almanac` Python namespace exposes the existing agent-agnostic `memento/` implementation. Both import paths resolve to the same module objects during migration.
 Modules handle config, search, graph algorithms, vault I/O, LLM abstraction, and type definitions.
 Hooks and MCP tools are thin wrappers around this package.
 

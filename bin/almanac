@@ -112,25 +112,9 @@ case "$cmd" in
         nohup "$qmd_path" vsearch "warmup" -c "${MEMENTO_QMD_COLLECTION:-memento}" -n 1 </dev/null >/dev/null 2>&1 &
         exit 0
         ;;
-    search|recall|reindex)
+    search|recall|reindex|tools|archive|health|doctor|retrieval-report|retrieval-dashboard)
         export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
-        exec python3 -m memento "$cmd" "$@"
-        ;;
-    tools)
-        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
-        exec python3 -m memento.mcp_inventory "$@"
-        ;;
-    archive)
-        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
-        exec python3 -m memento.archive "$@"
-        ;;
-    health|doctor)
-        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
-        exec python3 -m memento.health "$@"
-        ;;
-    retrieval-report|retrieval-dashboard)
-        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
-        exec python3 -m memento.retrieval_dashboard "$@"
+        exec python3 -m almanac "$cmd" "$@"
         ;;
     version|-v|--version)
         cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "unknown"
