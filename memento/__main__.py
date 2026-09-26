@@ -1,4 +1,4 @@
-"""Entry points for Memento Vault.
+"""Entry points for Almanac.
 
 Default behavior stays the MCP server so existing ``python -m memento`` MCP
 registrations keep working. Named subcommands provide a local, non-MCP retrieval
@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         return _reindex(argv[1:])
     if command in {"help", "-h", "--help"}:
         print(
-            "Memento Vault MCP Server\n"
+            "Almanac MCP Server\n"
             "Usage: python -m memento [search|recall|reindex] ...\n"
             "Without a subcommand, starts the MCP server."
         )

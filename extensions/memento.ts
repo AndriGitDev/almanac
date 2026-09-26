@@ -1054,7 +1054,7 @@ export default function mementoExtension(pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("memento", {
-		description: "Open the Memento Vault dashboard",
+		description: "Open the Almanac dashboard",
 		handler: async (_args, ctx) => {
 			if (!ctx.hasUI || typeof ctx.ui.custom !== "function") {
 				invokeMementoSkill(ctx);

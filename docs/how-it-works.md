@@ -1,6 +1,6 @@
 # How It Works
 
-Memento Vault captures knowledge from Claude Code sessions, makes it searchable, and injects relevant notes back into active sessions.
+Almanac captures knowledge from Claude Code sessions, makes it searchable, and injects relevant notes back into active sessions.
 
 ## Capture flow (write path)
 

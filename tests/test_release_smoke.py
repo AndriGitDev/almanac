@@ -33,7 +33,11 @@ def copy_release_metadata(tmp_path: Path) -> Path:
     (root / "Formula").mkdir()
     shutil.copy(REPO_ROOT / "VERSION", root / "VERSION")
     shutil.copy(REPO_ROOT / "package.json", root / "package.json")
+    shutil.copy(REPO_ROOT / "pyproject.toml", root / "pyproject.toml")
+    shutil.copy(REPO_ROOT / "README.md", root / "README.md")
+    shutil.copy(REPO_ROOT / "bin" / "almanac", root / "bin" / "almanac")
     shutil.copy(REPO_ROOT / "memento" / "__init__.py", root / "memento" / "__init__.py")
+    shutil.copy(REPO_ROOT / "Formula" / "almanac.rb", root / "Formula" / "almanac.rb")
     shutil.copy(REPO_ROOT / "Formula" / "memento-vault.rb", root / "Formula" / "memento-vault.rb")
     return root
 

@@ -1,7 +1,7 @@
 FROM python:3.12.11-slim
 
-LABEL maintainer="memento-vault"
-LABEL description="Memento Vault — persistent knowledge store for coding agents"
+LABEL maintainer="AndriGitDev/almanac"
+LABEL description="Almanac — persistent knowledge store for coding agents"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

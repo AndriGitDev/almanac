@@ -685,7 +685,7 @@ wheels = [
 ]
 
 [[package]]
-name = "memento-vault"
+name = "almanac"
 source = { editable = "." }
 
 [package.optional-dependencies]

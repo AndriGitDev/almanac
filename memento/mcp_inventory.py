@@ -197,7 +197,7 @@ def render_mcp_tool_markdown() -> str:
 
     lines = [
         START_MARKER,
-        f"The MCP server currently registers **{len(MCP_TOOL_INVENTORY)} tools**. This table is generated from `memento.mcp_inventory.MCP_TOOL_INVENTORY`; refresh/check it with `memento-vault tools --markdown` or `memento-vault tools --check`.",
+        f"The MCP server currently registers **{len(MCP_TOOL_INVENTORY)} tools**. This table is generated from `memento.mcp_inventory.MCP_TOOL_INVENTORY`; refresh/check it with `almanac tools --markdown` or `almanac tools --check`.",
         "",
         "| Tool | Category | What it does | When to use it |",
         "|------|----------|--------------|----------------|",

@@ -262,6 +262,10 @@ setup_cli >/dev/null
     assert link.is_symlink()
     assert os.readlink(link) == os.path.join(repo, "bin", "memento-vault")
 
+    almanac_link = tmp_path / ".local" / "bin" / "almanac"
+    assert almanac_link.is_symlink()
+    assert os.readlink(almanac_link) == os.path.join(repo, "bin", "almanac")
+
     result = subprocess.run([str(link), "version"], check=True, text=True, capture_output=True)
     with open(os.path.join(repo, "VERSION")) as f:
         assert result.stdout.strip() == f.read().strip()

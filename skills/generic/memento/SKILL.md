@@ -1,11 +1,11 @@
 ---
 name: memento
-description: Capture durable knowledge from the current work session into Memento Vault. Use when the user asks to remember, save, capture, or record decisions, discoveries, bug fixes, or reusable patterns.
+description: Capture durable knowledge from the current work session into Almanac. Use when the user asks to remember, save, capture, or record decisions, discoveries, bug fixes, or reusable patterns.
 ---
 
 # Memento
 
-Capture durable session knowledge as atomic notes in Memento Vault.
+Capture durable session knowledge as atomic notes in Almanac.
 
 ## Preferred Path
 

@@ -1,11 +1,11 @@
 ---
 name: inception
-description: Run or preview Memento Vault consolidation. Use when the user asks to consolidate, find patterns, run inception, preview clusters, or synthesize cross-session themes.
+description: Run or preview Almanac consolidation. Use when the user asks to consolidate, find patterns, run inception, preview clusters, or synthesize cross-session themes.
 ---
 
 # Inception
 
-Run Memento Vault consolidation to find patterns across notes.
+Run Almanac consolidation to find patterns across notes.
 
 ## Process
 

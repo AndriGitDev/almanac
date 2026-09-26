@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the memento-vault Rondo profile with the project defaults.
+# Run the Almanac Rondo profile with the project defaults.
 #
 # Usage:
 #   ./scripts/run-rondo                    # long-running poller + dashboard on :4000
@@ -20,7 +20,7 @@ ACK_FLAG="--i-understand-that-this-will-be-running-without-the-usual-guardrails"
 
 usage() {
   cat <<'EOF'
-Run the memento-vault Rondo profile with the project defaults.
+Run the Almanac Rondo profile with the project defaults.
 
 Usage:
   ./scripts/run-rondo                    # long-running poller + dashboard on :4000
@@ -54,6 +54,11 @@ fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 workflow_path="${RONDO_WORKFLOW:-$repo_root/WORKFLOW.md}"
+
+if grep -q 'SET_ALMANAC_LINEAR_PROJECT_SLUG' "$workflow_path"; then
+  echo "error: configure an Almanac Linear project_slug in $workflow_path before running Rondo" >&2
+  exit 2
+fi
 
 if [[ -z "${LINEAR_API_KEY:-}" ]]; then
   echo "error: LINEAR_API_KEY is not set" >&2

@@ -1,4 +1,4 @@
-# Memento Vault — Cloudflare Tunnel deployment
+# Almanac — Cloudflare Tunnel deployment
 #
 # Exposes your vault to the internet via Cloudflare Tunnel.
 # No public IP, no port forwarding, automatic TLS.

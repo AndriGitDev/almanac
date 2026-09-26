@@ -214,6 +214,37 @@ def check_homebrew_formula(root: Path) -> CheckResult:
     )
 
 
+def check_almanac_identity(root: Path) -> CheckResult:
+    pyproject = read_text(root / "pyproject.toml")
+    readme = read_text(root / "README.md")
+    formula_path = root / "Formula" / "almanac.rb"
+    if not formula_path.exists():
+        return fail("almanac identity", "Missing Formula/almanac.rb.")
+    formula = read_text(formula_path)
+    problems = []
+    for required in (
+        'name = "almanac"',
+        'Homepage = "https://github.com/AndriGitDev/almanac"',
+        'Upstream = "https://github.com/sandsower/memento-vault"',
+    ):
+        if required not in pyproject:
+            problems.append(f"pyproject.toml lacks {required!r}")
+    if not readme.startswith("# Almanac\n") or "https://github.com/sandsower/memento-vault" not in readme:
+        problems.append("README must name Almanac and credit upstream")
+    for required in (
+        "class Almanac < Formula",
+        'homepage "https://github.com/AndriGitDev/almanac"',
+        'bin.install_symlink libexec/"bin/almanac"',
+    ):
+        if required not in formula:
+            problems.append(f"Formula/almanac.rb lacks {required!r}")
+    if not (root / "bin" / "almanac").exists():
+        problems.append("Missing bin/almanac")
+    if problems:
+        return fail("almanac identity", "; ".join(problems))
+    return pass_("almanac identity", "Package, docs, command, and formula identify Almanac with upstream credit.")
+
+
 def check_pi_package_metadata(root: Path) -> CheckResult:
     package_path = root / "package.json"
     if not package_path.exists():
@@ -309,6 +340,8 @@ def check_install_execution(root: Path) -> CheckResult:
             problems.append("missing ~/.claude/hooks/memento-triage.py")
         if not (home / ".claude" / "hooks" / "memento" / "lifecycle.py").exists():
             problems.append("missing ~/.claude/hooks/memento/lifecycle.py")
+        if not (home / ".local" / "bin" / "almanac").is_symlink():
+            problems.append("missing ~/.local/bin/almanac")
         settings = home / ".claude" / "settings.json"
         if not settings.exists():
             problems.append("missing ~/.claude/settings.json")
@@ -349,6 +382,17 @@ def run_command(name: str, command: list[str], *, root: Path, expect_stdout: str
 
 
 def safe_command_checks(root: Path) -> Iterable[CheckResult]:
+    almanac_cli = root / "bin" / "almanac"
+    if almanac_cli.exists():
+        yield run_command("almanac cli help", [str(almanac_cli), "help"], root=root, expect_stdout="Usage: almanac")
+        yield run_command(
+            "almanac cli version",
+            [str(almanac_cli), "version"],
+            root=root,
+            expect_stdout=read_text(root / "VERSION").strip(),
+        )
+    else:
+        yield fail("almanac cli help", "Missing bin/almanac.")
     cli = root / "bin" / "memento-vault"
     if not cli.exists():
         yield fail("cli help", "Missing bin/memento-vault; restore CLI wrapper.")
@@ -360,9 +404,7 @@ def safe_command_checks(root: Path) -> Iterable[CheckResult]:
 
     installer = root / "install.sh"
     if installer.exists():
-        yield run_command(
-            "install help", [str(installer), "--help"], root=root, expect_stdout="Memento Vault installer"
-        )
+        yield run_command("install help", [str(installer), "--help"], root=root, expect_stdout="Almanac installer")
     else:
         yield fail("install help", "Missing install.sh; restore installer before release.")
 
@@ -370,7 +412,7 @@ def safe_command_checks(root: Path) -> Iterable[CheckResult]:
         "python module help",
         [sys.executable, "-m", "memento", "--help"],
         root=root,
-        expect_stdout="Memento Vault MCP Server",
+        expect_stdout="Almanac MCP Server",
     )
 
 
@@ -426,6 +468,7 @@ def main(argv: list[str] | None = None) -> int:
         check_python_runtime_requirement(root),
         check_version_consistency(root),
         check_homebrew_formula(root),
+        check_almanac_identity(root),
         check_pi_package_metadata(root),
         check_shell_syntax(root),
     ]

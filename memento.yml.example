@@ -1,4 +1,4 @@
-# Memento Vault configuration
+# Almanac configuration
 # Copy this to ~/.config/memento-vault/memento.yml or ~/memento/memento.yml
 
 # Where your vault lives (default: ~/memento)

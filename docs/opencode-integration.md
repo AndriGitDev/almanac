@@ -1,8 +1,8 @@
 # OpenCode integration
 
-Memento works with [OpenCode](https://github.com/sst/opencode) over MCP. This guide wires the vault up end-to-end so an OpenCode session can search past notes, capture new ones, and leave fleeting activity markers automatically.
+Almanac works with [OpenCode](https://github.com/sst/opencode) over MCP. This guide wires the vault up end-to-end so an OpenCode session can search past notes, capture new ones, and leave fleeting activity markers automatically.
 
-It assumes memento is already installed locally — either via `./install.sh` into `~/.claude/hooks/memento/` (the path Claude Code uses) or via `pip install memento-vault[mcp]` into a virtualenv.
+It assumes Almanac is already installed locally — either via `./install.sh` into `~/.claude/hooks/memento/` (the path Claude Code uses) or via `python -m pip install -e '.[mcp]'` from an Almanac checkout into a virtualenv.
 
 ## 1. MCP server config
 

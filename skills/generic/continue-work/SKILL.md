@@ -1,6 +1,6 @@
 ---
 name: continue-work
-description: Recover recent working context from local state and Memento Vault. Use when the user asks to continue, resume, pick up where they left off, or find prior work.
+description: Recover recent working context from local state and Almanac. Use when the user asks to continue, resume, pick up where they left off, or find prior work.
 ---
 
 # Continue Work

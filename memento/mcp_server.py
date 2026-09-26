@@ -284,9 +284,9 @@ def _build_server() -> FastMCP:
     port = int(os.environ.get("MEMENTO_PORT", "8745"))
 
     kwargs = {
-        "name": "memento-vault",
+        "name": "almanac",
         "instructions": (
-            "Memento Vault is a persistent knowledge store for coding agents.\n\n"
+            "Almanac is a persistent knowledge store for coding agents.\n\n"
             "General answering path: use memento_search when the user asks about "
             "past decisions, prior fixes, project history, session context, or exact "
             "identifiers. Use memento_contradictions when the user wants to inspect "
@@ -1912,7 +1912,7 @@ def main():
     import argparse
     import sys
 
-    parser = argparse.ArgumentParser(description="Memento Vault MCP Server")
+    parser = argparse.ArgumentParser(description="Almanac MCP Server")
     parser.add_argument(
         "--transport",
         choices=["stdio", "sse", "streamable-http"],

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Memento Vault installer
+# Almanac installer
 # Installs hooks, skills, and agents into Claude Code, then initializes the vault.
 # Version-aware: tracks installed file checksums so upgrades skip user-modified files.
 #
 # Usage:
-#   git clone https://github.com/sandsower/memento-vault.git
-#   cd memento-vault
+#   git clone https://github.com/AndriGitDev/almanac.git
+#   cd almanac
 #   ./install.sh
 #
 # Or with a custom vault path:
@@ -46,7 +46,7 @@ CLI_REMOTE=false
 
 usage() {
     cat <<EOF
-Memento Vault installer v${NEW_VERSION}
+Almanac installer v${NEW_VERSION}
 
 Usage: ./install.sh [OPTIONS]
 
@@ -180,7 +180,7 @@ fi
 
 if [ -n "$INSTALLED_VERSION" ]; then
     if [ "$INSTALLED_VERSION" = "$NEW_VERSION" ] && [ "$FORCE" != true ]; then
-        info "Memento Vault v${NEW_VERSION} is already installed."
+        info "Almanac v${NEW_VERSION} is already installed."
         if [ "$REINSTALL" != true ]; then
             reinstall=""
             if can_prompt; then
@@ -193,10 +193,10 @@ if [ -n "$INSTALLED_VERSION" ]; then
             fi
         fi
     else
-        info "Upgrading Memento Vault: v${INSTALLED_VERSION} -> v${NEW_VERSION}"
+        info "Upgrading Almanac: v${INSTALLED_VERSION} -> v${NEW_VERSION}"
     fi
 else
-    info "Installing Memento Vault v${NEW_VERSION}"
+    info "Installing Almanac v${NEW_VERSION}"
 fi
 
 # --- Preflight checks ---
@@ -390,7 +390,7 @@ fi
 
 # --- Install CLI ---
 
-step "Installing memento-vault CLI..."
+step "Installing Almanac CLI..."
 setup_cli
 
 # --- Install memento package ---
