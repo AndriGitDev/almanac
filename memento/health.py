@@ -1253,11 +1253,12 @@ def _mcp_entry_shape(data: Any) -> tuple[str, str | None]:
     command_name = Path(str(command)).name if command else ""
     python_command = command_name.startswith("python")
     has_module_args = isinstance(args, list) and any(
-        args[index] == "-m" and index + 1 < len(args) and args[index + 1] == "memento" for index in range(len(args))
+        args[index] == "-m" and index + 1 < len(args) and args[index + 1] in {"almanac", "memento"}
+        for index in range(len(args))
     )
     if python_command and has_module_args and isinstance(env, dict) and env.get("PYTHONPATH"):
         return "local stdio", None
-    return "invalid", "local MCP entry must run python3 -m memento with PYTHONPATH"
+    return "invalid", "local MCP entry must run python3 -m almanac (or memento) with PYTHONPATH"
 
 
 def _mcp_registration_shape(output: str) -> str:
@@ -1269,7 +1270,7 @@ def _mcp_registration_shape(output: str) -> str:
     urls = re.findall(r"https?://[^\s]+", text)
     if urls:
         return "remote http" if any(url.rstrip("/").endswith("/mcp") for url in urls) else "invalid"
-    if re.search(r"\bpython(?:3(?:\.\d+)?)?\b", text) and re.search(r"(?:^|\s)-m\s+memento(?:\s|$)", text):
+    if re.search(r"\bpython(?:3(?:\.\d+)?)?\b", text) and re.search(r"(?:^|\s)-m\s+(?:almanac|memento)(?:\s|$)", text):
         return "local stdio"
     return "invalid"
 

@@ -431,6 +431,15 @@ for critical in __init__.py config.py utils.py store.py search.py lifecycle.py p
     fi
 done
 
+# Add the new import path alongside the installed legacy implementation.
+ALMANAC_PKG_DIR="$CLAUDE_DIR/hooks/almanac"
+mkdir -p "$ALMANAC_PKG_DIR/adapters"
+for mod_path in "$SCRIPT_DIR"/almanac/*.py "$SCRIPT_DIR"/almanac/adapters/*.py; do
+    [ -f "$mod_path" ] || continue
+    rel_path="${mod_path#"$SCRIPT_DIR"/almanac/}"
+    safe_copy "$mod_path" "$ALMANAC_PKG_DIR/$rel_path" "almanac/$rel_path" || true
+done
+
 if [ "$PKG_SKIPPED" -gt 0 ]; then
     info "Package: $PKG_COPIED updated, $PKG_SKIPPED skipped (locally modified)"
 else

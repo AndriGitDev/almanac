@@ -1192,6 +1192,7 @@ def test_mcp_registration_shape_rejects_wrong_python_module():
     assert health._mcp_registration_shape("memento-vault: stdio python3 -m other_module") == "invalid"
     assert health._mcp_registration_shape("memento-vault: stdio python3 /tmp/server.py") == "invalid"
     assert health._mcp_registration_shape("memento-vault: stdio python3 -m memento") == "local stdio"
+    assert health._mcp_registration_shape("memento-vault: stdio python3 -m almanac") == "local stdio"
     assert health._mcp_registration_shape("memento-vault\n  Command: python3\n  Args: -m memento") == "local stdio"
     assert health._mcp_registration_shape("memento-vault: http https://vault.example.com") == "invalid"
     assert health._mcp_registration_shape("memento-vault: http https://vault.example.com/mcp") == "remote http"
@@ -1209,6 +1210,21 @@ def test_mcp_local_stdio_shape_rejects_reordered_args():
             }
         )[0]
         == "invalid"
+    )
+
+
+def test_mcp_local_stdio_shape_accepts_almanac_module():
+    assert (
+        health._mcp_entry_shape(
+            {
+                "memento-vault": {
+                    "command": "python3",
+                    "args": ["-m", "almanac"],
+                    "env": {"PYTHONPATH": "/tmp/hooks"},
+                }
+            }
+        )[0]
+        == "local stdio"
     )
 
 

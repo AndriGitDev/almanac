@@ -183,7 +183,7 @@ Your vault and notes stay untouched.
 
 ## Project and compatibility
 
-Almanac is an independent fork of [Memento Vault](https://github.com/sandsower/memento-vault), originally created by Victor Valenzuela. It retains the upstream Git history and MIT copyright notice. The Python module (`memento`), MCP tool names (`memento_*`), existing vault format, configuration paths, and environment variables remain compatible. The `memento-vault` command remains as an alias for `almanac`. Existing vaults require no data migration.
+Almanac is an independent fork of [Memento Vault](https://github.com/sandsower/memento-vault), originally created by Victor Valenzuela. It retains the upstream Git history and MIT copyright notice. New Python integrations can use `import almanac` and `python -m almanac`; `memento` imports, MCP tool names (`memento_*`), existing vault format, configuration paths, and environment variables remain compatible. Both import paths share the same module state. The `memento-vault` command remains as an alias for `almanac`. Existing vaults require no data migration.
 
 ## License
 

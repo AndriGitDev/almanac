@@ -37,7 +37,7 @@ jobs:
       - name: ruff format check
         run: python -m ruff format --check .
       - name: compileall
-        run: python -m compileall -q memento hooks scripts
+        run: python -m compileall -q almanac memento hooks scripts
 
   gate-tests:
     name: Gate test suites

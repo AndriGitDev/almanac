@@ -426,7 +426,7 @@ _register_with_claude() {
             fi
         else
             echo "  claude mcp add memento-vault -s user -e PYTHONPATH=\"$CLAUDE_DIR/hooks\" \\"
-            echo "    -- python3 -m memento"
+            echo "    -- python3 -m almanac"
         fi
         echo ""
         return
@@ -449,7 +449,7 @@ _register_with_claude() {
         fi
     else
         add_cmd=(claude mcp add memento-vault -s user -e "PYTHONPATH=$CLAUDE_DIR/hooks" \
-            -- python3 -m memento)
+            -- python3 -m almanac)
     fi
 
     claude mcp remove memento-vault -s user 2>/dev/null || true
@@ -482,7 +482,7 @@ _register_with_codex() {
         else
             echo "  codex mcp add memento-vault \\"
             echo "    --env PYTHONPATH=\"$CLAUDE_DIR/hooks\" \\"
-            echo "    -- python3 -m memento"
+            echo "    -- python3 -m almanac"
         fi
         echo ""
         return
@@ -523,7 +523,7 @@ _register_with_codex() {
     else
         add_cmd=(codex mcp add memento-vault \
             --env "PYTHONPATH=$CLAUDE_DIR/hooks" \
-            -- python3 -m memento)
+            -- python3 -m almanac)
     fi
 
     codex mcp remove memento-vault 2>/dev/null || true

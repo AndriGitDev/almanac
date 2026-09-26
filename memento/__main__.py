@@ -17,10 +17,10 @@ def _json_dump(payload: object) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
-def _search(argv: list[str]) -> int:
+def _search(argv: list[str], prog: str) -> int:
     from memento.retrieval_policy import ExplicitSearchRequest, ExplicitSearchRuntime
 
-    parser = argparse.ArgumentParser(prog="python -m memento search")
+    parser = argparse.ArgumentParser(prog=f"{prog} search")
     parser.add_argument("query", nargs="+", help="Natural-language question or exact identifier")
     parser.add_argument("--limit", type=int, default=5)
     parser.add_argument("--semantic", action="store_true")
@@ -50,10 +50,10 @@ def _search(argv: list[str]) -> int:
     return 0 if payload.get("results") else 1
 
 
-def _recall(argv: list[str]) -> int:
+def _recall(argv: list[str], prog: str) -> int:
     from memento.lifecycle import build_recall
 
-    parser = argparse.ArgumentParser(prog="python -m memento recall")
+    parser = argparse.ArgumentParser(prog=f"{prog} recall")
     parser.add_argument("prompt", nargs="+", help="Prompt to run through production prompt-recall policy")
     parser.add_argument("--cwd", default="")
     parser.add_argument("--session-id", default="local-cli")
@@ -68,11 +68,11 @@ def _recall(argv: list[str]) -> int:
     return 0 if payload.get("should_inject") else 1
 
 
-def _reindex(argv: list[str]) -> int:
+def _reindex(argv: list[str], prog: str) -> int:
     from memento.config import get_config
     from memento.search_backend import get_backend
 
-    parser = argparse.ArgumentParser(prog="python -m memento reindex")
+    parser = argparse.ArgumentParser(prog=f"{prog} reindex")
     parser.add_argument("--collection", default="")
     parser.add_argument("--no-embed", action="store_true", help="Skip embedding/vector update where supported")
     args = parser.parse_args(argv)
@@ -85,19 +85,35 @@ def _reindex(argv: list[str]) -> int:
     return 0 if ok else 1
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, prog: str = "python -m memento") -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     command = argv[0] if argv else ""
     if command == "search":
-        return _search(argv[1:])
+        return _search(argv[1:], prog)
     if command == "recall":
-        return _recall(argv[1:])
+        return _recall(argv[1:], prog)
     if command == "reindex":
-        return _reindex(argv[1:])
+        return _reindex(argv[1:], prog)
+    if command == "tools":
+        from memento.mcp_inventory import main as tools_main
+
+        return tools_main(argv[1:])
+    if command == "archive":
+        from memento.archive import main as archive_main
+
+        return archive_main(argv[1:])
+    if command in {"health", "doctor"}:
+        from memento.health import main as health_main
+
+        return health_main(argv[1:])
+    if command in {"retrieval-report", "retrieval-dashboard"}:
+        from memento.retrieval_dashboard import main as dashboard_main
+
+        return dashboard_main(argv[1:])
     if command in {"help", "-h", "--help"}:
         print(
             "Almanac MCP Server\n"
-            "Usage: python -m memento [search|recall|reindex] ...\n"
+            f"Usage: {prog} [search|recall|reindex|tools|archive|health|retrieval-report] ...\n"
             "Without a subcommand, starts the MCP server."
         )
         return 0

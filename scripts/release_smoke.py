@@ -340,6 +340,8 @@ def check_install_execution(root: Path) -> CheckResult:
             problems.append("missing ~/.claude/hooks/memento-triage.py")
         if not (home / ".claude" / "hooks" / "memento" / "lifecycle.py").exists():
             problems.append("missing ~/.claude/hooks/memento/lifecycle.py")
+        if not (home / ".claude" / "hooks" / "almanac" / "__main__.py").exists():
+            problems.append("missing ~/.claude/hooks/almanac/__main__.py")
         if not (home / ".local" / "bin" / "almanac").is_symlink():
             problems.append("missing ~/.local/bin/almanac")
         settings = home / ".claude" / "settings.json"
@@ -354,6 +356,17 @@ def check_install_execution(root: Path) -> CheckResult:
                 problems.append("SessionEnd hook not registered in settings.json")
         if not (home / "memento" / "notes").is_dir():
             problems.append("vault notes/ not created")
+        installed_env = {**env, "PYTHONPATH": str(home / ".claude" / "hooks")}
+        installed_module = subprocess.run(
+            [sys.executable, "-m", "almanac", "--help"],
+            cwd=home,
+            env=installed_env,
+            text=True,
+            capture_output=True,
+            timeout=20,
+        )
+        if installed_module.returncode != 0 or "Usage: python -m almanac" not in installed_module.stdout:
+            problems.append("installed Almanac Python module cannot start")
         if problems:
             return fail("install execution", "; ".join(problems))
         return pass_("install execution", "Non-interactive fresh-HOME install completed with expected layout.")
@@ -408,6 +421,12 @@ def safe_command_checks(root: Path) -> Iterable[CheckResult]:
     else:
         yield fail("install help", "Missing install.sh; restore installer before release.")
 
+    yield run_command(
+        "almanac python module help",
+        [sys.executable, "-m", "almanac", "--help"],
+        root=root,
+        expect_stdout="Usage: python -m almanac",
+    )
     yield run_command(
         "python module help",
         [sys.executable, "-m", "memento", "--help"],
