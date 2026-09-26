@@ -1,6 +1,5 @@
-"""Almanac — persistent knowledge capture for coding agents.
+"""Compatibility namespace for existing Memento integrations."""
 
-The ``memento`` import remains for compatibility with existing installations.
-"""
+from almanac import __version__
 
-__version__ = "5.0.0"
+__all__ = ["__version__"]

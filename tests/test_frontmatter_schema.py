@@ -116,7 +116,7 @@ def test_frontmatter_schema_checker_detects_missing_documented_source(tmp_path):
     original = checker.DOC_PATH.read_text(encoding="utf-8")
     doc_copy = _write_doc_copy(
         tmp_path,
-        original.replace("| `mcp-capture` | `memento_capture` session-summary note writer |\n", ""),
+        original.replace("| `mcp-capture` | `almanac_capture` session-summary note writer |\n", ""),
     )
 
     errors = checker.run_check(doc_copy)

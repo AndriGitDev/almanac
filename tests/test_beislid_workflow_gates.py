@@ -13,7 +13,7 @@ ACTION_POLICY = REPO_ROOT / ".beislid" / "action-policy.json"
 EXPECTED_COMMANDS = {
     "ruff-check": ".venv/bin/python -m ruff check .",
     "ruff-format-check": ".venv/bin/python -m ruff format --check .",
-    "python-compileall": ".venv/bin/python -m compileall -q memento hooks scripts",
+    "python-compileall": ".venv/bin/python -m compileall -q almanac memento hooks scripts",
     "frontmatter-schema-drift": ".venv/bin/python scripts/check_frontmatter_schema.py",
     "targeted-tests": ".venv/bin/python -m pytest tests/test_llm_backends.py tests/test_lifecycle.py tests/test_triage.py tests/test_store.py tests/test_embedded_search.py tests/test_frontmatter_schema.py tests/test_script_harnesses.py tests/test_beislid_workflow_gates.py",
     "retrieval-tests": ".venv/bin/python -m pytest tests/test_tenet_*.py tests/test_multi_hop.py tests/test_deep_recall.py",
@@ -134,7 +134,7 @@ def test_beislid_gates_are_rich_pre_pr_sensors() -> None:
             assert "tests/test_beislid_workflow_gates.py" in body
 
         if name == "mcp-server-tests":
-            assert "memento/auth.py" in body
+            assert "almanac/auth.py" in body
 
 
 def test_beislid_process_artifact_and_workflow_wiring() -> None:
@@ -190,28 +190,28 @@ def test_beislid_process_artifact_and_workflow_wiring() -> None:
         "targeted-tests",
     }
     assert set(_artifact_gate_names(["hooks/vault-commit.sh"])) == {"targeted-tests"}
-    assert set(_artifact_gate_names(["memento/mcp_server.py"])) == {
+    assert set(_artifact_gate_names(["almanac/mcp_server.py"])) == {
         "ruff-check",
         "ruff-format-check",
         "python-compileall",
         "targeted-tests",
         "mcp-server-tests",
     }
-    assert set(_artifact_gate_names(["memento/auth.py"])) == {
+    assert set(_artifact_gate_names(["almanac/auth.py"])) == {
         "ruff-check",
         "ruff-format-check",
         "python-compileall",
         "targeted-tests",
         "mcp-server-tests",
     }
-    assert set(_artifact_gate_names(["memento/types.py"])) == {
+    assert set(_artifact_gate_names(["almanac/types.py"])) == {
         "frontmatter-schema-drift",
         "targeted-tests",
         "ruff-check",
         "ruff-format-check",
         "python-compileall",
     }
-    assert set(_artifact_gate_names(["memento/search.py"])) == {
+    assert set(_artifact_gate_names(["almanac/search.py"])) == {
         "ruff-check",
         "ruff-format-check",
         "python-compileall",
@@ -223,7 +223,7 @@ def test_beislid_process_artifact_and_workflow_wiring() -> None:
         "release-smoke",
         "install-exec-smoke",
     }
-    assert set(_artifact_gate_names(["memento/retrieval_policy.py"])) == {
+    assert set(_artifact_gate_names(["almanac/retrieval_policy.py"])) == {
         "ruff-check",
         "ruff-format-check",
         "python-compileall",
@@ -232,7 +232,7 @@ def test_beislid_process_artifact_and_workflow_wiring() -> None:
         "eval-framework-tests",
         "capture-retrieve-loop-hermetic",
     }
-    assert set(_artifact_gate_names(["memento/lifecycle.py"])) == {
+    assert set(_artifact_gate_names(["almanac/lifecycle.py"])) == {
         "ruff-check",
         "ruff-format-check",
         "python-compileall",

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vault-commit.sh — auto-commit all changes in the memento vault.
+# vault-commit.sh — auto-commit all changes in the Almanac vault.
 # Called by memento-triage.py, memento-sweeper.py, /memento, /memento-defrag.
 # Idempotent: exits cleanly if nothing to commit.
 #
@@ -8,9 +8,15 @@
 
 set -euo pipefail
 
-# Resolve vault path from config, falling back to ~/memento
+# Resolve the configured vault, including legacy Memento installs.
 resolve_vault() {
+    if [ -n "${ALMANAC_VAULT_PATH:-${MEMENTO_VAULT_PATH:-}}" ]; then
+        echo "${ALMANAC_VAULT_PATH:-$MEMENTO_VAULT_PATH}"
+        return
+    fi
     local config_files=(
+        "$HOME/.config/almanac/almanac.yml"
+        "$HOME/.almanac.yml"
         "$HOME/.config/memento-vault/memento.yml"
         "$HOME/.memento-vault.yml"
     )
@@ -24,7 +30,11 @@ resolve_vault() {
             fi
         fi
     done
-    echo "$HOME/memento"
+    if [ -d "$HOME/memento" ] && [ ! -d "$HOME/almanac" ]; then
+        echo "$HOME/memento"
+    else
+        echo "$HOME/almanac"
+    fi
 }
 
 VAULT="$(resolve_vault)"
@@ -64,7 +74,15 @@ from pathlib import Path
 paths_file = Path(sys.argv[1])
 vault = Path.cwd()
 raw_paths = [p for p in paths_file.read_bytes().split(b"\0") if p]
-tombstone_path = vault / ".memento" / "tombstones.jsonl"
+legacy_metadata = vault / ".memento"
+current_metadata = vault / ".almanac"
+if legacy_metadata.exists() and not current_metadata.exists():
+    metadata_dir = legacy_metadata
+elif vault == Path.home() / "memento" and not current_metadata.exists():
+    metadata_dir = legacy_metadata
+else:
+    metadata_dir = current_metadata
+tombstone_path = metadata_dir / "tombstones.jsonl"
 latest_by_path = {}
 if tombstone_path.exists():
     for line in tombstone_path.read_text(encoding="utf-8").splitlines():

@@ -8,16 +8,16 @@ cd almanac
 ./install.sh
 ```
 
-Creates the vault at `~/memento`, copies hooks and the `memento/` package into `~/.claude/`, optionally sets up Obsidian views and QMD search.
+Creates the vault at `~/almanac`, copies hooks and the `almanac/` package into `~/.claude/`, optionally sets up Obsidian views and QMD search.
 Works on Linux and macOS.
 
 Custom vault path:
 
 ```bash
-MEMENTO_VAULT_PATH=~/my-vault ./install.sh
+ALMANAC_VAULT_PATH=~/my-vault ./install.sh
 ```
 
-The installer links both the `almanac` CLI and the compatible `memento-vault` alias into `~/.local/bin` when possible, so future updates can use `almanac update`.
+The installer links the `almanac` CLI into `~/.local/bin` when possible, so future updates can use `almanac update`.
 If `~/.local/bin` is not on your `PATH`, either add it or run the repository-local `./bin/almanac` directly.
 
 ## Reinstalling and forcing
@@ -29,7 +29,7 @@ almanac install --reinstall
 ```
 
 `--force` is reserved for recovery from broken installed files.
-It overwrites memento-managed files and requires confirmation, or `MEMENTO_FORCE=1` in non-interactive environments.
+It overwrites almanac-managed files and requires confirmation, or `ALMANAC_FORCE=1` in non-interactive environments.
 
 ## Health and doctor
 
@@ -79,8 +79,8 @@ For agents that support MCP but not native hooks (Cursor, Windsurf, etc.):
 ./install.sh --mcp
 ```
 
-This installs the `memento/` package, writes generic MCP server config, and registers the server with Claude Code and Codex when those CLIs are installed.
-The server runs over stdio via `python -m almanac`; older `python -m memento` registrations remain valid.
+This installs the `almanac/` package, writes generic MCP server config, and registers the server with Claude Code and Codex when those CLIs are installed.
+The server runs over stdio via `python -m almanac`; older `python -m memento` registrations remain valid and expose legacy MCP tool aliases.
 The installer verifies the `mcp` Python package is available and installs it if needed.
 Claude Code gets Claude-specific skills and the concierge agent under `~/.claude`; Codex gets agent-agnostic skills under `~/.codex/skills`.
 
@@ -114,8 +114,8 @@ Use portable archives when moving a vault between machines or safely merging vau
 Archives keep Markdown as the canonical source of truth and include vault identity, `notes/`, `fleeting/`, `projects/`, `archive/`, sync ledger state, and tombstones; derived search indexes and embeddings are excluded.
 
 ```bash
-almanac archive export --vault ~/memento ./memento-portable.zip
-almanac archive import --vault ~/memento-restored ./memento-portable.zip
+almanac archive export --vault ~/almanac ./almanac-portable.zip
+almanac archive import --vault ~/almanac-restored ./almanac-portable.zip
 ```
 
 Imports default to safe conflict errors on existing divergent files.

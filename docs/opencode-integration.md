@@ -2,22 +2,22 @@
 
 Almanac works with [OpenCode](https://github.com/sst/opencode) over MCP. This guide wires the vault up end-to-end so an OpenCode session can search past notes, capture new ones, and leave fleeting activity markers automatically.
 
-It assumes Almanac is already installed locally — either via `./install.sh` into `~/.claude/hooks/memento/` (the path Claude Code uses) or via `python -m pip install -e '.[mcp]'` from an Almanac checkout into a virtualenv.
+It assumes Almanac is already installed locally — either via `./install.sh` into `~/.claude/hooks/almanac/` (the path Claude Code uses) or via `python -m pip install -e '.[mcp]'` from an Almanac checkout into a virtualenv.
 
 ## 1. MCP server config
 
-Add a `memento` entry under `mcp` in `~/.config/opencode/opencode.json`:
+Add a `almanac` entry under `mcp` in `~/.config/opencode/opencode.json`:
 
 ```json
 {
   "mcp": {
-    "memento": {
+    "almanac": {
       "type": "local",
-      "command": ["python", "-P", "-m", "memento"],
+      "command": ["python", "-P", "-m", "almanac"],
       "enabled": true,
       "environment": {
         "PYTHONPATH": "/home/you/.claude/hooks",
-        "MEMENTO_AGENT": "opencode"
+        "ALMANAC_AGENT": "opencode"
       },
       "timeout": 10000
     }
@@ -27,34 +27,34 @@ Add a `memento` entry under `mcp` in `~/.config/opencode/opencode.json`:
 
 A few details worth knowing:
 
-- `-P` strips the current working directory from `sys.path`, so the package always resolves through `PYTHONPATH` (or site-packages, if you `pip install`ed) regardless of where you launch `opencode` from. Without it you can accidentally import a sibling `memento/` directory from a checked-out fork — see `MEMENTO_OPENCODE_SESSION_ID` below for the related foot-gun.
-- `MEMENTO_AGENT=opencode` tells memento's transcript adapter to use the OpenCode parser when a tool call passes `transcript_path=`.
-- If you installed memento into a virtualenv with pip, point `command[0]` at that venv's Python (`/path/to/venv/bin/python`) and drop the `PYTHONPATH` entry — pip puts memento in site-packages.
+- `-P` strips the current working directory from `sys.path`, so the package always resolves through `PYTHONPATH` (or site-packages, if you `pip install`ed) regardless of where you launch `opencode` from. Without it you can accidentally import a sibling `almanac/` directory from a checked-out fork — see `ALMANAC_OPENCODE_SESSION_ID` below for the related foot-gun.
+- `ALMANAC_AGENT=opencode` tells almanac's transcript adapter to use the OpenCode parser when a tool call passes `transcript_path=`.
+- If you installed almanac into a virtualenv with pip, point `command[0]` at that venv's Python (`/path/to/venv/bin/python`) and drop the `PYTHONPATH` entry — pip puts almanac in site-packages.
 
 Restart any running OpenCode TUI for the new MCP server to be picked up — OpenCode does not respawn MCP children inside a live session.
 
-Verify with `opencode mcp list`. You should see `memento ✓ connected`.
+Verify with `opencode mcp list`. You should see `almanac ✓ connected`.
 
 ## 2. AGENTS.md instructions
 
 Drop the following into `~/.config/opencode/AGENTS.md` (or a project-local `AGENTS.md`) so the model proactively uses the vault:
 
 ```markdown
-## Memento vault — persistent memory across harnesses
+## Almanac vault — persistent memory across harnesses
 
-You have access to a memento vault via MCP tools (prefix `memento_`). The vault
+You have access to a almanac vault via MCP tools (prefix `almanac_`). The vault
 holds atomic notes from prior sessions across every coding agent the user runs.
 
-On the **first user message** of a session, call `memento_search` with the
+On the **first user message** of a session, call `almanac_search` with the
 working directory and a query derived from the user's request. Use the
 returned notes as context before answering. If the user references "yesterday",
 "last week", or "what we decided about X", search before answering — the model
 must not rely on its own memory.
 
-When the user says "remember this" / "save this" / "memento":
+When the user says "remember this" / "save this" / "almanac":
 
-- Call `memento_store` for a single distinct fact.
-- Call `memento_capture` at session end to triage the whole session.
+- Call `almanac_store` for a single distinct fact.
+- Call `almanac_capture` at session end to triage the whole session.
 ```
 
 Tune the prompt to your style. The key behaviors are: search at session start, store deliberately, capture at end.
@@ -63,18 +63,18 @@ Tune the prompt to your style. The key behaviors are: search at session start, s
 
 OpenCode emits a `session.idle` event whenever a turn finishes. You can drop a small plugin that catches that event and writes a fleeting marker into the vault, even when the session was too small for a full triage capture. The marker is one line per session under `<vault>/fleeting/<YYYY-MM-DD>.md`.
 
-Put this in `~/.config/opencode/plugins/memento-fleeting.ts`:
+Put this in `~/.config/opencode/plugins/almanac-fleeting.ts`:
 
 ```typescript
 import type { Plugin } from "@opencode-ai/plugin"
 import { spawn } from "node:child_process"
 
-const HELPER = `${process.env.HOME}/.local/share/memento-opencode/fleeting.py`
-const PYTHON = process.env.MEMENTO_PYTHON ?? process.env.PYTHON ?? "python3"
+const HELPER = `${process.env.HOME}/.local/share/almanac-opencode/fleeting.py`
+const PYTHON = process.env.ALMANAC_PYTHON ?? process.env.PYTHON ?? "python3"
 const HOOKS_PATH = `${process.env.HOME}/.claude/hooks`
 const PYTHONPATH = [process.env.PYTHONPATH, HOOKS_PATH].filter(Boolean).join(":")
 
-export const MementoFleetingPlugin: Plugin = async ({ client, directory }) => {
+export const AlmanacFleetingPlugin: Plugin = async ({ client, directory }) => {
   return {
     event: async ({ event }) => {
       if (event?.type !== "session.idle") return
@@ -104,7 +104,7 @@ export const MementoFleetingPlugin: Plugin = async ({ client, directory }) => {
       child.unref()
 
       client.app.log({
-        service: "memento-fleeting",
+        service: "almanac-fleeting",
         level: "info",
         message: `dispatched session=${sessionID} pid=${child.pid}`,
       })
@@ -113,21 +113,22 @@ export const MementoFleetingPlugin: Plugin = async ({ client, directory }) => {
 }
 ```
 
-If memento is installed in a virtualenv, set `MEMENTO_PYTHON=/path/to/venv/bin/python` before launching OpenCode so the detached helper uses the same environment. The plugin preserves any existing `PYTHONPATH` and appends the hooks path for source installs.
+If almanac is installed in a virtualenv, set `ALMANAC_PYTHON=/path/to/venv/bin/python` before launching OpenCode so the detached helper uses the same environment. The plugin preserves any existing `PYTHONPATH` and appends the hooks path for source installs.
 
-And `~/.local/share/memento-opencode/fleeting.py`:
+And `~/.local/share/almanac-opencode/fleeting.py`:
 
 ```python
 #!/usr/bin/env python3
-"""Append a session marker to memento's fleeting log.
+"""Append a session marker to almanac's fleeting log.
 
 Reads JSON from stdin: {session_id, cwd, agent}.
 """
+
 import json
 import sys
 
-from memento.config import get_vault
-from memento.store import (
+from almanac.config import get_vault
+from almanac.store import (
     acquire_vault_write_lock,
     append_fleeting_session,
     release_vault_write_lock,
@@ -167,12 +168,12 @@ if __name__ == "__main__":
 
 ## 4. Optional: full transcript capture
 
-For substantive sessions, the model should call `memento_capture` directly with `transcript_path` pointing at OpenCode's SQLite session store, typically `~/.local/share/opencode/opencode.db`. Memento's OpenCode transcript adapter parses the `session`, `message`, and `part` rows out of that DB and feeds the same triage pipeline Claude Code uses.
+For substantive sessions, the model should call `almanac_capture` directly with `transcript_path` pointing at OpenCode's SQLite session store, typically `~/.local/share/opencode/opencode.db`. Almanac's OpenCode transcript adapter parses the `session`, `message`, and `part` rows out of that DB and feeds the same triage pipeline Claude Code uses.
 
-You can scope the parse to a specific session id with the `MEMENTO_OPENCODE_SESSION_ID` environment variable — otherwise the most recently created session is used. Most callers leave it unset and rely on the "latest session" default; the env var exists for tooling that knows the session id (e.g. a future opencode plugin that captures synchronously).
+You can scope the parse to a specific session id with the `ALMANAC_OPENCODE_SESSION_ID` environment variable — otherwise the most recently created session is used. Most callers leave it unset and rely on the "latest session" default; the env var exists for tooling that knows the session id (e.g. a future opencode plugin that captures synchronously).
 
 ## Troubleshooting
 
-- **"not connected" mid-session**: OpenCode does not respawn MCP children that die. Restart the TUI; the next process spawns a fresh memento server. `opencode mcp list` from another shell will misleadingly report `✓ connected` because that command spawns its own transient server.
-- **`memento_search` returns empty for notes you just wrote**: memento's index is updated by `memento_store` and friends. Direct file writes to `<vault>/notes/` bypass it. Run `memento_reindex` (via MCP) or capture through the official API.
+- **"not connected" mid-session**: OpenCode does not respawn MCP children that die. Restart the TUI; the next process spawns a fresh almanac server. `opencode mcp list` from another shell will misleadingly report `✓ connected` because that command spawns its own transient server.
+- **`almanac_search` returns empty for notes you just wrote**: almanac's index is updated by `almanac_store` and friends. Direct file writes to `<vault>/notes/` bypass it. Run `almanac_reindex` (via MCP) or capture through the official API.
 - **Tool count looks low**: OpenCode silently drops some MCP tools depending on cwd. Until the upstream issue is resolved, launch `opencode` from a project directory with a `pyproject.toml` / `AGENTS.md` if you need the full tool surface.

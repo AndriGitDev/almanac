@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install helpers for memento-vault.
+"""Install helpers for Almanac.
 
 Consolidates all JSON manipulation needed by install.sh into a single
 script with subcommand dispatch. Called via:
@@ -15,13 +15,15 @@ from datetime import datetime
 from json import JSONDecodeError
 
 
-MEMENTO_HOOK_SCRIPTS = {
+OWNED_HOOK_SCRIPTS = {
     "memento-triage.py",
+    "almanac-triage.py",
     "vault-briefing.py",
     "vault-recall.py",
     "vault-tool-context.py",
 }
-MEMENTO_SERVER_NAME = "memento-vault"
+ALMANAC_SERVER_NAME = "almanac"
+LEGACY_SERVER_NAME = "memento-vault"
 
 
 # --- Manifest operations ---
@@ -107,14 +109,14 @@ def _command_uses_owned_hook(command, hooks_dir):
         return False
     return any(
         re.search(r"(?:^|[\s'\"])(?:python3\s+)?" + re.escape(hooks_dir + script) + r"(?:$|[\s'\"])", command)
-        for script in MEMENTO_HOOK_SCRIPTS
+        for script in OWNED_HOOK_SCRIPTS
     )
 
 
 def _extract_owned_python_invocation(command, hooks_dir):
     if not isinstance(command, str):
         return ""
-    scripts = "|".join(re.escape(script) for script in sorted(MEMENTO_HOOK_SCRIPTS))
+    scripts = "|".join(re.escape(script) for script in sorted(OWNED_HOOK_SCRIPTS))
     match = re.search(r"(python3\s+" + re.escape(hooks_dir) + r"(?:" + scripts + r").*)", command)
     return match.group(1) if match else ""
 
@@ -128,14 +130,14 @@ def mcp_config(remote_mode, claude_dir, remote_url, api_key):
         url = remote_url.rstrip("/")
         if not url.endswith("/mcp"):
             url += "/mcp"
-        entry = {"memento-vault": {"type": "http", "url": url}}
+        entry = {ALMANAC_SERVER_NAME: {"type": "http", "url": url}}
         if api_key:
-            entry["memento-vault"]["headers"] = {"Authorization": f"Bearer {api_key}"}
+            entry[ALMANAC_SERVER_NAME]["headers"] = {"Authorization": f"Bearer {api_key}"}
     else:
         entry = {
-            "memento-vault": {
+            ALMANAC_SERVER_NAME: {
                 "command": "python3",
-                "args": ["-m", "memento"],
+                "args": ["-m", "almanac"],
                 "env": {"PYTHONPATH": claude_dir + "/hooks"},
             }
         }
@@ -163,9 +165,9 @@ def mcp_config(remote_mode, claude_dir, remote_url, api_key):
 
 def remote_env(env_file_path, remote_url, api_key):
     """Write the remote environment file (key=value format)."""
-    env = {"MEMENTO_VAULT_URL": remote_url}
+    env = {"ALMANAC_VAULT_URL": remote_url}
     if api_key:
-        env["MEMENTO_API_KEY"] = api_key
+        env["ALMANAC_API_KEY"] = api_key
     lines = [f"{k}={json.dumps(v)}" for k, v in env.items()]
     with open(env_file_path, "w") as f:
         f.write("\n".join(lines) + "\n")
@@ -189,7 +191,7 @@ def merge_settings(settings_path, claude_dir, vault_path, experimental, hook_env
             "hooks": [
                 {
                     "type": "command",
-                    "command": prefix + "python3 " + hooks_dir + "memento-triage.py",
+                    "command": prefix + "python3 " + hooks_dir + "almanac-triage.py",
                     "timeout": 30,
                     "async": True,
                 }
@@ -233,6 +235,26 @@ def merge_settings(settings_path, claude_dir, vault_path, experimental, hook_env
     cfg = _load_json_object_or_fresh(settings_path, "settings.json")
 
     hooks = cfg.setdefault("hooks", {})
+
+    # An upgrade must replace the old SessionEnd command; running both would
+    # capture every session twice. Leave other legacy hooks alone until their
+    # same-named Almanac replacements have been written.
+    if "SessionEnd" in hooks and isinstance(hooks["SessionEnd"], list):
+        updated = []
+        for entry in hooks["SessionEnd"]:
+            if not isinstance(entry, dict):
+                updated.append(entry)
+                continue
+            commands = entry.get("hooks", [entry])
+            if not isinstance(commands, list):
+                updated.append(entry)
+                continue
+            kept = [hook for hook in commands if "memento-triage.py" not in hook.get("command", "")]
+            if kept:
+                replacement = dict(entry)
+                replacement["hooks"] = kept
+                updated.append(replacement)
+        hooks["SessionEnd"] = updated
 
     # Inject missing hooks
     added = []
@@ -288,7 +310,7 @@ def merge_settings(settings_path, claude_dir, vault_path, experimental, hook_env
 
 
 def uninstall_settings(settings_path, claude_dir, vault_path):
-    """Remove memento-owned hooks and permissions from Claude settings.json."""
+    """Remove Almanac-owned hooks and permissions from Claude settings.json."""
     if not os.path.exists(settings_path):
         print("settings.json not found; nothing to update")
         return
@@ -349,25 +371,27 @@ def uninstall_settings(settings_path, claude_dir, vault_path):
     with os.fdopen(fd, "w") as f:
         json.dump(cfg, f, indent=2)
     os.replace(tmp, settings_path)
-    print(f"Removed {removed_hooks} memento hook(s) and {removed_perms} permission rule(s) from settings.json")
+    print(f"Removed {removed_hooks} Almanac hook(s) and {removed_perms} permission rule(s) from settings.json")
 
 
 def uninstall_mcp_config(claude_dir):
-    """Remove only the memento-vault entry from generic MCP config."""
+    """Remove Almanac and legacy entries from generic MCP config."""
     config_path = os.path.join(claude_dir, "mcp-servers.json")
     if not os.path.exists(config_path):
         print("mcp-servers.json not found; nothing to update")
         return
     cfg = _load_json_object_or_fresh(config_path, "mcp-servers.json")
-    if MEMENTO_SERVER_NAME in cfg:
-        del cfg[MEMENTO_SERVER_NAME]
+    owned = [name for name in (ALMANAC_SERVER_NAME, LEGACY_SERVER_NAME) if name in cfg]
+    if owned:
+        for name in owned:
+            del cfg[name]
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(config_path), suffix=".json")
         with os.fdopen(fd, "w") as f:
             json.dump(cfg, f, indent=2)
         os.replace(tmp, config_path)
-        print("Removed memento-vault from mcp-servers.json")
+        print("Removed Almanac MCP entries from mcp-servers.json")
     else:
-        print("memento-vault not present in mcp-servers.json")
+        print("Almanac MCP entries not present in mcp-servers.json")
 
 
 # --- MCP URL helper (for bash to capture) ---

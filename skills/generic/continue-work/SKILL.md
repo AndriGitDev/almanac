@@ -23,8 +23,8 @@ Recover context quickly, starting with local state and using the vault only when
    - Uncommitted changes
    - Pending items
 
-3. Search Memento only when local context is thin or the user asks about prior history:
-   - Prefer `memento_search` if available.
+3. Search Almanac only when local context is thin or the user asks about prior history:
+   - Prefer `almanac_search` if available.
    - Fall back to QMD or grep over the configured vault.
 
 4. Ask the user what to resume before making changes.

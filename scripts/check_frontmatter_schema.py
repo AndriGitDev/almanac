@@ -22,13 +22,13 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 DOC_PATH = REPO_ROOT / "docs" / "frontmatter-schema.md"
-INCEPTION_HOOK_PATH = REPO_ROOT / "hooks" / "memento-inception.py"
+INCEPTION_HOOK_PATH = REPO_ROOT / "hooks" / "almanac-inception.py"
 WRITER_SOURCE_PATHS = (
-    REPO_ROOT / "memento" / "store.py",
-    REPO_ROOT / "memento" / "mcp_server.py",
-    REPO_ROOT / "memento" / "pi_bridge.py",
-    REPO_ROOT / "memento" / "smart_store.py",
-    REPO_ROOT / "hooks" / "memento-triage.py",
+    REPO_ROOT / "almanac" / "store.py",
+    REPO_ROOT / "almanac" / "mcp_server.py",
+    REPO_ROOT / "almanac" / "pi_bridge.py",
+    REPO_ROOT / "almanac" / "smart_store.py",
+    REPO_ROOT / "hooks" / "almanac-triage.py",
 )
 
 # Current compatibility/documentation-only source values. These are accepted in
@@ -93,7 +93,7 @@ def _frontmatter_value(text: str, key: str) -> str | None:
 
 
 def _write_note_fixture(vault: Path, *, note_type: str = "discovery", source: str = "session") -> str:
-    from memento.store import write_note
+    from almanac.store import write_note
 
     path = write_note(
         vault,
@@ -106,21 +106,21 @@ def _write_note_fixture(vault: Path, *, note_type: str = "discovery", source: st
         origin=f"fixture:{source}",
         validity_context="schema checker fixture",
         supersedes="[[older-schema-fixture]]",
-        project="/tmp/memento-vault",
+        project="/tmp/almanac-vault",
         branch="schema-checker",
         session_id=f"session-{source}",
-        citations=[{"file": "memento/store.py", "anchor": "def write_note(", "commit": "abc1234"}],
+        citations=[{"file": "almanac/store.py", "anchor": "def write_note(", "commit": "abc1234"}],
     )
     return path.read_text(encoding="utf-8")
 
 
 def _daily_snapshot_fixtures(vault: Path) -> list[str]:
-    from memento.store import write_daily_snapshot
+    from almanac.store import write_daily_snapshot
 
     first = write_daily_snapshot(
         vault,
         date="2026-06-29",
-        repo_slug="memento-vault",
+        repo_slug="almanac-vault",
         content="Daily fixture body.",
     )
     if "error" in first:
@@ -128,7 +128,7 @@ def _daily_snapshot_fixtures(vault: Path) -> list[str]:
     second = write_daily_snapshot(
         vault,
         date="2026-06-29",
-        repo_slug="memento-vault",
+        repo_slug="almanac-vault",
         content="Daily supersede fixture body.",
         supersede=True,
     )
@@ -261,7 +261,7 @@ def expected_schema() -> SchemaExpectation:
     if inception_type:
         note_types.add(inception_type)
 
-    from memento.store import _CANONICAL_NOTE_TYPES
+    from almanac.store import _CANONICAL_NOTE_TYPES
 
     note_types.update(_CANONICAL_NOTE_TYPES)
 

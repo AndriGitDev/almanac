@@ -1,13 +1,13 @@
 ---
 name: orra-init
-description: Initialize orra in the current repo. Runs orra_setup, installs all stock directives, and adds vault-bridge when memento-vault is available. Use when Vic says "init orra", "orra setup", "set up orra here", or invokes /orra-init.
+description: Initialize orra in the current repo. Runs orra_setup, installs all stock directives, and adds vault-bridge when almanac is available. Use when Vic says "init orra", "orra setup", "set up orra here", or invokes /orra-init.
 ---
 
 # orra-init
 
-Scaffold orra in the current repo: run setup, install the stock directive set, and wire up memento integration via vault-bridge when memento is live.
+Scaffold orra in the current repo: run setup, install the stock directive set, and wire up almanac integration via vault-bridge when almanac is live.
 
-This skill is shipped by memento-vault as an experimental integration, gated behind `./install.sh --experimental`. It brings two systems together without either becoming a hard dependency of the other: orra continues to work without memento, memento continues to work without orra, and the vault-bridge directive is the only coupling surface.
+This skill is shipped by almanac as an experimental integration, gated behind `./install.sh --experimental`. It brings two systems together without either becoming a hard dependency of the other: orra continues to work without almanac, almanac continues to work without orra, and the vault-bridge directive is the only coupling surface.
 
 ## When to use
 
@@ -21,26 +21,26 @@ Orra requires a git repo. Run `git rev-parse --git-dir` from the current working
 
 ## Steps
 
-1. **Load deferred tools if needed.** If `orra_setup`, `orra_directive`, and `memento_status` are not already loaded, load them in one batch:
+1. **Load deferred tools if needed.** If `orra_setup`, `orra_directive`, and `almanac_status` are not already loaded, load them in one batch:
 
    ```
-   ToolSearch("select:mcp__orra__orra_setup,mcp__orra__orra_directive,mcp__memento-vault__memento_status")
+   ToolSearch("select:mcp__orra__orra_setup,mcp__orra__orra_directive,mcp__almanac__almanac_status")
    ```
 
 2. **Run `orra_setup`.** Creates `.orra/config.json`, installs the orchestrator persona to `.claude/agents/orchestrator.md`, adds `.orra/` to `.gitignore`, scaffolds `.orra/memory/`. Idempotent; safe on repos that already have `.orra/`.
 
 3. **Install all stock directives.** Call `orra_directive({action: "install-all"})`. Existing customized directives are preserved (the tool skips them explicitly).
 
-4. **Check memento availability.** Call `memento_status`. A healthy response (returns `vault_exists: true` or a positive `note_count`) means memento is live. Error or unhealthy response means memento is not set up; skip vault-bridge silently, that's a supported configuration.
+4. **Check almanac availability.** Call `almanac_status`. A healthy response (returns `vault_exists: true` or a positive `note_count`) means almanac is live. Error or unhealthy response means almanac is not set up; skip vault-bridge silently, that's a supported configuration.
 
-5. **Install vault-bridge (if memento is live).**
+5. **Install vault-bridge (if almanac is live).**
    - If `.orra/directives/vault-bridge.md` already exists: leave it alone and note that the user has a local copy (possibly customized).
    - If it does not exist: copy the template.
      ```bash
      cp ~/.claude/skills/orra-init/templates/vault-bridge.md .orra/directives/vault-bridge.md
      ```
 
-6. **Patch anchor lines into the four memory-using directives (if vault-bridge is installed).** This step is what actually lets vault-bridge intercept memory operations; without it, stock directives write to `.orra/memory/` and ignore memento. Orra's `install-all` pulls stock templates from the npm package that have no anchor, so the patch must be re-applied every time fresh directives land.
+6. **Patch anchor lines into the four memory-using directives (if vault-bridge is installed).** This step is what actually lets vault-bridge intercept memory operations; without it, stock directives write to `.orra/memory/` and ignore almanac. Orra's `install-all` pulls stock templates from the npm package that have no anchor, so the patch must be re-applied every time fresh directives land.
 
    The exact anchor text to insert (copy verbatim):
 
@@ -58,14 +58,14 @@ Orra requires a git repo. Run `git rev-parse --git-dir` from the current working
 7. **Report.** One-screen summary:
    - Orra scaffolded at `.orra/` (or "already present, no-op")
    - N directives installed, M skipped
-   - Vault-bridge: installed | already present | skipped (memento unavailable)
-   - Memento status: note count, project count, fleeting count (if healthy)
+   - Vault-bridge: installed | already present | skipped (almanac unavailable)
+   - Almanac status: note count, project count, fleeting count (if healthy)
    - Next step: `claude --agent orchestrator` to start an orchestrator session in this repo
 
 ## Rules
 
 - Never overwrite `.orra/directives/*.md` files that already exist. Both `orra_directive install-all` and the vault-bridge copy respect local customizations.
-- If memento is unavailable, that is a normal outcome, not an error. The user may be in a repo where they intentionally want orra without memento coupling.
+- If almanac is unavailable, that is a normal outcome, not an error. The user may be in a repo where they intentionally want orra without almanac coupling.
 - Do not run `orra_setup` outside a git repo. The tool will error with `fatal: not a git repository`. Preflight catches this.
 - The only modification to stock directives is the Step 6 anchor-line patch for the four memory-using directives, and only when vault-bridge is installed. Do not make other edits to stock directives. If orra's package ships updated templates via `install-all`, re-running `/orra-init` is the path to re-apply the anchor.
 

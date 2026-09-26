@@ -1,0 +1,1444 @@
+#!/usr/bin/env python3
+"""
+Almanac triage — runs on SessionEnd.
+Reads hook input from stdin, parses the transcript, scores the session,
+writes a fleeting note or spawns the almanac agent.
+"""
+
+import json
+import sys
+import os
+import re
+import subprocess
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+# Shared utilities
+_repo_root = Path(__file__).parent.parent
+sys.path.insert(0, str(_repo_root))
+sys.path.insert(0, str(Path(__file__).parent))
+from almanac.config import detect_project, get_config, get_vault  # noqa: E402
+from almanac.llm import in_llm_subprocess, llm_complete  # noqa: E402
+from almanac.smart_store import write_smart_store_note  # noqa: E402
+from almanac.store import (  # noqa: E402
+    acquire_vault_write_lock,
+    append_project_session_line,
+    load_inception_state,
+    log_retrieval,
+    log_triage_health,
+    release_vault_write_lock,
+)
+from almanac.adapters import parse_transcript, render_transcript_text, truncate_transcript  # noqa: E402
+from almanac.utils import normalize_note_tags, read_hook_input, sanitize_secrets  # noqa: E402
+from almanac import sync_ledger  # noqa: E402
+
+
+# --- Substantiality scoring ---
+
+
+# Keywords that signal a high-value session even with few exchanges
+_INSIGHT_KEYWORDS = re.compile(
+    r"\b(bug|fix|broke|error|issue|debug|crash|regression|root cause|why does|how to)\b",
+    re.IGNORECASE,
+)
+
+LOCAL_EXTRACTION_RETRY_KIND = "local-extraction"
+LOCAL_EXTRACTION_RETRY_MAX_ATTEMPTS = 3
+LOCAL_EXTRACTION_RETRY_SESSION_LIMIT = 1
+
+
+def is_substantial(meta):
+    """Score whether a session is substantial or trivial."""
+    config = get_config()
+
+    if meta["exchange_count"] > config["exchange_threshold"]:
+        return True
+    if len(meta["files_edited"]) > config["file_count_threshold"]:
+        return True
+
+    notable_patterns = config["notable_patterns"]
+    for f in meta["files_edited"]:
+        for pattern in notable_patterns:
+            if pattern in f:
+                return True
+
+    # Short but meaty: keyword match in first prompt + at least 5 exchanges
+    if meta["exchange_count"] >= 5 and meta.get("first_prompt"):
+        if _INSIGHT_KEYWORDS.search(meta["first_prompt"]):
+            return True
+
+    # Read-heavy investigation sessions (deep dives)
+    if len(meta.get("files_read", [])) >= 6:
+        return True
+
+    return False
+
+
+def _pi_triage_health(action, meta=None, hook_input=None, transcript_path=None, **kwargs):
+    """Mirror Pi-specific triage health into the pi-bridge health stream."""
+    meta = meta or {}
+    hook_input = hook_input or {}
+    agent = meta.get("agent") or hook_input.get("agent") or os.environ.get("ALMANAC_AGENT")
+    if agent != "pi":
+        return
+    payload = {
+        "operation": "triage",
+        "backend": "almanac-triage.py",
+        "agent": "pi",
+        "session_id": kwargs.pop("session_id", None)
+        or meta.get("session_id")
+        or hook_input.get("session_id")
+        or "unknown",
+        "cwd": kwargs.pop("cwd", None) or meta.get("cwd") or hook_input.get("cwd") or "",
+        "transcript_path": str(transcript_path or hook_input.get("transcript_path") or ""),
+        "source_event": hook_input.get("source_event"),
+        "reason": hook_input.get("reason"),
+    }
+    payload.update({key: value for key, value in kwargs.items() if value is not None})
+    log_triage_health(f"pi_{action}", hook="pi-bridge", **payload)
+
+
+def has_new_insight(meta):
+    """Delta-check: query QMD for existing coverage of this session's topics.
+    Returns True if the session likely contains new information not already
+    in the vault. Falls back to True if QMD is unavailable."""
+    import shutil
+
+    if not shutil.which("qmd"):
+        return True
+
+    config = get_config()
+
+    # Build a search query from the session's key signals
+    query_parts = []
+    if meta["first_prompt"]:
+        query_parts.append(meta["first_prompt"][:120])
+    if meta["git_branch"] and meta["git_branch"] != "HEAD":
+        branch_words = re.sub(r"[^a-z0-9]", " ", meta["git_branch"].lower()).strip()
+        if branch_words:
+            query_parts.append(branch_words)
+
+    if not query_parts:
+        return True
+
+    query = " ".join(query_parts)
+
+    try:
+        result = subprocess.run(
+            ["qmd", "search", query, "-c", config["qmd_collection"], "-n", "5"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return True
+
+        lines = result.stdout.strip().splitlines()
+        hit_count = sum(1 for line in lines if line.strip() and not line.startswith("#"))
+
+        # Also check extra collections for broader coverage
+        for extra in config.get("extra_qmd_collections", []):
+            try:
+                extra_result = subprocess.run(
+                    ["qmd", "search", query, "-c", extra, "-n", "3"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if extra_result.returncode == 0:
+                    extra_lines = extra_result.stdout.strip().splitlines()
+                    hit_count += sum(1 for line in extra_lines if line.strip() and not line.startswith("#"))
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+
+        if hit_count < 3:
+            return True
+
+        # Even with good coverage, new files mean new work
+        if len(meta["files_edited"]) > 0:
+            vault_path = get_config()["vault_path"]
+            non_vault = [f for f in meta["files_edited"] if vault_path not in f]
+            if non_vault:
+                return True
+
+        return False
+
+    except subprocess.TimeoutExpired:
+        return True
+    except Exception as exc:
+        log_retrieval("triage", "has_new_insight_failed", error=str(exc))
+        return True
+
+
+# --- Helpers ---
+
+
+def ensure_project_index(project_slug, cwd, git_branch):
+    """Create or return path to project index file."""
+    project_file = get_vault() / "projects" / f"{project_slug}.md"
+    if not project_file.exists():
+        lines = [
+            "---",
+            f"title: {project_slug}",
+            f"project: {cwd or 'unknown'}",
+        ]
+        if git_branch and git_branch != "HEAD":
+            lines.append(f"branch: {git_branch}")
+        lines.extend(["---", "", "## Notes", "", "## Sessions", ""])
+        project_file.write_text("\n".join(lines))
+    return project_file
+
+
+def append_session_to_project(project_file, session_id, summary, ticket=None):
+    """Append a session line to the project index."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    line = f"- {today} `{session_id}` — {summary}\n"
+    content = project_file.read_text()
+
+    if ticket:
+        ticket_header = f"## {ticket}:"
+        if ticket_header in content:
+            idx = content.index(ticket_header)
+            next_section = content.find("\n## ", idx + len(ticket_header))
+            if next_section == -1:
+                content = content.rstrip("\n") + "\n" + line
+            else:
+                content = content[:next_section].rstrip("\n") + "\n" + line + "\n" + content[next_section:]
+        else:
+            content = content.rstrip("\n") + f"\n\n## {ticket}\n\n" + line
+    else:
+        content = append_project_session_line(content, line)
+
+    project_file.write_text(content)
+
+
+def write_fleeting(session_id, meta, project_slug):
+    """Append a one-liner session ledger entry to today's fleeting note.
+
+    Sessions are written under a ## Sessions header so structured content
+    from other systems (e.g. orra's vault-bridge) can coexist above it.
+    """
+    vault = get_vault()
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now = datetime.now(timezone.utc).strftime("%H:%M")
+    fleeting_file = vault / "fleeting" / f"{today}.md"
+
+    if not fleeting_file.exists():
+        fleeting_file.write_text(f"# {today}\n\n## Sessions\n\n")
+    elif "## Sessions" not in fleeting_file.read_text():
+        with open(fleeting_file, "a") as f:
+            f.write("\n## Sessions\n\n")
+
+    branch_str = ""
+    if meta["git_branch"] and meta["git_branch"] != "HEAD":
+        branch_str = f" ({meta['git_branch']})"
+
+    files_str = ""
+    if meta["files_edited"]:
+        files_str = f", {len(meta['files_edited'])} files edited"
+
+    prompt_str = ""
+    if meta["first_prompt"]:
+        prompt_str = meta["first_prompt"][:100]
+        if len(meta["first_prompt"]) > 100:
+            prompt_str += "..."
+
+    line = f"- {now} `{session_id}` {meta['cwd'] or '?'}{branch_str} — {meta['exchange_count']} exchanges{files_str}"
+    if prompt_str:
+        line += f" — {prompt_str}"
+    if meta.get("last_outcome"):
+        line += f" → {meta['last_outcome']}"
+    line += "\n"
+
+    with open(fleeting_file, "a") as f:
+        f.write(line)
+
+
+def build_session_summary(meta):
+    """Build a short summary string for the project index."""
+    parts = []
+    if meta["first_prompt"]:
+        parts.append(meta["first_prompt"][:80])
+    else:
+        parts.append(f"{meta['exchange_count']} exchanges")
+    if meta["files_edited"]:
+        parts.append(f"{len(meta['files_edited'])} files")
+    return ", ".join(parts)
+
+
+# --- Vault operations ---
+
+
+VAULT_COMMIT = Path(__file__).parent / "vault-commit.sh"
+
+
+def normalize_all_notes():
+    """Normalize tags on all notes in the vault. Safe to call multiple times."""
+    vault = get_vault()
+    notes_dir = vault / "notes"
+    if not notes_dir.exists():
+        return
+    for note_path in notes_dir.glob("*.md"):
+        normalize_note_tags(note_path)
+
+
+def vault_commit(message="auto: vault update", delay_seconds=0, sentinel=None):
+    """Commit all vault changes. Runs detached.
+
+    If sentinel is provided, waits for that file to appear (agent completion)
+    before normalizing tags and committing. Falls back to delay_seconds as a
+    hard timeout if the sentinel never appears.
+    """
+    commit_script = str(VAULT_COMMIT)
+    if not VAULT_COMMIT.exists():
+        # Fall back to looking in the install location
+        commit_script = str(Path.home() / ".claude" / "hooks" / "vault-commit.sh")
+
+    if sentinel:
+        # Wait for agent completion, then normalize and commit
+        hooks_dir = str(Path(__file__).parent)
+        max_wait = max(delay_seconds, 120)
+        subprocess.Popen(
+            [
+                sys.executable,
+                str(Path(__file__).parent / "wait-and-commit.py"),
+                str(sentinel),
+                str(max_wait),
+                hooks_dir,
+                commit_script,
+                message,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    else:
+        # Pass arguments via sys.argv to avoid shell injection from message/path content
+        subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import subprocess,time,sys; time.sleep(int(sys.argv[1])); subprocess.run([sys.argv[2], sys.argv[3]], capture_output=True)",
+                str(delay_seconds),
+                commit_script,
+                message,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+
+def reindex_qmd(delay_seconds=0):
+    """Reindex the almanac collection in QMD. Runs detached. No-op if QMD is not installed."""
+    import shutil
+
+    if not shutil.which("qmd"):
+        return
+
+    config = get_config()
+    collection = config["qmd_collection"]
+
+    # Pass collection name via sys.argv to avoid injection
+    subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import subprocess,time,shutil,sys; time.sleep(int(sys.argv[1])); qmd=shutil.which('qmd');"
+            " qmd and subprocess.run([qmd,'update','-c',sys.argv[2]], capture_output=True);"
+            " qmd and subprocess.run([qmd,'embed'], capture_output=True)",
+            str(delay_seconds),
+            collection,
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def _session_token(session_id, max_chars=32):
+    """Return a filesystem-safe short token for session-derived paths/logs."""
+    token = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(session_id or "unknown"))[:max_chars]
+    return token.strip("._-") or "unknown"
+
+
+def _sentinel_path(session_id):
+    """Return the sentinel path for a session's note-writing run."""
+    vault = get_vault()
+    return vault / ".agent-done" / f"{_session_token(session_id, 16)}.done"
+
+
+def _parse_structured_notes_response(raw):
+    """Parse structured note output from the LLM into a list of note dicts."""
+    if not raw:
+        return []
+
+    stripped = raw.strip()
+    if stripped.startswith("```"):
+        lines = stripped.split("\n")
+        if lines[-1].strip() == "```":
+            lines = lines[1:-1]
+        else:
+            lines = lines[1:]
+        stripped = "\n".join(lines)
+
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError:
+        return []
+
+    if isinstance(data, dict):
+        data = data.get("notes", [])
+
+    if not isinstance(data, list):
+        return []
+
+    return [item for item in data if isinstance(item, dict) and item.get("title") and item.get("body")]
+
+
+TRIAGE_NOTES_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "notes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "body": {"type": "string"},
+                    "type": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "certainty": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "validity_context": {"type": "string"},
+                    "supersedes": {"type": "string"},
+                    "citations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "file": {"type": "string"},
+                                "anchor": {"type": "string"},
+                                "commit": {"type": "string"},
+                            },
+                            "required": ["file", "anchor"],
+                        },
+                    },
+                },
+                "required": ["title", "body", "type", "tags", "certainty"],
+            },
+        }
+    },
+    "required": ["notes"],
+}
+
+
+def _existing_note_titles(vault):
+    titles = []
+    notes_dir = vault / "notes"
+    if notes_dir.exists():
+        for note_path in notes_dir.glob("*.md"):
+            titles.append(note_path.stem)
+    return titles
+
+
+def _build_structured_notes_prompt(session_id, transcript_text, meta, project_slug, existing_titles):
+    return (
+        "Read this session transcript and return JSON only.\n"
+        'Return either a JSON array of notes or {"notes": [...]}.\n'
+        "Each note must include: title, body, type, tags, certainty.\n"
+        "certainty must be an integer from 1 to 5, not a word such as confirmed.\n"
+        "Optional fields: validity_context, supersedes, citations.\n"
+        "When a note asserts something about specific code you saw in the transcript, "
+        "add citations: a list of {file, anchor} objects, where file is the repo-relative "
+        "path you saw and anchor is a short, verbatim, distinctive line from that file "
+        "(under 120 characters) that would let someone verify the claim still holds. "
+        "commit is an optional short git sha for provenance only. Omit citations entirely "
+        "when the note isn't about specific code.\n"
+        "Do not include any prose outside JSON.\n\n"
+        f"Session ID: {session_id}\n"
+        f"Project slug: {project_slug}\n"
+        f"CWD: {meta.get('cwd')}\n"
+        f"Branch: {meta.get('git_branch')}\n"
+        f"Edited files: {json.dumps(meta.get('files_edited', []))}\n"
+        f"Existing notes: {json.dumps(existing_titles[:100])}\n\n"
+        "Transcript:\n"
+        f"{transcript_text}"
+    )
+
+
+def _llm_telemetry(result):
+    return {
+        "backend": result.backend,
+        "model": result.model,
+        "prompt_bytes": result.prompt_bytes,
+        "output_bytes": result.output_bytes,
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+        "duration_ms": result.duration_ms,
+    }
+
+
+def _note_already_written(vault, title, session_id):
+    """Return True if this session/title pair already has a note.
+
+    Retry paths can rerun after a partial write or after an operator manually
+    reprocessed a spooled extraction. Store-level slug collision protection
+    prevents overwrites but would otherwise create duplicate `-2` notes, so
+    triage does a lightweight frontmatter check before writing.
+    """
+    notes_dir = vault / "notes"
+    if not notes_dir.exists():
+        return False
+    session_line = f"session_id: {session_id}"
+    for note_path in notes_dir.glob("*.md"):
+        try:
+            head = note_path.read_text(encoding="utf-8", errors="replace").split("---", 2)[1]
+        except (OSError, IndexError):
+            continue
+        title_match = re.search(r"^title:\s*(.+)$", head, re.MULTILINE)
+        stored_title = title_match.group(1).strip().strip("\"'") if title_match else ""
+        if session_line in head and stored_title == str(title):
+            return True
+    return False
+
+
+def _write_structured_notes(notes, vault, session_id, meta, project_slug, llm_telemetry, transcript_path=None):
+    if not acquire_vault_write_lock():
+        log_retrieval(
+            "triage",
+            "structured_notes_lock_timeout",
+            session_id=session_id,
+            project=project_slug,
+        )
+        log_triage_health(
+            "structured_notes_lock_timeout",
+            session_id=session_id,
+            project=project_slug,
+        )
+        _pi_triage_health(
+            "structured_notes_lock_timeout",
+            meta=meta,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            project=project_slug,
+        )
+        return 0
+    try:
+        written = 0
+        skipped_duplicates = 0
+        for note in notes:
+            if _note_already_written(vault, note["title"], session_id):
+                skipped_duplicates += 1
+                continue
+            result = write_smart_store_note(
+                title=note["title"],
+                body=sanitize_secrets(note["body"]),
+                note_type=note.get("type", "discovery"),
+                tags=note.get("tags", []),
+                certainty=note.get("certainty"),
+                project=meta.get("cwd"),
+                branch=meta.get("git_branch"),
+                session_id=session_id,
+                validity_context=note.get("validity_context") or note.get("validity-context"),
+                supersedes=note.get("supersedes"),
+                origin=f"claude_triage:{meta.get('agent') or 'claude'}",
+                source="session",
+                citations=note.get("citations"),
+            )
+            if result.get("decision") in ("created", "merged_into"):
+                written += 1
+            elif result.get("decision") == "already_covered":
+                skipped_duplicates += 1
+        log_triage_health(
+            "structured_notes_written",
+            session_id=session_id,
+            project=project_slug,
+            notes_written=written,
+            skipped_duplicates=skipped_duplicates,
+            **llm_telemetry,
+        )
+        _pi_triage_health(
+            "structured_notes_written",
+            meta=meta,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            project=project_slug,
+            notes_written=written,
+            skipped_duplicates=skipped_duplicates,
+            **llm_telemetry,
+        )
+        return written
+    finally:
+        release_vault_write_lock()
+
+
+def _local_extraction_source(session_id):
+    return f"session:{session_id}"
+
+
+def _local_extraction_retry_max_attempts():
+    try:
+        return max(1, int(get_config().get("local_extraction_retry_max_attempts", LOCAL_EXTRACTION_RETRY_MAX_ATTEMPTS)))
+    except (TypeError, ValueError):
+        return LOCAL_EXTRACTION_RETRY_MAX_ATTEMPTS
+
+
+def _spool_local_extraction_failure(
+    vault,
+    session_id,
+    transcript_path,
+    transcript_text,
+    meta,
+    project_slug,
+    *,
+    error,
+    rendered_chars,
+    transcript_truncated,
+    llm_telemetry,
+):
+    """Persist enough local LLM extraction context for a future retry."""
+    source = _local_extraction_source(session_id)
+    envelope = {
+        "version": 1,
+        "operation": "structured_notes",
+        "session_id": session_id,
+        "transcript_path": str(transcript_path),
+        "transcript_text": transcript_text,
+        "meta": meta,
+        "project_slug": project_slug,
+        "agent": meta.get("agent") or "unknown",
+        "failure": {
+            "error": str(error),
+            "rendered_chars": rendered_chars,
+            "transcript_truncated": transcript_truncated,
+            "llm": llm_telemetry,
+        },
+        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    payload = json.dumps(envelope, ensure_ascii=False, sort_keys=True)
+    payload_hash = sync_ledger.content_hash(payload)
+    spool_path = None
+    try:
+        spool_path = str(sync_ledger.spool_payload(vault, LOCAL_EXTRACTION_RETRY_KIND, source, payload))
+    except Exception as exc:
+        print(f"[almanac] local extraction retry spool failed: {exc}", file=sys.stderr)
+    try:
+        sync_ledger.record(
+            vault,
+            LOCAL_EXTRACTION_RETRY_KIND,
+            source,
+            status="error",
+            content_hash=payload_hash,
+            error=str(error),
+            spool_path=spool_path,
+        )
+    except Exception as exc:
+        print(f"[almanac] local extraction retry ledger record failed: {exc}", file=sys.stderr)
+
+
+_LEDGER_ERROR_LIMIT = 500
+
+
+def _recovery_dead_letter_entry(vault, entry, error_msg):
+    """Append a dead-letter entry preserving the original attempt counter.
+
+    During recovery (`force=True`), a failed re-attempt writes a dead-letter
+    entry with the *same* attempt number so the operator can retry again.
+    """
+    from datetime import datetime, timezone
+
+    # Keep error bounded like sync_ledger.record() does.
+    safe_error = str(error_msg)[:_LEDGER_ERROR_LIMIT]
+
+    sync_ledger.append(
+        vault,
+        {
+            "ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "kind": LOCAL_EXTRACTION_RETRY_KIND,
+            "source": entry.get("source") or "",
+            "status": "dead-letter",
+            "attempt": entry.get("attempt", 1),
+            "content_hash": entry.get("content_hash"),
+            "error": safe_error,
+            "spool_path": entry.get("spool_path"),
+        },
+    )
+    # Re-read and return the folded current state for this source.
+    folded = sync_ledger.fold_state(vault)
+    return folded.get((LOCAL_EXTRACTION_RETRY_KIND, entry.get("source") or ""), {})
+
+
+def _retry_local_extraction_entry(vault, entry, *, force=False):
+    source = entry.get("source") or ""
+    max_attempts = _local_extraction_retry_max_attempts()
+    if not force and int(entry.get("attempt") or 0) >= max_attempts:
+        return sync_ledger.record(
+            vault,
+            LOCAL_EXTRACTION_RETRY_KIND,
+            source,
+            status="dead-letter",
+            content_hash=entry.get("content_hash"),
+            error=f"retry attempts exhausted after {entry.get('attempt')} attempt(s)",
+            spool_path=entry.get("spool_path"),
+        )
+
+    raw = sync_ledger.read_spooled(entry.get("spool_path") or "")
+    if raw is None:
+        msg = "spooled payload missing"
+        if force:
+            return _recovery_dead_letter_entry(vault, entry, msg)
+        return sync_ledger.record(
+            vault,
+            LOCAL_EXTRACTION_RETRY_KIND,
+            source,
+            status="dead-letter",
+            content_hash=entry.get("content_hash"),
+            error=msg,
+            spool_path=entry.get("spool_path"),
+        )
+    try:
+        envelope = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        msg = f"spooled payload invalid JSON: {exc}"
+        if force:
+            return _recovery_dead_letter_entry(vault, entry, msg)
+        return sync_ledger.record(
+            vault,
+            LOCAL_EXTRACTION_RETRY_KIND,
+            source,
+            status="dead-letter",
+            content_hash=entry.get("content_hash"),
+            error=msg,
+            spool_path=entry.get("spool_path"),
+        )
+
+    session_id = envelope.get("session_id") or source.removeprefix("session:") or "unknown"
+    project_slug = envelope.get("project_slug") or "unknown"
+    meta = envelope.get("meta") if isinstance(envelope.get("meta"), dict) else {}
+    transcript_text = str(envelope.get("transcript_text") or "")
+    prompt = _build_structured_notes_prompt(
+        session_id, transcript_text, meta, project_slug, _existing_note_titles(vault)
+    )
+    result = llm_complete(
+        prompt,
+        config={
+            "llm_structured_json_schema": TRIAGE_NOTES_JSON_SCHEMA,
+            "llm_structured_json_tool_name": "emit_notes",
+        },
+    )
+    telemetry = _llm_telemetry(result)
+    if not result.ok:
+        error = result.error or "unknown llm error"
+        if force:
+            return _recovery_dead_letter_entry(vault, entry, f"recovery failed: {error}")
+        status = "dead-letter" if int(entry.get("attempt") or 0) + 1 >= max_attempts else "error"
+        return sync_ledger.record(
+            vault,
+            LOCAL_EXTRACTION_RETRY_KIND,
+            source,
+            status=status,
+            content_hash=entry.get("content_hash"),
+            error=error,
+            spool_path=entry.get("spool_path"),
+        )
+
+    notes = _parse_structured_notes_response(result.text)
+    if not notes:
+        msg = "recovery produced no structured notes" if force else "retry produced no structured notes"
+        if force:
+            return _recovery_dead_letter_entry(vault, entry, msg)
+        return sync_ledger.record(
+            vault,
+            LOCAL_EXTRACTION_RETRY_KIND,
+            source,
+            status="dead-letter",
+            content_hash=entry.get("content_hash"),
+            error=msg,
+            spool_path=entry.get("spool_path"),
+        )
+
+    written = _write_structured_notes(
+        notes,
+        vault,
+        session_id,
+        meta,
+        project_slug,
+        telemetry,
+        transcript_path=envelope.get("transcript_path"),
+    )
+    if written == 0 and not all(_note_already_written(vault, note["title"], session_id) for note in notes):
+        msg = "recovery did not write notes" if force else "retry did not write notes"
+        if force:
+            return _recovery_dead_letter_entry(vault, entry, msg)
+        return sync_ledger.record(
+            vault,
+            LOCAL_EXTRACTION_RETRY_KIND,
+            source,
+            status="error",
+            content_hash=entry.get("content_hash"),
+            error=msg,
+            spool_path=entry.get("spool_path"),
+        )
+    return sync_ledger.record(
+        vault,
+        LOCAL_EXTRACTION_RETRY_KIND,
+        source,
+        status="ok",
+        content_hash=entry.get("content_hash"),
+        remote_path=f"local:{written}:notes",
+    )
+
+
+def retry_local_extractions(vault=None, limit=LOCAL_EXTRACTION_RETRY_SESSION_LIMIT):
+    """Retry failed local structured-note extractions from the spool."""
+    vault = vault or get_vault()
+    pending = [
+        entry
+        for entry in sync_ledger.pending_retries(vault)
+        if entry.get("kind") == LOCAL_EXTRACTION_RETRY_KIND and entry.get("status") == "error"
+    ]
+    if limit:
+        pending = pending[: max(0, int(limit))]
+    results = []
+    for entry in pending:
+        results.append(_retry_local_extraction_entry(vault, entry))
+    return results
+
+
+def recover_dead_letter_extractions(vault=None, limit=LOCAL_EXTRACTION_RETRY_SESSION_LIMIT):
+    """Re-attempt dead-lettered local structured-note extractions.
+
+    Unlike ``retry_local_extractions`` this bypasses the max-attempts gate
+    and uses ``force=True`` so dead-lettered entries get one re-attempt per
+    invocation. On failure the attempt counter is NOT advanced, so the
+    operator can run recovery again.
+    """
+    vault = vault or get_vault()
+    dead = [entry for entry in sync_ledger.dead_letters(vault) if entry.get("kind") == LOCAL_EXTRACTION_RETRY_KIND]
+    if limit:
+        dead = dead[: max(0, int(limit))]
+    results = []
+    for entry in dead:
+        results.append(_retry_local_extraction_entry(vault, entry, force=True))
+    return results
+
+
+def process_structured_notes(session_id, transcript_path, meta, project_slug):
+    """Read transcript, call the shared LLM, and write structured notes."""
+    vault = get_vault()
+    log_triage_health("structured_notes_attempt", session_id=session_id, project=project_slug)
+    _pi_triage_health(
+        "structured_notes_attempt",
+        meta=meta,
+        transcript_path=transcript_path,
+        session_id=session_id,
+        project=project_slug,
+    )
+    try:
+        transcript_text = sanitize_secrets(
+            render_transcript_text(
+                transcript_path,
+                agent=meta.get("agent"),
+                session_id=meta.get("opencode_session_id") or meta.get("session_id") or session_id,
+            )
+        )
+    except (OSError, UnicodeDecodeError, ValueError):
+        log_retrieval(
+            "triage",
+            "structured_notes_transcript_unreadable",
+            session_id=session_id,
+            project=project_slug,
+        )
+        log_triage_health(
+            "structured_notes_transcript_unreadable",
+            session_id=session_id,
+            project=project_slug,
+        )
+        _pi_triage_health(
+            "structured_notes_transcript_unreadable",
+            meta=meta,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            project=project_slug,
+        )
+        return 0
+
+    try:
+        max_chars = int(get_config().get("triage_transcript_max_chars", 400_000))
+    except (TypeError, ValueError):
+        max_chars = 400_000
+    rendered_chars = len(transcript_text)
+    transcript_text = truncate_transcript(transcript_text, max_chars)
+    transcript_truncated = len(transcript_text) < rendered_chars
+    if transcript_truncated:
+        log_triage_health(
+            "structured_notes_transcript_truncated",
+            session_id=session_id,
+            project=project_slug,
+            transcript_chars=rendered_chars,
+            prompt_chars=len(transcript_text),
+        )
+        _pi_triage_health(
+            "structured_notes_transcript_truncated",
+            meta=meta,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            project=project_slug,
+            transcript_chars=rendered_chars,
+            prompt_chars=len(transcript_text),
+        )
+
+    prompt = _build_structured_notes_prompt(
+        session_id,
+        transcript_text,
+        meta,
+        project_slug,
+        _existing_note_titles(vault),
+    )
+
+    result = llm_complete(
+        prompt,
+        config={
+            "llm_structured_json_schema": TRIAGE_NOTES_JSON_SCHEMA,
+            "llm_structured_json_tool_name": "emit_notes",
+        },
+    )
+    llm_telemetry = _llm_telemetry(result)
+    if not result.ok:
+        error = result.error or "unknown llm error"
+        log_retrieval(
+            "triage",
+            "structured_notes_llm_failed",
+            session_id=session_id,
+            project=project_slug,
+            error=error,
+        )
+        log_triage_health(
+            "structured_notes_llm_failed",
+            session_id=session_id,
+            project=project_slug,
+            error=error,
+            transcript_chars=rendered_chars,
+            transcript_truncated=transcript_truncated,
+            **llm_telemetry,
+        )
+        _pi_triage_health(
+            "structured_notes_llm_failed",
+            meta=meta,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            project=project_slug,
+            error=error,
+            transcript_chars=rendered_chars,
+            transcript_truncated=transcript_truncated,
+            **llm_telemetry,
+        )
+        _spool_local_extraction_failure(
+            vault,
+            session_id,
+            transcript_path,
+            transcript_text,
+            meta,
+            project_slug,
+            error=error,
+            rendered_chars=rendered_chars,
+            transcript_truncated=transcript_truncated,
+            llm_telemetry=llm_telemetry,
+        )
+        return 0
+
+    notes = _parse_structured_notes_response(result.text)
+    if not notes:
+        log_retrieval(
+            "triage",
+            "structured_notes_parse_empty",
+            session_id=session_id,
+            project=project_slug,
+            raw_preview=result.text[:200] if result.text else "",
+        )
+        log_triage_health(
+            "structured_notes_parse_empty",
+            session_id=session_id,
+            project=project_slug,
+            **llm_telemetry,
+        )
+        _pi_triage_health(
+            "structured_notes_parse_empty",
+            meta=meta,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            project=project_slug,
+            **llm_telemetry,
+        )
+        return 0
+
+    return _write_structured_notes(notes, vault, session_id, meta, project_slug, llm_telemetry, transcript_path)
+
+
+def _run_structured_notes_worker(payload_path, sentinel_path):
+    """Detached worker for structured note extraction."""
+    try:
+        with open(payload_path) as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        payload = None
+        error = str(exc)
+        log_retrieval("triage", "structured_notes_payload_unreadable", error=error)
+        log_triage_health("structured_notes_payload_unreadable", session_id="unknown", error=error)
+    finally:
+        try:
+            os.unlink(payload_path)
+        except OSError:
+            pass
+
+    try:
+        if payload:
+            try:
+                written = process_structured_notes(
+                    payload["session_id"],
+                    payload["transcript_path"],
+                    payload["meta"],
+                    payload["project_slug"],
+                )
+                if written == 0:
+                    log_retrieval(
+                        "triage",
+                        "structured_notes_empty",
+                        session_id=payload["session_id"],
+                        project=payload["project_slug"],
+                    )
+            except Exception as exc:
+                log_retrieval(
+                    "triage",
+                    "structured_notes_failed",
+                    session_id=payload["session_id"],
+                    error=str(exc),
+                    project=payload["project_slug"],
+                )
+                log_triage_health(
+                    "structured_notes_failed",
+                    session_id=payload["session_id"],
+                    error=str(exc),
+                    project=payload["project_slug"],
+                )
+                _pi_triage_health(
+                    "structured_notes_failed",
+                    meta=payload.get("meta") or {},
+                    transcript_path=payload.get("transcript_path"),
+                    session_id=payload["session_id"],
+                    error=str(exc),
+                    project=payload["project_slug"],
+                )
+    finally:
+        sentinel = Path(sentinel_path)
+        sentinel.parent.mkdir(parents=True, exist_ok=True)
+        sentinel.touch()
+
+
+def spawn_almanac_agent(session_id, transcript_path, meta, project_slug):
+    """Spawn a background structured-note worker.
+
+    Returns the sentinel Path that is touched when the process finishes.
+    """
+    vault = get_vault()
+
+    sentinel = _sentinel_path(session_id)
+    sentinel.parent.mkdir(parents=True, exist_ok=True)
+    sentinel.unlink(missing_ok=True)
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", prefix="triage-notes-", dir=vault, delete=False) as tmp:
+        json.dump(
+            {
+                "session_id": session_id,
+                "transcript_path": transcript_path,
+                "meta": meta,
+                "project_slug": project_slug,
+            },
+            tmp,
+        )
+        payload_path = tmp.name
+
+    subprocess.Popen(
+        [sys.executable, __file__, "--structured-notes", payload_path, str(sentinel)],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return sentinel
+
+
+# --- Main ---
+
+
+def _requested_session_id(hook_input):
+    """Return a real hook session id, treating sentinels as absent."""
+    session_id = hook_input.get("session_id")
+    return session_id if session_id and session_id != "unknown" else None
+
+
+def run_remote_triage(hook_input):
+    """Run triage via the remote vault client — sends capture request over HTTP.
+
+    Mirrors local triage semantics:
+    - All sessions with >=2 exchanges get a fleeting entry + project index update
+    - Only substantial sessions also get a permanent atomic note
+
+    The server-side almanac_capture supports fleeting_only=True to write only
+    the fleeting log without creating a permanent note.
+    """
+    from almanac.remote_client import capture as remote_capture
+
+    requested_session_id = _requested_session_id(hook_input)
+    session_id = requested_session_id or "unknown"
+    transcript_path = hook_input.get("transcript_path")
+
+    if not transcript_path or not os.path.exists(transcript_path):
+        return
+
+    try:
+        meta = parse_transcript(transcript_path, session_id=requested_session_id)
+    except Exception:
+        return
+
+    if not requested_session_id:
+        session_id = meta.get("session_id") or Path(transcript_path).stem or "unknown"
+
+    if meta["exchange_count"] < 2:
+        return
+
+    if not meta["cwd"]:
+        meta["cwd"] = hook_input.get("cwd")
+
+    substantial = is_substantial(meta)
+    new_insight = has_new_insight(meta) if substantial else False
+    summary = build_session_summary(meta)
+    agent = meta.get("agent", "unknown")
+    result = remote_capture(
+        session_summary=summary,
+        cwd=meta.get("cwd", ""),
+        branch=meta.get("git_branch", ""),
+        files_edited=meta.get("files_edited", []),
+        session_id=session_id,
+        agent=agent,
+        fleeting_only=not (substantial and new_insight),
+    )
+
+    # Best-effort vault lookup; if this fails, ledger recording is skipped
+    # but the rest of the branch still runs.
+    try:
+        vault = get_vault()
+    except Exception:
+        vault = None
+
+    source = f"session:{session_id}"
+    sanitized_summary = sanitize_secrets(summary)
+    payload_hash = sync_ledger.content_hash(sanitized_summary)
+
+    if isinstance(result, dict) and "error" in result:
+        print(f"[almanac] remote capture failed for session {session_id}: {result['error']}", file=sys.stderr)
+        # Spool BOTH formats:
+        #   1. Legacy markdown spool under vault/spool/remote-failures/ for
+        #      operator inspection (kept for backward compat with older tools).
+        #   2. Structured JSON envelope under .sync/spool/capture/ with the
+        #      full capture args — this is what the retry path replays from,
+        #      so a substantive capture doesn't silently degrade to fleeting.
+        legacy_spool_path = None
+        try:
+            legacy_vault = vault or get_vault()
+            spool_dir = legacy_vault / "spool" / "remote-failures"
+            spool_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+            safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", session_id)[:64]
+            spool_file = spool_dir / f"{ts}-{safe_id}.md"
+            fm = {
+                "session_id": session_id,
+                "branch": str(meta.get("git_branch", "")),
+                "cwd": str(meta.get("cwd", "")),
+                "error": str(result["error"]),
+                "captured": ts,
+            }
+            fm_lines = "\n".join(f"{k}: {json.dumps(v)}" for k, v in fm.items())
+            spool_file.write_text(f"---\n{fm_lines}\n---\n\n{sanitized_summary}\n")
+            legacy_spool_path = str(spool_file)
+            print(f"[almanac] spooled session to {spool_file} for later reconciliation", file=sys.stderr)
+        except Exception as fallback_exc:
+            print(f"[almanac] spool fallback also failed: {fallback_exc}", file=sys.stderr)
+
+        # Build the JSON envelope the retry path will consume. Preserves every
+        # argument the original remote_capture() call used so the replay is
+        # identical to the first attempt.
+        retry_spool_path = None
+        if vault:
+            try:
+                envelope = {
+                    "version": 1,
+                    "session_summary": sanitized_summary,
+                    "cwd": meta.get("cwd", "") or "",
+                    "branch": meta.get("git_branch", "") or "",
+                    "files_edited": list(meta.get("files_edited") or []),
+                    "session_id": session_id,
+                    "agent": agent,
+                    "fleeting_only": not (substantial and new_insight),
+                }
+                retry_spool_path = str(sync_ledger.spool_payload(vault, "capture", source, json.dumps(envelope)))
+            except Exception as exc:
+                print(f"[almanac] retry spool failed: {exc}", file=sys.stderr)
+
+        # Record the failure in the sync ledger so retry tooling can find it.
+        # Prefer the structured envelope; fall back to legacy spool if envelope
+        # write failed.
+        if vault:
+            try:
+                sync_ledger.record(
+                    vault,
+                    "capture",
+                    source,
+                    status="error",
+                    content_hash=payload_hash,
+                    error=str(result["error"]),
+                    spool_path=retry_spool_path or legacy_spool_path,
+                )
+            except Exception as exc:
+                print(f"[almanac] ledger record failed: {exc}", file=sys.stderr)
+    else:
+        # Record success so retry tooling skips this session and idempotency
+        # holds if the same capture is attempted again.
+        if vault:
+            try:
+                sync_ledger.record(
+                    vault,
+                    "capture",
+                    source,
+                    status="ok",
+                    content_hash=payload_hash,
+                    remote_path=(result or {}).get("path") if isinstance(result, dict) else None,
+                )
+            except Exception as exc:
+                print(f"[almanac] ledger record failed: {exc}", file=sys.stderr)
+
+
+def main():
+    # SessionEnd fires for the headless `claude` children almanac spawns for
+    # triage synthesis too. Triaging them would call llm_complete -> spawn
+    # another child -> fire SessionEnd -> recurse (see almanac/llm.py). No-op.
+    if in_llm_subprocess():
+        sys.exit(0)
+
+    try:
+        hook_input = read_hook_input()
+    except Exception as exc:
+        error = str(exc)
+        log_retrieval("triage", "hook_input_failed", error=error)
+        log_triage_health("hook_input_failed", session_id="unknown", error=error)
+        sys.exit(0)
+
+    requested_session_id = _requested_session_id(hook_input)
+    session_id = requested_session_id or "unknown"
+    transcript_path = hook_input.get("transcript_path")
+
+    if not transcript_path or not os.path.exists(transcript_path):
+        log_triage_health("missing_transcript", session_id=session_id)
+        _pi_triage_health(
+            "missing_transcript", hook_input=hook_input, transcript_path=transcript_path, session_id=session_id
+        )
+        sys.exit(0)
+
+    try:
+        meta = parse_transcript(transcript_path, session_id=requested_session_id)
+    except Exception as exc:
+        error = str(exc)
+        log_retrieval("triage", "parse_transcript_failed", error=error, session_id=session_id)
+        log_triage_health("parse_transcript_failed", session_id=session_id, error=error)
+        _pi_triage_health(
+            "parse_transcript_failed",
+            hook_input=hook_input,
+            transcript_path=transcript_path,
+            session_id=session_id,
+            error=error,
+        )
+        sys.exit(0)
+
+    if not requested_session_id:
+        session_id = meta.get("session_id") or Path(transcript_path).stem or "unknown"
+
+    if not meta["cwd"]:
+        meta["cwd"] = hook_input.get("cwd")
+
+    if meta["exchange_count"] < 2:
+        sys.exit(0)
+
+    config = get_config()
+    vault = get_vault()
+
+    # Ensure vault directories exist
+    (vault / "fleeting").mkdir(parents=True, exist_ok=True)
+    (vault / "notes").mkdir(parents=True, exist_ok=True)
+    (vault / "projects").mkdir(parents=True, exist_ok=True)
+    (vault / "archive").mkdir(parents=True, exist_ok=True)
+
+    project_slug, ticket = detect_project(meta["cwd"], meta["git_branch"])
+
+    write_fleeting(session_id, meta, project_slug)
+
+    project_file = ensure_project_index(project_slug, meta["cwd"], meta["git_branch"])
+    summary = build_session_summary(meta)
+    append_session_to_project(project_file, session_id, summary, ticket=ticket)
+
+    if config["auto_commit"]:
+        vault_commit(f"auto: triage session {session_id[:8]}")
+
+    substantial = is_substantial(meta)
+    new_insight = has_new_insight(meta) if substantial else False
+
+    log_retrieval(
+        "triage",
+        "decision",
+        session_id=session_id[:8],
+        project=project_slug,
+        exchanges=meta["exchange_count"],
+        files_edited=len(meta["files_edited"]),
+        substantial=substantial,
+        new_insight=new_insight,
+        agent_spawned=substantial and new_insight,
+    )
+    _pi_triage_health(
+        "decision",
+        meta=meta,
+        hook_input=hook_input,
+        transcript_path=transcript_path,
+        session_id=session_id,
+        project=project_slug,
+        exchanges=meta["exchange_count"],
+        files_edited=len(meta["files_edited"]),
+        substantial=substantial,
+        new_insight=new_insight,
+        agent_spawned=substantial and new_insight,
+    )
+
+    if substantial and new_insight:
+        sentinel = spawn_almanac_agent(session_id, transcript_path, meta, project_slug)
+        delay = config["agent_delay_seconds"]
+        # Backfill certainty on any notes the agent missed
+        backfill_certainty(delay_seconds=delay - 5)
+        if config["auto_commit"]:
+            vault_commit(f"auto: notes from session {session_id[:8]}", delay_seconds=delay, sentinel=sentinel)
+        reindex_qmd(delay_seconds=delay + 5)
+    else:
+        # Always reindex so fleeting notes become searchable
+        reindex_qmd()
+
+    # Inception: background consolidation (gated)
+    if config.get("inception_enabled", False):
+        maybe_trigger_inception(config)
+
+    # Additionally sync to remote vault if configured
+    from almanac.remote_client import is_remote
+
+    if is_remote():
+        try:
+            run_remote_triage(hook_input)
+        except Exception as exc:
+            print(f"[almanac] remote sync failed (local capture succeeded): {exc}", file=sys.stderr)
+
+    try:
+        retry_local_extractions(vault, limit=LOCAL_EXTRACTION_RETRY_SESSION_LIMIT)
+    except Exception as exc:
+        print(f"[almanac] local extraction retry failed: {exc}", file=sys.stderr)
+
+    sys.exit(0)
+
+
+def backfill_certainty(delay_seconds=0):
+    """Scan vault notes for missing certainty and backfill from type/source.
+
+    Runs detached after a delay so the almanac agent has time to write first.
+    """
+    vault = get_vault()
+    backfill_script = str(Path(__file__).parent / "almanac-sweeper.py")
+
+    # Use the sweeper's backfill subcommand if available, otherwise inline
+    if Path(backfill_script).exists():
+        subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import time,subprocess,sys; time.sleep(int(sys.argv[1])); "
+                "subprocess.run([sys.argv[2], sys.argv[3], 'backfill-certainty', sys.argv[4]], capture_output=True)",
+                str(max(delay_seconds, 0)),
+                sys.executable,
+                backfill_script,
+                str(vault / "notes"),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return
+
+    # Inline fallback: scan notes and patch missing certainty
+    notes_dir = str(vault / "notes")
+    subprocess.Popen(
+        [sys.executable, str(Path(__file__).parent / "_backfill_certainty.py"), notes_dir, str(max(delay_seconds, 0))],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def maybe_trigger_inception(config):
+    """Spawn the Inception if enough new notes have accumulated."""
+    state = load_inception_state()
+    vault = Path(config["vault_path"])
+    notes_dir = vault / "notes"
+
+    if not notes_dir.exists():
+        return
+
+    last_run = state.get("last_run_iso")
+    threshold = config.get("inception_threshold", 5)
+
+    if last_run:
+        try:
+            cutoff = datetime.fromisoformat(last_run)
+            new_count = sum(1 for f in notes_dir.glob("*.md") if datetime.fromtimestamp(f.stat().st_mtime) > cutoff)
+        except (ValueError, OSError):
+            new_count = 0
+    else:
+        new_count = len(list(notes_dir.glob("*.md")))
+
+    if new_count < threshold:
+        log_retrieval("inception", "skip", new_notes=new_count, threshold=threshold)
+        return
+
+    inception_script = Path(__file__).parent / "almanac-inception.py"
+    if not inception_script.exists():
+        inception_script = Path.home() / ".claude" / "hooks" / "almanac-inception.py"
+
+    if not inception_script.exists():
+        return
+
+    log_retrieval("inception", "trigger", new_notes=new_count, threshold=threshold, last_run=last_run)
+
+    subprocess.Popen(
+        [sys.executable, str(inception_script)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 4 and sys.argv[1] == "--structured-notes":
+        _run_structured_notes_worker(sys.argv[2], sys.argv[3])
+    elif len(sys.argv) in {2, 3} and sys.argv[1] == "--retry-local-extractions":
+        limit = int(sys.argv[2]) if len(sys.argv) == 3 else 0
+        results = retry_local_extractions(limit=limit)
+        print(json.dumps({"retried": len(results), "results": results}, ensure_ascii=False))
+    elif len(sys.argv) in {2, 3} and sys.argv[1] == "--recover-dead-letters":
+        limit = int(sys.argv[2]) if len(sys.argv) == 3 else 0
+        results = recover_dead_letter_extractions(limit=limit)
+        print(json.dumps({"recovered": len(results), "results": results}, ensure_ascii=False))
+    else:
+        main()

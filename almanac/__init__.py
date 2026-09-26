@@ -1,9 +1,6 @@
-"""Almanac's public Python namespace.
+"""Almanac — persistent knowledge capture for coding agents.
 
-The implementation remains in ``memento`` during the compatibility migration.
-Submodules are exact aliases, so both import paths share caches and state.
+The ``memento`` import remains for compatibility with existing installations.
 """
 
-from memento import __version__
-
-__all__ = ["__version__"]
+__version__ = "5.1.0"

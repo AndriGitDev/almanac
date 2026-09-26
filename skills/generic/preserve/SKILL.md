@@ -17,9 +17,9 @@ Archive artifact bundles intact under `archive/`.
 
 1. Summarize what will be preserved and whether copy or move will be used.
 2. Copy by default. Only move when the user explicitly requests a destructive move.
-3. Prefer the `memento_preserve` MCP tool when available.
+3. Prefer the `almanac_preserve` MCP tool when available.
 4. Preserve into `archive/<slug>/` with the source tree intact.
-5. Write a manifest at `archive/<slug>/.memento/manifest.json` and a lightweight index note at `archive/<slug>/.memento/index.md`.
+5. Write a manifest at `archive/<slug>/.almanac/manifest.json` and a lightweight index note at `archive/<slug>/.almanac/index.md`.
 6. If a project can be detected, update the relevant project index with a link to the bundle index note.
 7. Include original source path, title, description, tags, cwd, branch, and session id when known.
 8. Warn if files look sensitive; do not silently redact the preserved bundle itself.

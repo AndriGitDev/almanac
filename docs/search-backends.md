@@ -6,7 +6,7 @@ The vault auto-detects the best available search backend:
 2. **Embedded** (if onnxruntime + sqlite-vec installed) -- built-in FTS5 + sqlite-vec with nomic-embed-text, RRF hybrid fusion. No external tools needed. Default on remote/Docker deployments.
 3. **Grep** -- substring matching fallback. Always works, no dependencies.
 
-Override with `search_backend: qmd | embedded | grep` in config, or `MEMENTO_SEARCH_BACKEND` env var.
+Override with `search_backend: qmd | embedded | grep` in config, or `ALMANAC_SEARCH_BACKEND` env var.
 
 The embedded backend uses a single `search.db` SQLite file (derived, disposable).
 Markdown files stay the source of truth.
@@ -20,7 +20,7 @@ Without it the concierge agent uses the embedded backend or falls back to grep.
 QMD is required for Tenet and Inception.
 
 ```bash
-qmd search "caching strategy" -c memento
+qmd search "caching strategy" -c almanac
 ```
 
 The concierge agent uses QMD automatically when you ask about past decisions.

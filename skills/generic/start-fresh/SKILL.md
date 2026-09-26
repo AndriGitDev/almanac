@@ -9,7 +9,7 @@ Checkpoint the current session before the user starts a fresh context.
 
 ## Process
 
-1. Capture durable knowledge with the `memento` skill or `memento_capture` MCP tool.
+1. Capture durable knowledge with the `almanac` skill or `almanac_capture` MCP tool.
 2. Detect the current work scope:
    - Prefer git root and branch.
    - If not in git, use the current directory name.

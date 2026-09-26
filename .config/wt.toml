@@ -1,4 +1,4 @@
-# Worktrunk project config for memento-vault.
+# Worktrunk project config for almanac.
 # Keep new worktrees immediately usable for local gates without copying secrets.
 
 [pre-start]

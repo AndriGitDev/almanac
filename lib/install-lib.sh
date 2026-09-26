@@ -32,7 +32,7 @@ warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 error() { echo -e "${RED}[x]${NC} $1"; }
 step()  { echo -e "\n${BOLD}$1${NC}"; }
 skip()  { echo -e "${CYAN}[~]${NC} $1"; }
-can_prompt() { [ "${MEMENTO_NONINTERACTIVE:-}" != "1" ] && [ -t 0 ]; }
+can_prompt() { [ "${ALMANAC_NONINTERACTIVE:-${MEMENTO_NONINTERACTIVE:-}}" != "1" ] && [ -t 0 ]; }
 
 # --- Manifest helpers ---
 
@@ -94,13 +94,11 @@ save_manifest() {
 
 setup_cli() {
     local almanac_src="$SCRIPT_DIR/bin/almanac"
-    local cli_src="$SCRIPT_DIR/bin/memento-vault"
-    local cli_bin_dir="${MEMENTO_CLI_BIN_DIR:-$HOME/.local/bin}"
+    local cli_bin_dir="${ALMANAC_CLI_BIN_DIR:-${MEMENTO_CLI_BIN_DIR:-$HOME/.local/bin}}"
     local almanac_dest="$cli_bin_dir/almanac"
-    local cli_dest="$cli_bin_dir/memento-vault"
 
-    if [ ! -x "$cli_src" ]; then
-        warn "memento-vault CLI not found at $cli_src; skipping CLI install"
+    if [ ! -x "$almanac_src" ]; then
+        warn "Almanac CLI not found at $almanac_src; skipping CLI install"
         return
     fi
 
@@ -116,24 +114,9 @@ setup_cli() {
         fi
     fi
 
-    local existing_cli
-    existing_cli=$(command -v memento-vault 2>/dev/null || true)
-    if [ -n "$existing_cli" ] && [ "$existing_cli" != "$cli_dest" ]; then
-        info "Legacy CLI already available at $existing_cli"
-        return
-    fi
-
-    if [ -e "$cli_dest" ] && [ ! -L "$cli_dest" ]; then
-        warn "CLI already exists at $cli_dest and is not a symlink; leaving it unchanged"
-        return
-    fi
-
-    ln -sfn "$cli_src" "$cli_dest"
-    info "CLI linked to $cli_dest"
-
     case ":$PATH:" in
         *":$cli_bin_dir:"*) ;;
-        *) warn "$cli_bin_dir is not on PATH; use $cli_dest or add it to your shell profile" ;;
+        *) warn "$cli_bin_dir is not on PATH; use $almanac_dest or add it to your shell profile" ;;
     esac
 }
 
@@ -280,7 +263,7 @@ PY
 }
 
 validate_pi_bridge_environment() {
-    local package_dir="${MEMENTO_PKG_DIR:-$CLAUDE_DIR/hooks/memento}"
+    local package_dir="${ALMANAC_PKG_DIR:-$CLAUDE_DIR/hooks/almanac}"
     if ! command -v python3 &>/dev/null; then
         error "python3 is required for Pi bridge integration but was not found."
         exit 1
@@ -293,17 +276,17 @@ validate_pi_bridge_environment() {
     local output rc
     set +e
     output=$(cd / && PYTHONPATH="$CLAUDE_DIR/hooks${PYTHONPATH:+:$PYTHONPATH}" \
-        MEMENTO_VAULT_PATH="$VAULT_PATH" \
-        MEMENTO_SEARCH_BACKEND="${MEMENTO_SEARCH_BACKEND:-grep}" \
-        python3 -m memento.pi_bridge status --cwd "$SCRIPT_DIR" 2>&1)
+        ALMANAC_VAULT_PATH="$VAULT_PATH" \
+        ALMANAC_SEARCH_BACKEND="${ALMANAC_SEARCH_BACKEND:-${MEMENTO_SEARCH_BACKEND:-grep}}" \
+        python3 -m almanac.pi_bridge status --cwd "$SCRIPT_DIR" 2>&1)
     rc=$?
     set -e
     if [ "$rc" -ne 0 ]; then
-        error "Pi bridge validation failed: python3 could not run memento.pi_bridge from $package_dir"
+        error "Pi bridge validation failed: python3 could not run almanac.pi_bridge from $package_dir"
         printf '%s\n' "$output" | sed 's/^/    /'
         exit 1
     fi
-    info "Pi bridge validation: python3 can run memento.pi_bridge"
+    info "Pi bridge validation: python3 can run almanac.pi_bridge"
 }
 
 # --- setup_vault ---
@@ -338,7 +321,7 @@ setup_vault() {
     if [ ! -d "$VAULT_PATH/.git" ]; then
         git -C "$VAULT_PATH" init
         git -C "$VAULT_PATH" add -A
-        git -C "$VAULT_PATH" commit -m "init: bootstrap memento vault" --allow-empty
+        git -C "$VAULT_PATH" commit -m "init: bootstrap almanac vault" --allow-empty
         info "Initialized git repository"
     else
         info "Git repo already initialized"
@@ -387,7 +370,7 @@ setup_vault() {
 
 register_mcp_cli() {
     # Clear stale auth cache (prevents "Skipping connection (cached needs-auth)")
-    python3 "$HELPER" clear-auth-cache "$CLAUDE_DIR" "memento-vault" 2>/dev/null || true
+    python3 "$HELPER" clear-auth-cache "$CLAUDE_DIR" "almanac" 2>/dev/null || true
 
     if [ "$REMOTE_MODE" = true ]; then
         # Wake the remote server before registering (Fly.io suspend/cold start)
@@ -420,12 +403,12 @@ _register_with_claude() {
         if [ "$REMOTE_MODE" = true ]; then
             local mcp_url
             mcp_url=$(python3 "$HELPER" mcp-url "$REMOTE_URL")
-            echo "  claude mcp add -s user --transport http memento-vault $mcp_url \\"
+            echo "  claude mcp add -s user --transport http almanac $mcp_url \\"
             if [ -n "$REMOTE_API_KEY" ]; then
                 echo "    --header \"Authorization: Bearer $REMOTE_API_KEY\""
             fi
         else
-            echo "  claude mcp add memento-vault -s user -e PYTHONPATH=\"$CLAUDE_DIR/hooks\" \\"
+            echo "  claude mcp add almanac -s user -e PYTHONPATH=\"$CLAUDE_DIR/hooks\" \\"
             echo "    -- python3 -m almanac"
         fi
         echo ""
@@ -434,7 +417,7 @@ _register_with_claude() {
 
     # Snapshot existing registration (best effort) so we can show it on failure.
     local prior_config=""
-    prior_config=$(claude mcp get memento-vault 2>/dev/null || true)
+    prior_config=$(claude mcp get almanac 2>/dev/null || true)
 
     # Build the add command as an array so quoting stays sane.
     local add_cmd=()
@@ -442,17 +425,17 @@ _register_with_claude() {
         local mcp_url
         mcp_url=$(python3 "$HELPER" mcp-url "$REMOTE_URL")
         if [ -n "$REMOTE_API_KEY" ]; then
-            add_cmd=(claude mcp add -s user --transport http memento-vault "$mcp_url" \
+            add_cmd=(claude mcp add -s user --transport http almanac "$mcp_url" \
                 --header "Authorization: Bearer $REMOTE_API_KEY")
         else
-            add_cmd=(claude mcp add -s user --transport http memento-vault "$mcp_url")
+            add_cmd=(claude mcp add -s user --transport http almanac "$mcp_url")
         fi
     else
-        add_cmd=(claude mcp add memento-vault -s user -e "PYTHONPATH=$CLAUDE_DIR/hooks" \
+        add_cmd=(claude mcp add almanac -s user -e "PYTHONPATH=$CLAUDE_DIR/hooks" \
             -- python3 -m almanac)
     fi
 
-    claude mcp remove memento-vault -s user 2>/dev/null || true
+    claude mcp remove almanac -s user 2>/dev/null || true
 
     if "${add_cmd[@]}"; then
         info "MCP server registered with Claude Code (scope: user)"
@@ -472,15 +455,15 @@ _register_with_codex() {
             local codex_mcp_url
             codex_mcp_url=$(python3 "$HELPER" mcp-url "$REMOTE_URL")
             if [ -n "$REMOTE_API_KEY" ]; then
-                echo "  export MEMENTO_API_KEY=<stored in $CLAUDE_DIR/memento-remote.env>"
-                echo "  codex mcp add memento-vault \\"
+                echo "  export ALMANAC_API_KEY=<stored in $CLAUDE_DIR/almanac-remote.env>"
+                echo "  codex mcp add almanac \\"
                 echo "    --url $codex_mcp_url \\"
-                echo "    --bearer-token-env-var MEMENTO_API_KEY"
+                echo "    --bearer-token-env-var ALMANAC_API_KEY"
             else
-                echo "  codex mcp add memento-vault --url $codex_mcp_url"
+                echo "  codex mcp add almanac --url $codex_mcp_url"
             fi
         else
-            echo "  codex mcp add memento-vault \\"
+            echo "  codex mcp add almanac \\"
             echo "    --env PYTHONPATH=\"$CLAUDE_DIR/hooks\" \\"
             echo "    -- python3 -m almanac"
         fi
@@ -507,26 +490,26 @@ _register_with_codex() {
     fi
 
     local prior_config=""
-    prior_config=$(codex mcp get memento-vault 2>/dev/null || true)
+    prior_config=$(codex mcp get almanac 2>/dev/null || true)
 
     local add_cmd=()
     if [ "$REMOTE_MODE" = true ]; then
         local codex_mcp_url
         codex_mcp_url=$(python3 "$HELPER" mcp-url "$REMOTE_URL")
         if [ -n "$REMOTE_API_KEY" ]; then
-            add_cmd=(codex mcp add memento-vault \
+            add_cmd=(codex mcp add almanac \
                 --url "$codex_mcp_url" \
-                --bearer-token-env-var MEMENTO_API_KEY)
+                --bearer-token-env-var ALMANAC_API_KEY)
         else
-            add_cmd=(codex mcp add memento-vault --url "$codex_mcp_url")
+            add_cmd=(codex mcp add almanac --url "$codex_mcp_url")
         fi
     else
-        add_cmd=(codex mcp add memento-vault \
+        add_cmd=(codex mcp add almanac \
             --env "PYTHONPATH=$CLAUDE_DIR/hooks" \
             -- python3 -m almanac)
     fi
 
-    codex mcp remove memento-vault 2>/dev/null || true
+    codex mcp remove almanac 2>/dev/null || true
 
     if "${add_cmd[@]}"; then
         info "MCP server registered with Codex"
@@ -548,14 +531,17 @@ setup_qmd() {
     step "Setting up QMD collection..."
 
     local qmd_config="$HOME/.config/qmd/index.yml"
+    local qmd_collection
+    qmd_collection=$(sed -n 's/^qmd_collection:[[:space:]]*//p' "$CONFIG_FILE" | head -1)
+    qmd_collection="${qmd_collection:-almanac}"
     if [ -f "$qmd_config" ]; then
-        if grep -q "memento:" "$qmd_config"; then
-            info "QMD memento collection already configured"
+        if grep -q "^[[:space:]]*$qmd_collection:" "$qmd_config"; then
+            info "QMD $qmd_collection collection already configured"
         else
-            warn "QMD config exists but has no memento collection."
+            warn "QMD config exists but has no $qmd_collection collection."
             echo -e "${DIM}Add this to $qmd_config under collections:${NC}"
             echo ""
-            echo "  memento:"
+            echo "  $qmd_collection:"
             echo "    path: $VAULT_PATH"
             echo '    pattern: "**/*.md"'
             echo "    context:"
@@ -563,7 +549,7 @@ setup_qmd() {
         fi
     else
         mkdir -p "$(dirname "$qmd_config")"
-        sed "s|~/memento|$VAULT_PATH|g" "$SCRIPT_DIR/templates/qmd-collection.yml" > "$qmd_config"
+        sed -e "s|~/almanac|$VAULT_PATH|g" -e "s|almanac:|$qmd_collection:|g" "$SCRIPT_DIR/templates/qmd-collection.yml" > "$qmd_config"
         info "Created QMD config at $qmd_config"
     fi
 
@@ -574,11 +560,11 @@ setup_qmd() {
             echo ""
             read -rp "Run initial QMD indexing now? [Y/n] " index_now || index_now=""
         else
-            info "Non-interactive install: skipping initial QMD indexing (run 'qmd update -c memento && qmd embed' later)."
+            info "Non-interactive install: skipping initial QMD indexing (run 'qmd update -c $qmd_collection && qmd embed' later)."
             index_now="n"
         fi
         if [[ ! "$index_now" =~ ^[Nn] ]]; then
-            qmd update -c memento && qmd embed
+            qmd update -c "$qmd_collection" && qmd embed
             info "QMD index built"
         fi
     fi
@@ -594,8 +580,8 @@ setup_shell_warmup() {
         fish) shell_rc="$HOME/.config/fish/config.fish" ;;
     esac
 
-    local warmup_marker="qmd vsearch.*warmup|python3 -c .*qmd.*vsearch.*warmup|memento-vault warmup"
-    local warmup_cli="$SCRIPT_DIR/bin/memento-vault"
+    local warmup_marker="qmd vsearch.*warmup|python3 -c .*qmd.*vsearch.*warmup|memento-vault warmup|almanac warmup"
+    local warmup_cli="$SCRIPT_DIR/bin/almanac"
     local warmup_cli_quoted
     printf -v warmup_cli_quoted '%q' "$warmup_cli"
     local warmup_block="# Warm QMD embedding model on shell startup (detached, silent)
@@ -615,6 +601,7 @@ patterns = [
     r'# Warm QMD embedding model on shell startup \([^)]+\)\n[^\n]*qmd vsearch "warmup"[^\n]*',
     r'# Warm QMD embedding model on shell startup \([^)]+\)\n[^\n]*python3 -c .*qmd.*vsearch.*warmup[^\n]*',
     r'# Warm QMD embedding model on shell startup \([^)]+\)\n[^\n]*memento-vault warmup[^\n]*',
+    r'# Warm QMD embedding model on shell startup \([^)]+\)\n[^\n]*almanac warmup[^\n]*',
 ]
 for pattern in patterns:
     text = re.sub(pattern, new_block, text)
@@ -641,6 +628,9 @@ WARMUP_EOF
 # --- print_summary ---
 
 print_summary() {
+    local qmd_collection
+    qmd_collection=$(sed -n 's/^qmd_collection:[[:space:]]*//p' "$CONFIG_FILE" | head -1)
+    qmd_collection="${qmd_collection:-almanac}"
     if [ "$REMOTE_MODE" = true ] && [ "$EXPERIMENTAL" = true ]; then
         step "Installation complete! (v${NEW_VERSION} — local + remote)"
     elif [ "$REMOTE_MODE" = true ]; then
@@ -673,15 +663,15 @@ print_summary() {
         echo "  - Each prompt triggers JIT recall (related vault notes injected automatically)"
         echo "  - File reads inject vault notes about known code areas (tool-aware context)"
     fi
-    echo "  - Use /memento to manually capture insights during a session"
+    echo "  - Use /almanac to manually capture insights during a session"
     echo "  - Use /inception to find cross-session patterns (Inception)"
-    echo "  - Use /memento-defrag monthly to archive stale notes"
+    echo "  - Use /almanac-defrag monthly to archive stale notes"
     echo "  - Use /continue-work to pick up where you left off"
     echo "  - Use /start-fresh to checkpoint and clear context"
     echo ""
 
     # Check Inception dependencies if enabled
-    if grep -q "^inception_enabled: true" "$CONFIG_DIR/memento.yml" 2>/dev/null; then
+    if grep -q "^inception_enabled: true" "$CONFIG_FILE" 2>/dev/null; then
         local inception_deps_ok=true
         for pkg in numpy hdbscan sklearn; do
             if ! python3 -c "import $pkg" 2>/dev/null; then
@@ -697,7 +687,7 @@ print_summary() {
     fi
 
     if [ "$QMD_AVAILABLE" = true ]; then
-        echo "Search: qmd search \"your query\" -c memento"
+        echo "Search: qmd search \"your query\" -c ${qmd_collection:-almanac}"
     else
         echo "Search: grep -r \"your query\" $VAULT_PATH/notes/"
         echo "  (install qmd for semantic search: https://github.com/tobi/qmd)"
@@ -709,9 +699,9 @@ print_summary() {
     if [ "$REMOTE_MODE" = true ]; then
         echo ""
         echo "To use from other tools, set these environment variables:"
-        echo "  export MEMENTO_VAULT_URL=$REMOTE_URL"
+        echo "  export ALMANAC_VAULT_URL=$REMOTE_URL"
         if [ -n "$REMOTE_API_KEY" ]; then
-            echo "  export MEMENTO_API_KEY=<stored in $CLAUDE_DIR/memento-remote.env>"
+            echo "  export ALMANAC_API_KEY=<stored in $CLAUDE_DIR/almanac-remote.env>"
             echo "  (Codex remote MCP reads this variable when Codex starts.)"
         fi
     else

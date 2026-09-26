@@ -79,7 +79,7 @@ def test_vault_commit_records_deleted_note_tombstones_and_commits(tmp_path: Path
     )
     assert result.returncode == 0, result.stderr
 
-    tombstone_lines = (vault / ".memento" / "tombstones.jsonl").read_text(encoding="utf-8").splitlines()
+    tombstone_lines = (vault / ".almanac" / "tombstones.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(tombstone_lines) == 1
     tombstone = json.loads(tombstone_lines[0])
     assert tombstone["path"] == "notes/deleted.md"

@@ -18,22 +18,22 @@ Use this skill for prompts like:
 - "where was X implemented?"
 - "find prior context on X"
 - "check memory / search the vault before answering"
-- "what does memento know about X?"
+- "what does almanac know about X?"
 
 ## Search order
 
-1. Use `memento_search` if available. It is the preferred explicit retrieval tool and returns backend/index metadata.
+1. Use `almanac_search` if available. It is the preferred explicit retrieval tool and returns backend/index metadata.
 2. If MCP/tools are unavailable, use the local production CLI path, not ad-hoc grep first:
-   - `memento-vault search "<query>" --limit 5 --detail-level summary`
-   - or `python3 -m memento search "<query>" --limit 5 --detail-level summary`
-   - For prompt-time context parity, use `memento-vault recall "<prompt>"` or `python3 -m memento recall "<prompt>"`.
-3. If the local CLI is unavailable, read `~/.config/memento-vault/memento.yml` or `~/memento/memento.yml`, then use QMD directly if installed.
+   - `almanac-vault search "<query>" --limit 5 --detail-level summary`
+   - or `python3 -m almanac search "<query>" --limit 5 --detail-level summary`
+   - For prompt-time context parity, use `almanac-vault recall "<prompt>"` or `python3 -m almanac recall "<prompt>"`.
+3. If the local CLI is unavailable, read `~/.config/almanac-vault/almanac.yml` or `~/almanac/almanac.yml`, then use QMD directly if installed.
 4. Use grep over `notes/`, `projects/`, and `fleeting/` only as a last-resort emergency fallback. Say that grep bypasses the production ranking/index path.
-5. Use `memento_get` or local file reads when a specific note path needs full content.
+5. Use `almanac_get` or local file reads when a specific note path needs full content.
 
 ## Response
 
-Give the answer first, then cite the relevant note paths or project indexes. Mention the retrieval surface used (`memento_search`, local CLI, QMD, or grep) and call out when the result came from a degraded fallback or when local and remote results disagree.
+Give the answer first, then cite the relevant note paths or project indexes. Mention the retrieval surface used (`almanac_search`, local CLI, QMD, or grep) and call out when the result came from a degraded fallback or when local and remote results disagree.
 
 ## Rules
 

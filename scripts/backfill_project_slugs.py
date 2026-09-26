@@ -42,8 +42,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from memento.config import get_config, get_vault, repo_slug_from_path, slugify  # noqa: E402
-from memento.store import _normalize_tags, _write_text_atomic, split_frontmatter  # noqa: E402
+from almanac.config import get_config, get_vault, repo_slug_from_path, slugify  # noqa: E402
+from almanac.store import _normalize_tags, _write_text_atomic, split_frontmatter  # noqa: E402
 
 # Bare branch names seen in legacy `project` fields. These cannot be mapped
 # back to a repo mechanically, so they are reported but never rewritten.

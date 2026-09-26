@@ -1,12 +1,12 @@
 # Configuration
 
-Config file: `~/.config/memento-vault/memento.yml` (created by the installer).
+Config file: `~/.config/almanac/almanac.yml` (created by the installer).
 
 ## Config file locations (checked in order)
 
-1. `~/memento/memento.yml` (vault root)
-2. `~/.config/memento-vault/memento.yml`
-3. `~/.memento-vault.yml` (home directory)
+1. `~/almanac/almanac.yml` (vault root)
+2. `~/.config/almanac/almanac.yml`
+3. `~/.almanac.yml` (home directory)
 
 First file found wins. If none exist, defaults apply.
 
@@ -14,7 +14,7 @@ First file found wins. If none exist, defaults apply.
 
 ```yaml
 # Where your vault lives
-vault_path: ~/memento
+vault_path: ~/almanac
 
 # Sessions with more exchanges than this are "substantial"
 # Substantial sessions spawn a background agent for atomic notes
@@ -28,7 +28,7 @@ file_count_threshold: 3
 notable_patterns: [plan, design, MEMORY.md, CLAUDE.md, SKILL.md]
 
 # QMD collection name (empty string disables QMD integration)
-qmd_collection: memento
+qmd_collection: almanac
 
 # Additional QMD collections to search
 extra_qmd_collections: []
@@ -43,7 +43,7 @@ auto_commit: true
 agent_model: sonnet
 
 # Optional hardened mode for detached Claude workers.
-# When true, memento/llm.py adds --bare to headless Claude calls.
+# When true, almanac/llm.py adds --bare to headless Claude calls.
 # This skips hook/plugin/skill discovery and requires API-key or apiKeyHelper auth.
 claude_bare_headless: false
 
@@ -153,11 +153,11 @@ Each backend normalizes its own relevance signal to `[0, 1]` at the `search()` b
 - **embedded-vec**: sqlite-vec's `notes_vec` table is declared with `distance_metric=cosine`, so cosine distance (`1 - cosine_similarity`, range `[0, 2]`) maps to `(cos_sim + 1) / 2` - identical direction -> 1.0, orthogonal/unrelated -> 0.5, opposite -> 0.0.
 - **grep**: matched-terms / total-terms coverage fraction, already bounded by construction.
 
-This normalization is a coarse, monotonic-per-backend signal, not a guarantee that the same score means the same thing on every backend - `recall_min_score` is a noise floor more than a fine-grained confidence signal (see `confidence_margin()` in `memento/retrieval_policy.py` for the relative rank-1-vs-rank-2 gap the deep pipeline actually uses to decide confidence).
+This normalization is a coarse, monotonic-per-backend signal, not a guarantee that the same score means the same thing on every backend - `recall_min_score` is a noise floor more than a fine-grained confidence signal (see `confidence_margin()` in `almanac/retrieval_policy.py` for the relative rank-1-vs-rank-2 gap the deep pipeline actually uses to decide confidence).
 
 ## Post-capture extensions
 
-The `/memento` skill checks for `~/.claude/skills/memento-post/SKILL.md` after creating notes. If the file exists, its instructions run as an extra step. Use this for things like promoting notes to a team vault or applying domain-specific tags.
+The `/almanac` skill checks for `~/.claude/skills/almanac-post/SKILL.md` after creating notes. If the file exists, its instructions run as an extra step. Use this for things like promoting notes to a team vault or applying domain-specific tags.
 
 ## Tuning the triage
 
@@ -261,7 +261,7 @@ tool_context_cooldown: 3
 # Refresh directory-level cached results after N hours (default 24; 0 disables expiry)
 tool_context_cache_ttl_hours: 24
 
-# With retrieval_log: true or MEMENTO_DEBUG=1, log one terminal decision per call.
+# With retrieval_log: true or ALMANAC_DEBUG=1, log one terminal decision per call.
 tool_context_diagnostics: true
 
 # Include compact path/title/score candidate summaries in those decision logs.
@@ -298,7 +298,7 @@ deep_recall_backend: codex     # "codex" or "claude"
 
 ### Agentic retrieval tier (experimental)
 
-One-shot top-k injection is the deferred workers' ceiling: a single search pass (or a single guess-the-titles completion) either finds the right notes or it doesn't. When enabled, both background workers instead run a bounded ReAct-style loop (`memento/retrieval_agent.py`) that calls search/query/related/get tools in-process, over as many as 6 turns and 60 seconds:
+One-shot top-k injection is the deferred workers' ceiling: a single search pass (or a single guess-the-titles completion) either finds the right notes or it doesn't. When enabled, both background workers instead run a bounded ReAct-style loop (`almanac/retrieval_agent.py`) that calls search/query/related/get tools in-process, over as many as 6 turns and 60 seconds:
 
 - **Deep recall worker** (the primary consumer): on not-confident complex prompts, the deep-recall worker's internals upgrade from a single "suggest likely note titles" completion to the tool-using agent, which actually searches and traverses the vault before writing its picks to the same suggestions file consumed on the next prompt.
 - **Deferred briefing worker**: the SessionStart background search upgrades from a one-shot semantic search to the same loop, writing to the same deferred-briefing file/TTL.
@@ -322,7 +322,7 @@ llm_backend: pi
 llm_model: openrouter/deepseek/deepseek-v4-pro
 ```
 
-Memento invokes `pi` in a bare, non-interactive text-in/text-out mode (`--print --no-tools --no-session`, among other flags) -- it is a single completion call, not an agent run; memento's own retrieval agent (above) drives its own tool loop on top of that text contract. If `pi` is not resolvable on `PATH`, `preflight_check` reports a clear error rather than crashing the calling worker. Note: this is unrelated to `memento/pi_bridge.py`, which is the reverse integration -- the `pi` runtime embedding memento as an extension.
+Almanac invokes `pi` in a bare, non-interactive text-in/text-out mode (`--print --no-tools --no-session`, among other flags) -- it is a single completion call, not an agent run; almanac's own retrieval agent (above) drives its own tool loop on top of that text contract. If `pi` is not resolvable on `PATH`, `preflight_check` reports a clear error rather than crashing the calling worker. Note: this is unrelated to `almanac/pi_bridge.py`, which is the reverse integration -- the `pi` runtime embedding almanac as an extension.
 
 ### Tier 1 retrieval enhancements (v1.2.0)
 
@@ -382,7 +382,7 @@ Periodically archives `notes/*.md` files that are durability-tier `cold`
 (never resurfaced -- see [frontmatter-schema.md#durability-tier](frontmatter-schema.md#durability-tier)),
 older than `archive_sweep_age_days`, and `certainty` below 4. Archiving moves
 the file to `archive/` and records a reversible tombstone -- never a hard
-delete. Runs from `hooks/memento-sweeper.py`'s periodic sweep.
+delete. Runs from `hooks/almanac-sweeper.py`'s periodic sweep.
 
 ```yaml
 archive_sweep_enabled: false     # no-op until explicitly enabled
@@ -402,7 +402,7 @@ from a `notes/*.md` note with `source: mcp-capture` (the documented
 Anything left over that is older than `fleeting_expire_days` (`date`
 frontmatter, falling back to file mtime) is reversibly archived the same way
 the MEM-152 sweep above archives notes -- never a hard delete. Runs from
-`hooks/memento-sweeper.py`'s periodic sweep, right after the MEM-152 archive
+`hooks/almanac-sweeper.py`'s periodic sweep, right after the MEM-152 archive
 sweep.
 
 ```yaml
@@ -416,18 +416,18 @@ fleeting_expire_days: 14                 # age threshold (date frontmatter, else
 Replaces the old free-text `## Sessions`/`## Activity log` append (which
 corrupted real `projects/<slug>.md` hubs into multi-hundred-line files with
 duplicate headers and truncated entries) with mechanical, idempotent
-regeneration. `memento.hub.regenerate_project_hub` rebuilds a project's hub
+regeneration. `almanac.hub.regenerate_project_hub` rebuilds a project's hub
 **from scratch** every time (frontmatter + the wikilink graph -- see
 [how-it-works.md#project-hubs-and-vault-map-mem-160](how-it-works.md#project-hubs-and-vault-map-mem-160)
-for the section schema), and `memento.hub.vault_map` assembles a capped
+for the section schema), and `almanac.hub.vault_map` assembles a capped
 two-tier index (this project's hub plus top cross-project notes) for
 briefing injection.
 
 `hub_regeneration_enabled` gates the periodic sweep
-(`memento.hub.regenerate_stale_hubs`, run from `hooks/memento-sweeper.py`
+(`almanac.hub.regenerate_stale_hubs`, run from `hooks/almanac-sweeper.py`
 right after the MEM-153 fleeting lifecycle sweep) that regenerates hubs for
 any project with notes newer than its hub file. `vault_map_in_briefing`
-gates injecting `vault_map()`'s output into `memento.lifecycle.build_briefing`.
+gates injecting `vault_map()`'s output into `almanac.lifecycle.build_briefing`.
 Both default to `false` -- flip them once you've reviewed a regenerated hub
 and the assembled vault map.
 

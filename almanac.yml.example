@@ -1,0 +1,173 @@
+# Almanac configuration
+# Copy this to ~/.config/almanac/almanac.yml or ~/almanac/almanac.yml
+
+# Where your vault lives (default: ~/almanac)
+# Can also be set via ALMANAC_VAULT_PATH environment variable.
+vault_path: ~/almanac
+
+# --- Remote / Docker deployment ---
+# To deploy the vault as a remote service, use Docker:
+#   docker compose up -d
+# Then connect clients with:
+#   ./install.sh --remote https://your-server:8745
+#
+# Server-side API key for bearer token auth (clients must send this).
+# Can also be set via ALMANAC_API_KEY environment variable.
+# api_key:
+#
+# Environment variables for remote configuration:
+#   ALMANAC_VAULT_URL   - Remote vault URL (set on clients)
+#   ALMANAC_API_KEY     - Bearer token (set on both server and clients)
+#   ALMANAC_TRANSPORT   - Transport: stdio (default) or streamable-http
+#   ALMANAC_HOST        - Bind address for HTTP (default: 0.0.0.0)
+#   ALMANAC_PORT        - Port for HTTP (default: 8745)
+#   ALMANAC_VAULT_PATH  - Vault directory (default: ~/almanac)
+
+# --- Triage thresholds ---
+# Sessions with more than this many exchanges are considered "substantial"
+exchange_threshold: 15
+
+# Sessions editing more than this many files are considered "substantial"
+file_count_threshold: 3
+
+# File patterns that force a session to be considered substantial
+# (matched anywhere in the file path)
+notable_patterns: [plan, design, MEMORY.md, CLAUDE.md, SKILL.md]
+
+# --- QMD search ---
+# Name of the QMD collection (must match your qmd index.yml)
+# Set to empty string to disable QMD integration
+qmd_collection: almanac
+
+# Additional QMD collections to search (e.g., a team knowledge vault)
+# The concierge agent and delta-check will search these too
+# extra_qmd_collections: [my-team-docs]
+
+# --- Project rules ---
+# Map working directories to project slugs and ticket patterns.
+# Rules are checked in order; first match wins.
+# Without rules, the project slug is the directory name and tickets
+# are extracted by a generic [a-z]+-\d+ pattern.
+#
+# project_rules:
+#   - path_contains: "my-company.git"
+#     slug: "my-company"
+#     ticket_pattern: "(PROJ-\\d+)"
+#   - path_contains: "side-project"
+#     slug: "side-project"
+
+# --- Auto-commit ---
+# Automatically git-commit vault changes after triage
+auto_commit: true
+
+# --- Agent ---
+# Claude model to use for generating atomic notes
+agent_model: sonnet
+
+# Optional hardened mode for detached Claude workers.
+# When true, headless Claude calls add --bare and require API-key or apiKeyHelper auth.
+claude_bare_headless: false
+
+# Seconds to wait before committing agent-generated notes
+# (gives the background agent time to finish writing)
+agent_delay_seconds: 90
+
+# --- Session briefing (SessionStart hook) ---
+# Inject a project-aware vault briefing at the start of each session
+session_briefing: true
+
+# Maximum number of notes to include in the briefing
+briefing_max_notes: 5
+
+# Minimum QMD relevance score to include a note (0.0-1.0)
+briefing_min_score: 0.3
+
+# --- Prompt recall (UserPromptSubmit hook) ---
+# Inject relevant vault notes before each prompt is processed
+prompt_recall: true
+
+# Concrete/literal mode for paths, UUIDs, env vars, and quoted phrases.
+# Set to auto to enable only when the prompt looks literal; true forces it.
+recall_concrete_mode: auto
+
+# Minimum QMD relevance score for recall results (0.0-1.0)
+recall_min_score: 0.4
+
+# Maximum number of notes to inject per prompt
+recall_max_notes: 3
+
+# Diagnostics for tuning recall quality. Disabled by default.
+# When enabled, writes structured decision-path events to retrieval.jsonl.
+recall_diagnostics: false
+recall_diagnostics_include_candidates: false
+recall_diagnostics_max_candidates: 10
+
+# Skip broad project/history questions such as "what do we know about X?".
+# Use explicit search tools for those instead of automatic turn-level recall.
+recall_skip_broad_project_queries: true
+
+# Regex patterns for prompts that should skip recall
+# (matched case-insensitively against the full prompt)
+# recall_skip_patterns: ["^(yes|no|ok|sure|thanks)$", "^git\\s", "^run\\s"]
+
+# --- Tool context (PreToolUse hook) ---
+# Inject vault notes when Claude reads files in known code areas
+tool_context: true
+
+# Minimum QMD relevance score for tool context results (0.0-1.0)
+tool_context_min_score: 0.75
+
+# Maximum number of notes to inject per file read
+tool_context_max_notes: 2
+
+# Maximum total injections per session
+tool_context_max_injections: 5
+
+# Seconds between QMD calls (rate limiting)
+tool_context_cooldown: 1
+
+# Hours before directory-level tool-context cache entries are refreshed (0 disables expiry)
+tool_context_cache_ttl_hours: 24
+
+# Log one terminal decision per tool-context call when retrieval_log/ALMANAC_DEBUG is enabled.
+# Candidate summaries are off by default to keep diagnostic logs compact.
+tool_context_diagnostics: true
+tool_context_diagnostics_include_candidates: false
+tool_context_diagnostics_max_candidates: 10
+
+# --- Multi-hop retrieval (experimental) ---
+# Chain follow-up searches when a prompt references past decisions or other projects.
+# Extracts entities from initial results and searches again.
+# Only fires on the deep path (low BM25 confidence).
+multi_hop_enabled: false
+
+# Maximum follow-up search passes
+multi_hop_max: 2
+
+# --- Inception (background consolidation) ---
+# Clusters vault notes by embedding similarity and produces pattern notes.
+# Requires: numpy, hdbscan, scikit-learn (pip install numpy hdbscan scikit-learn)
+
+# Enable Inception (default: false)
+inception_enabled: false
+
+# LLM backend for synthesis: "codex" (subscription) or "claude" (API)
+inception_backend: codex
+
+# Minimum new notes since last run before triggering (default: 5)
+inception_threshold: 5
+
+# HDBSCAN minimum cluster size (default: 3)
+inception_min_cluster_size: 3
+
+# Maximum clusters to synthesize per run (default: 10)
+inception_max_clusters: 10
+
+# HDBSCAN cluster selection epsilon — higher = fewer, tighter clusters (default: 0.7)
+inception_cluster_threshold: 0.7
+
+# Tags to exclude from clustering (default: [])
+# inception_exclude_tags: [fleeting, wip]
+
+# Log clusters without writing notes (default: false)
+inception_dry_run: false

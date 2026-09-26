@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-shot fixer for out-of-range certainty values in existing notes (MEM-150).
 
-`_coerce_certainty()` in memento/store.py now clamps future writes into the
+`_coerce_certainty()` in almanac/store.py now clamps future writes into the
 1-5 range with a logged warning, but a handful of existing notes already have
 out-of-range certainty (e.g. `certainty: 95` or `certainty: 97`, presumably
 meant to be `5`) baked into their frontmatter from before that guard existed.
@@ -16,7 +16,7 @@ Usage:
 
 Only the `certainty:` line is touched -- every other frontmatter line and the
 full note body round-trip byte-for-byte, via the same atomic tmp+rename write
-(`_write_text_atomic`) the rest of memento/store.py uses.
+(`_write_text_atomic`) the rest of almanac/store.py uses.
 
 Do not run --apply against a shared/real vault without a backup.
 """
@@ -45,7 +45,7 @@ def find_bad_certainty_notes(vault_path):
     1-5. Unreadable files and notes without a certainty line are skipped
     silently -- this is a reporting/fix tool, not a validator.
     """
-    from memento.store import _frontmatter_int, split_frontmatter
+    from almanac.store import _frontmatter_int, split_frontmatter
 
     notes_dir = Path(vault_path) / "notes"
     if not notes_dir.is_dir():
@@ -73,7 +73,7 @@ def fix_note(note_path: Path, clamped_value: int) -> bool:
     substitution rather than rebuilding the frontmatter block, so ordering,
     quoting, and unrelated keys are untouched.
     """
-    from memento.store import _write_text_atomic
+    from almanac.store import _write_text_atomic
 
     text = note_path.read_text(encoding="utf-8", errors="replace")
     new_text, count = _CERTAINTY_LINE_RE.subn(f"certainty: {clamped_value}", text, count=1)
@@ -92,7 +92,7 @@ def main(argv=None) -> int:
     if args.vault:
         vault_path = args.vault
     else:
-        from memento.config import get_config
+        from almanac.config import get_config
 
         vault_path = get_config()["vault_path"]
 

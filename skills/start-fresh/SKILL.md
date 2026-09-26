@@ -5,7 +5,7 @@ description: Use when the user says "start fresh", "save and clear", "checkpoint
 
 # Start fresh
 
-Capture the session to the memento vault, update MEMORY.md with pending work pointers, then prompt the user to `/clear`.
+Capture the session to the almanac vault, update MEMORY.md with pending work pointers, then prompt the user to `/clear`.
 
 ## When to use
 
@@ -14,7 +14,7 @@ Capture the session to the memento vault, update MEMORY.md with pending work poi
 
 ## Process
 
-1. Invoke the `/memento` skill to capture session knowledge to the vault (decisions, discoveries, patterns)
+1. Invoke the `/almanac` skill to capture session knowledge to the vault (decisions, discoveries, patterns)
 2. **Detect the current scope.** Run `git rev-parse --show-toplevel` to get the worktree/repo path. Extract the last path component as the scope name (e.g., `main` from `repo.git/main`, or `my-project` from `~/projects/my-app`). If not in a git repo, use the current directory name.
 3. Review the conversation for any **pending work** — things that are unfinished or need follow-up
 4. If there are pending items, update the project's `MEMORY.md`:
@@ -29,7 +29,7 @@ Capture the session to the memento vault, update MEMORY.md with pending work poi
 
 | Content | Destination |
 |---------|-------------|
-| Session narrative, decisions, discoveries | Memento vault (via `/memento`) |
+| Session narrative, decisions, discoveries | Almanac vault (via `/almanac`) |
 | Pending/unfinished work pointers | MEMORY.md |
 | User preferences, stable config | MEMORY.md (if not already there) |
 
@@ -37,4 +37,4 @@ Capture the session to the memento vault, update MEMORY.md with pending work poi
 
 - Session narrative in MEMORY.md (the vault handles that)
 - Code snippets (the files themselves are the record)
-- Anything already captured in a previous `/memento` call this session
+- Anything already captured in a previous `/almanac` call this session

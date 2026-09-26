@@ -106,7 +106,7 @@ def test_deep_search_probe_uses_selected_backend(monkeypatch):
     assert result.details["result_count"] == 1
     assert calls == [
         {
-            "query": "memento-vault health probe",
+            "query": "almanac health probe",
             "collection": "memento",
             "limit": 1,
             "semantic": False,
@@ -121,10 +121,10 @@ def test_deep_mcp_probe_calls_tools(monkeypatch):
     calls = []
     import memento.mcp_server as mcp_server
 
-    monkeypatch.setattr(mcp_server, "memento_status", lambda: {"vault_exists": True, "qmd_available": True})
+    monkeypatch.setattr(mcp_server, "almanac_status", lambda: {"vault_exists": True, "qmd_available": True})
     monkeypatch.setattr(
         mcp_server,
-        "memento_search",
+        "almanac_search",
         lambda *args, **kwargs: calls.append((args, kwargs)) or [{"path": "notes/probe.md"}],
     )
 
@@ -133,7 +133,7 @@ def test_deep_mcp_probe_calls_tools(monkeypatch):
     assert result.status == "pass"
     assert result.details["search_result_count"] == 1
     assert calls == [
-        (("memento-vault health probe",), {"limit": 1, "semantic": False, "min_score": 0.0, "cwd": "/tmp/vault"})
+        (("almanac health probe",), {"limit": 1, "semantic": False, "min_score": 0.0, "cwd": "/tmp/vault"})
     ]
 
 
@@ -170,7 +170,7 @@ def test_deep_remote_probe_uses_short_timeout(monkeypatch):
     result = health._check_deep_remote_probe(probe_timeout_seconds=3)
 
     assert result.status == "pass"
-    assert calls == [("status", 3), ("search", "memento-vault health probe", 3)]
+    assert calls == [("status", 3), ("search", "almanac health probe", 3)]
 
 
 def test_health_json_exposes_automation_memory_readiness(capsys):
@@ -427,11 +427,8 @@ def test_retrieval_health_warns_when_log_is_unreadable():
         )
         + "\n"
     )
-    path.chmod(0)
-    try:
+    with patch.object(health, "_scan_retrieval_logs", side_effect=PermissionError("read denied")):
         report = health.build_report()
-    finally:
-        path.chmod(0o600)
 
     check = next(check for check in report.checks if check.name == "retrieval")
 
@@ -1102,7 +1099,7 @@ def test_mcp_remote_shape_valid_and_redacts_headers(capsys):
 
     assert code == 0
     assert check["status"] == "pass"
-    assert check["details"]["memento_vault"] == "remote http"
+    assert check["details"]["almanac"] == "remote http"
     assert token not in json.dumps(payload)
 
 
@@ -1185,7 +1182,7 @@ def test_mcp_local_stdio_shape_valid():
     check = next(check for check in report.checks if check.name == "mcp config")
 
     assert check.status == "pass"
-    assert check.details["memento_vault"] == "local stdio"
+    assert check.details["almanac"] == "local stdio"
 
 
 def test_mcp_registration_shape_rejects_wrong_python_module():
@@ -1337,13 +1334,13 @@ def test_health_queue_path_resolution_characterization(tmp_path, monkeypatch):
     assert health._pi_queue_file() == tmp_path / "pi-state" / "queue" / "pi-captures.jsonl"
 
     monkeypatch.delenv("MEMENTO_PI_STATE_HOME")
-    assert health._pi_queue_file() == tmp_path / "ignored-xdg" / "memento" / "pi" / "queue" / "pi-captures.jsonl"
+    assert health._pi_queue_file() == tmp_path / "ignored-xdg" / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
 
     monkeypatch.delenv("XDG_STATE_HOME")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     assert (
         health._pi_queue_file()
-        == tmp_path / "home" / ".local" / "state" / "memento" / "pi" / "queue" / "pi-captures.jsonl"
+        == tmp_path / "home" / ".local" / "state" / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
     )
 
 
@@ -1543,7 +1540,7 @@ def test_recent_certainty_string_triage_fail_points_to_reinstall():
     check = next(check for check in report.checks if check.name == "triage")
 
     assert check.status == "warn"
-    assert "stale installed memento package" in check.message
+    assert "stale installed Almanac package" in check.message
     assert "./install.sh --reinstall" in check.message
     assert "certainty labels like confirmed" in check.message
     assert check.details["last_error"] == certainty_error
@@ -1590,7 +1587,7 @@ def test_recent_mixed_mcp_and_certainty_triage_fail_reports_both_hints():
 
     assert check.status == "fail"
     assert "stale headless Claude MCP config" in check.message
-    assert "stale installed memento package" in check.message
+    assert "stale installed Almanac package" in check.message
     assert "certainty labels like confirmed" in check.message
     assert report.status == "fail"
 
@@ -1631,7 +1628,7 @@ def test_recent_certainty_string_triage_fail_detects_other_accepted_labels():
     check = next(check for check in report.checks if check.name == "triage")
 
     assert check.status == "warn"
-    assert "stale installed memento package" in check.message
+    assert "stale installed Almanac package" in check.message
     assert "./install.sh --reinstall" in check.message
 
 

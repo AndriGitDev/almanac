@@ -1,6 +1,6 @@
 {
   "name": "almanac-pi",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "type": "module",
   "private": true,
   "files": [
@@ -14,10 +14,21 @@
     "README.md",
     "LICENSE"
   ],
-  "keywords": ["pi-package"],
+  "keywords": [
+    "pi-package"
+  ],
   "pi": {
-    "extensions": ["./extensions/memento.ts"],
-    "skills": ["skills/generic"]
+    "extensions": [
+      "./extensions/almanac.ts"
+    ],
+    "skills": [
+      "./skills/generic/almanac",
+      "./skills/generic/almanac-defrag",
+      "./skills/generic/start-fresh",
+      "./skills/generic/continue-work",
+      "./skills/generic/concierge",
+      "./skills/generic/preserve"
+    ]
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"

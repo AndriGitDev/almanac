@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fast release/install/package smoke checks for memento-vault.
+"""Fast release/install/package smoke checks for Almanac.
 
 The default path is intentionally safe for local gates and CI: it only reads
 repository files and runs help/version commands that must not mutate the
@@ -158,49 +158,47 @@ def check_version_consistency(root: Path) -> CheckResult:
     else:
         mismatches.append("package.json is missing. Restore package.json.")
 
-    init_path = root / "memento" / "__init__.py"
+    init_path = root / "almanac" / "__init__.py"
     if init_path.exists():
         match = INIT_VERSION_RE.search(read_text(init_path))
         if not match:
-            mismatches.append("memento/__init__.py has no __version__. Add/update __version__.")
+            mismatches.append("almanac/__init__.py has no __version__. Add/update __version__.")
         elif match.group(1) != expected:
-            mismatches.append(f"memento/__init__.py has {match.group(1)}, expected {expected}. Update __version__.")
+            mismatches.append(f"almanac/__init__.py has {match.group(1)}, expected {expected}. Update __version__.")
     else:
-        mismatches.append("memento/__init__.py is missing. Restore it before release.")
+        mismatches.append("almanac/__init__.py is missing. Restore it before release.")
 
-    formula_path = root / "Formula" / "memento-vault.rb"
+    formula_path = root / "Formula" / "almanac.rb"
     if formula_path.exists():
         match = FORMULA_URL_VERSION_RE.search(read_text(formula_path))
         if not match:
-            mismatches.append("Formula/memento-vault.rb has no vX.Y.Z release URL. Update the formula URL.")
+            mismatches.append("Formula/almanac.rb has no vX.Y.Z release URL. Update the formula URL.")
         elif match.group(1) != expected:
-            mismatches.append(
-                f"Formula/memento-vault.rb URL has {match.group(1)}, expected {expected}. Update formula URL."
-            )
+            mismatches.append(f"Formula/almanac.rb URL has {match.group(1)}, expected {expected}. Update formula URL.")
     else:
-        mismatches.append("Formula/memento-vault.rb is missing. Restore the Homebrew formula.")
+        mismatches.append("Formula/almanac.rb is missing. Restore the Homebrew formula.")
 
     if mismatches:
         return fail("version consistency", " ".join(mismatches))
     return pass_(
-        "version consistency", f"VERSION, package.json, memento/__init__.py, and Formula URL agree on {expected}."
+        "version consistency", f"VERSION, package.json, almanac/__init__.py, and Formula URL agree on {expected}."
     )
 
 
 def check_homebrew_formula(root: Path) -> CheckResult:
-    formula = root / "Formula" / "memento-vault.rb"
+    formula = root / "Formula" / "almanac.rb"
     if not formula.exists():
-        return fail("homebrew formula", "Missing Formula/memento-vault.rb; restore formula before release.")
+        return fail("homebrew formula", "Missing Formula/almanac.rb; restore formula before release.")
 
     text = read_text(formula)
     required_snippets = [
-        "class MementoVault < Formula",
-        'homepage "https://github.com/sandsower/memento-vault"',
+        "class Almanac < Formula",
+        'homepage "https://github.com/AndriGitDev/almanac"',
         'depends_on "git"',
         'depends_on "python@3"',
-        'bin.install_symlink libexec/"bin/memento-vault"',
+        'bin.install_symlink libexec/"bin/almanac"',
         "test do",
-        "memento-vault version",
+        "almanac version",
     ]
     missing = [snippet for snippet in required_snippets if snippet not in text]
     if missing:
@@ -260,10 +258,10 @@ def check_pi_package_metadata(root: Path) -> CheckResult:
     if "pi-package" not in package.get("keywords", []):
         problems.append("package.json keywords should include pi-package.")
     pi_config = package.get("pi") or {}
-    if "./extensions/memento.ts" not in pi_config.get("extensions", []):
-        problems.append("package.json pi.extensions must include ./extensions/memento.ts.")
-    if "skills/generic" not in pi_config.get("skills", []):
-        problems.append("package.json pi.skills must include skills/generic.")
+    if "./extensions/almanac.ts" not in pi_config.get("extensions", []):
+        problems.append("package.json pi.extensions must include ./extensions/almanac.ts.")
+    if "./skills/generic/almanac" not in pi_config.get("skills", []):
+        problems.append("package.json pi.skills must include ./skills/generic/almanac.")
     if not package.get("files"):
         problems.append("package.json files list is empty; package dry-runs would omit release assets.")
 
@@ -315,13 +313,13 @@ def check_install_execution(root: Path) -> CheckResult:
     if not installer.exists():
         return fail("install execution", "Missing install.sh.")
 
-    home = Path(tempfile.mkdtemp(prefix="memento-install-smoke-"))
+    home = Path(tempfile.mkdtemp(prefix="almanac-install-smoke-"))
     try:
         (home / ".gitconfig").write_text("[user]\n\temail = smoke@invalid\n\tname = Install Smoke\n")
         env = os.environ.copy()
         env["HOME"] = str(home)
         # Keep XDG state inside the sandbox even if the caller overrides it.
-        for key in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "MEMENTO_VAULT_PATH"):
+        for key in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "ALMANAC_VAULT_PATH", "MEMENTO_VAULT_PATH"):
             env.pop(key, None)
         result = subprocess.run(
             ["bash", str(installer)],
@@ -336,10 +334,10 @@ def check_install_execution(root: Path) -> CheckResult:
         if result.returncode != 0:
             return fail("install execution", f"install.sh exited {result.returncode}. Output tail: {output[-600:]}")
         problems = []
-        if not (home / ".claude" / "hooks" / "memento-triage.py").exists():
-            problems.append("missing ~/.claude/hooks/memento-triage.py")
-        if not (home / ".claude" / "hooks" / "memento" / "lifecycle.py").exists():
-            problems.append("missing ~/.claude/hooks/memento/lifecycle.py")
+        if not (home / ".claude" / "hooks" / "almanac-triage.py").exists():
+            problems.append("missing ~/.claude/hooks/almanac-triage.py")
+        if not (home / ".claude" / "hooks" / "almanac" / "lifecycle.py").exists():
+            problems.append("missing ~/.claude/hooks/almanac/lifecycle.py")
         if not (home / ".claude" / "hooks" / "almanac" / "__main__.py").exists():
             problems.append("missing ~/.claude/hooks/almanac/__main__.py")
         if not (home / ".local" / "bin" / "almanac").is_symlink():
@@ -354,7 +352,7 @@ def check_install_execution(root: Path) -> CheckResult:
                 hooks = {}
             if "SessionEnd" not in hooks:
                 problems.append("SessionEnd hook not registered in settings.json")
-        if not (home / "memento" / "notes").is_dir():
+        if not (home / "almanac" / "notes").is_dir():
             problems.append("vault notes/ not created")
         installed_env = {**env, "PYTHONPATH": str(home / ".claude" / "hooks")}
         installed_module = subprocess.run(

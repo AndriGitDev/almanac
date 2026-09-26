@@ -1,7 +1,7 @@
 class Almanac < Formula
   desc "Persistent memory layer for AI coding agents"
   homepage "https://github.com/AndriGitDev/almanac"
-  url "https://github.com/AndriGitDev/almanac/archive/refs/tags/v5.0.0.tar.gz"
+  url "https://github.com/AndriGitDev/almanac/archive/refs/tags/v5.1.0.tar.gz"
   # sha256 "UPDATE_WITH_ACTUAL_SHA256_AFTER_RELEASE"
   license "MIT"
   head "https://github.com/AndriGitDev/almanac.git", branch: "main"
@@ -17,7 +17,6 @@ class Almanac < Formula
 
     # Link the CLI wrapper
     bin.install_symlink libexec/"bin/almanac"
-    bin.install_symlink libexec/"bin/memento-vault"
   end
 
   def caveats

@@ -52,7 +52,7 @@ def test_export_import_reproduces_portable_vault(tmp_path):
         assert "manifest.json" in names
         assert "payload/notes/alpha.md" in names
         assert "payload/.sync/ledger.jsonl" in names
-        assert "payload/.memento/tombstones.jsonl" in names
+        assert "payload/.almanac/tombstones.jsonl" in names
         assert not any(name.startswith("payload/.search/") for name in names)
 
     dest = tmp_path / "dest"

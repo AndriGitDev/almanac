@@ -28,7 +28,7 @@ The simplest option.
 Run on any machine with Docker -- a home server, VPS, or your laptop.
 
 ```bash
-MEMENTO_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))") \
+ALMANAC_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))") \
   docker compose up -d
 ```
 
@@ -44,12 +44,12 @@ Copy `fly.toml.example` to `fly.toml` and set `app` to the name of your own Fly 
 ```bash
 fly launch --copy-config --no-deploy
 fly volumes create vault_data --region iad --size 1 --yes
-fly secrets set MEMENTO_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+fly secrets set ALMANAC_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 fly deploy
 ```
 
 Vault is at `https://<app-name>.fly.dev/mcp`.
-The example retains the existing `MEMENTO_*` environment variables for compatibility.
+The example retains the existing `ALMANAC_*` environment variables for compatibility.
 
 ### Cloudflare Tunnel
 
@@ -62,7 +62,7 @@ No public IP needed, automatic TLS, free.
 
 ```bash
 export CLOUDFLARE_TUNNEL_TOKEN=<your-token>
-export MEMENTO_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+export ALMANAC_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 docker compose -f docker-compose.cloudflare.yml up -d
 ```
 
@@ -71,11 +71,11 @@ docker compose -f docker-compose.cloudflare.yml up -d
 Once the vault is running, connect any device:
 
 ```bash
-MEMENTO_API_KEY=<key> ./install.sh --remote https://vault.example.com --experimental
+ALMANAC_API_KEY=<key> ./install.sh --remote https://vault.example.com --experimental
 ```
 
 The installer registers the remote MCP server with Claude Code and Codex when their CLIs are installed.
-Codex stores only the bearer-token environment variable name, so start Codex with `MEMENTO_API_KEY` available in the environment.
+Codex stores only the bearer-token environment variable name, so start Codex with `ALMANAC_API_KEY` available in the environment.
 
 To upgrade an existing Claude-only remote install after installing Codex, rerun:
 
@@ -83,11 +83,11 @@ To upgrade an existing Claude-only remote install after installing Codex, rerun:
 ./install.sh --remote --experimental
 ```
 
-If `~/.claude/memento-remote.env` exists, the installer reuses the saved remote URL and API key.
+If `~/.claude/almanac-remote.env` exists, the installer reuses the saved remote URL and API key.
 
 Or configure MCP directly -- see [docs/mcp.md](mcp.md#connecting-remote-http) for the Claude Code, Codex, and other-agent connection snippets.
 
 ## Architecture
 
-The remote vault runs the same `memento/` package described in [docs/architecture.md](architecture.md), fronted by an HTTP transport instead of stdio, with pluggable bearer-token auth (`memento/auth.py`).
-Hooks talk to it via `memento/remote_client.py` instead of calling the local vault directly.
+The remote vault runs the same `almanac/` package described in [docs/architecture.md](architecture.md), fronted by an HTTP transport instead of stdio, with pluggable bearer-token auth (`almanac/auth.py`).
+Hooks talk to it via `almanac/remote_client.py` instead of calling the local vault directly.

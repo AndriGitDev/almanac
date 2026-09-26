@@ -64,7 +64,7 @@ usage() {
     echo "  --mcp            Install MCP server config"
     echo "  --remote URL     Connect to a remote vault"
     echo "  --reinstall      Safely rerun same-version install"
-    echo "  --force          DANGEROUS: overwrite local edits to memento-managed files"
+    echo "  --force          DANGEROUS: overwrite local edits to Almanac-managed files"
 }
 
 cmd="${1:-}"
@@ -109,7 +109,7 @@ case "$cmd" in
             exit 0
         fi
 
-        nohup "$qmd_path" vsearch "warmup" -c "${MEMENTO_QMD_COLLECTION:-memento}" -n 1 </dev/null >/dev/null 2>&1 &
+        nohup "$qmd_path" vsearch "warmup" -c "${ALMANAC_QMD_COLLECTION:-${MEMENTO_QMD_COLLECTION:-almanac}}" -n 1 </dev/null >/dev/null 2>&1 &
         exit 0
         ;;
     search|recall|reindex|tools|archive|health|doctor|retrieval-report|retrieval-dashboard)

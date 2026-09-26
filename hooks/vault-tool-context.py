@@ -2,7 +2,7 @@
 """
 Vault tool context — PreToolUse hook.
 
-Thin Claude Code adapter over memento.lifecycle.build_tool_context.
+Thin Claude Code adapter over almanac.lifecycle.build_tool_context.
 """
 
 import json
@@ -13,9 +13,9 @@ from pathlib import Path
 _repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(_repo_root))
 
-from memento.lifecycle import build_tool_context  # noqa: E402
-from memento.store import log_retrieval  # noqa: E402
-from memento.utils import read_hook_input  # noqa: E402
+from almanac.lifecycle import build_tool_context  # noqa: E402
+from almanac.store import log_retrieval  # noqa: E402
+from almanac.utils import read_hook_input  # noqa: E402
 
 
 def output_context(context_text: str) -> None:

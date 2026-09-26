@@ -10,7 +10,7 @@
 #   3. Configure the tunnel's public hostname to point at http://vault:8745
 #   4. Run:
 #        export CLOUDFLARE_TUNNEL_TOKEN=<your-token>
-#        export MEMENTO_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+#        export ALMANAC_API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 #        docker compose -f docker-compose.cloudflare.yml up -d
 #
 # Your vault will be at: https://<hostname-you-configured>/mcp
@@ -20,13 +20,13 @@ services:
     build: .
     volumes:
       - vault-data:/vault
-      - vault-config:/home/memento/.config/memento-vault
+      - vault-config:/home/almanac/.config/almanac
     environment:
-      MEMENTO_VAULT_PATH: /vault
-      MEMENTO_TRANSPORT: streamable-http
-      MEMENTO_HOST: 0.0.0.0
-      MEMENTO_PORT: "8745"
-      MEMENTO_API_KEY: "${MEMENTO_API_KEY:?Set MEMENTO_API_KEY before starting}"
+      ALMANAC_VAULT_PATH: /vault
+      ALMANAC_TRANSPORT: streamable-http
+      ALMANAC_HOST: 0.0.0.0
+      ALMANAC_PORT: "8745"
+      ALMANAC_API_KEY: "${ALMANAC_API_KEY:?Set ALMANAC_API_KEY before starting}"
     restart: unless-stopped
     networks:
       - internal
