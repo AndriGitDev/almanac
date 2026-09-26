@@ -1,18 +1,18 @@
 # MCP server
 
 The MCP server exposes read, lifecycle, write, and maintenance tools over stdio (local) or HTTP (remote).
-Any MCP-compatible agent can use them: Cursor, Windsurf, Codex, OpenCode, or Claude Code without native hooks.
+Any MCP-compatible agent can use them: Cursor, Windsurf, Codex, OpenCode, or Claude Code without native hooks. Existing client registration names such as `memento-vault` and all `memento_*` tool names remain compatible.
 
 ## Tool inventory
 
 <!-- memento-mcp-tools:start -->
-The MCP server currently registers **20 tools**. This table is generated from `memento.mcp_inventory.MCP_TOOL_INVENTORY`; refresh/check it with `memento-vault tools --markdown` or `memento-vault tools --check`.
+The MCP server currently registers **20 tools**. This table is generated from `memento.mcp_inventory.MCP_TOOL_INVENTORY`; refresh/check it with `almanac tools --markdown` or `almanac tools --check`.
 
 | Tool | Category | What it does | When to use it |
 |------|----------|--------------|----------------|
 | `memento_search` | Read | Search vault notes with BM25, optional semantic search, hybrid ranking, temporal decay, PageRank/access-log boosts, `concrete: auto\|true\|false` for exact identifiers and quoted phrases, and optional typed post-filters (type, tags, certainty, dates, branch, session_id, project) that mirror `memento_query`'s filter semantics. | Use before answering questions about past decisions, prior fixes, project history, session context, recurring patterns, or exact identifiers, including when ranked retrieval also needs metadata constraints. Do not use it to read a known note path. |
 | `memento_query` | Read | Run typed metadata filters, counts, date buckets, and recent-session listings over note frontmatter without reading full note bodies. | Use for count/list/filter questions by project, type, tag, certainty, source, date, branch, or session_id; use `memento_search` instead for topical recall or semantic retrieval. |
-| `memento_contradictions` | Read | Inspect a topic for disagreements, stale conclusions, supersession chains, and opposite-language hints. | Use when comparing competing notes about the same topic or when you need explicit superseded notes marked alongside their source paths and certainty/date context. |
+| `memento_contradictions` | Read | Inspect a topic for deterministic validity chains (note -> invalidated_by -> ... with dates) built from `valid_from`/`invalidated_by` frontmatter; the pre-MEM-163 lexical polarity-guessing report is available behind `contradictions_lexical_fallback` config. | Use when comparing competing notes about the same topic, checking whether a note has been explicitly invalidated, or walking a note's full validity history alongside certainty/date context. |
 | `memento_related` | Read | Walk the wikilink graph around a note: outbound/inbound links, a depth-limited neighborhood, and its supersession chain. Pure topology, no relevance scoring. | Use for "what links to X", neighborhood expansion, or finding the current/superseded version of a note; use `memento_search` instead for topical/semantic retrieval. |
 | `memento_briefing` | Lifecycle | Build a compact session-start briefing payload for host adapters. | Host-adapter primitive for automatic injection; not a general user-answering tool. |
 | `memento_recall` | Lifecycle | Build prompt-time recall context for host adapters. | Host-adapter primitive for automatic injection before an agent turn; not a general user-answering tool. |
@@ -33,7 +33,7 @@ The MCP server currently registers **20 tools**. This table is generated from `m
 <!-- memento-mcp-tools:end -->
 
 The same table is kept in sync in the README.
-Regenerate both from the single source of truth with `memento-vault tools --markdown`; never hand-edit the block between the markers.
+Regenerate both from the single source of truth with `almanac tools --markdown`; never hand-edit the block between the markers.
 
 ## Filtered search and graph lookups
 
@@ -60,8 +60,8 @@ Two tools added in the 2026-07-06 wave sharpen retrieval beyond plain ranked sea
 Hookless or tool-limited agents can still route through the same production search/recall policy without an MCP client:
 
 ```bash
-memento-vault search "what did we decide about cache invalidation" --limit 5
-memento-vault recall "how should we store bearer tokens that appear in URLs"
+almanac search "what did we decide about cache invalidation" --limit 5
+almanac recall "how should we store bearer tokens that appear in URLs"
 python3 -m memento search "MEMENTO_VAULT_PATH" --concrete auto
 python3 -m memento reindex
 ```

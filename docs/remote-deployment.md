@@ -39,6 +39,8 @@ For TLS on a VPS, add Caddy or use `setup-remote.sh --host your-domain.com --tls
 
 Managed cloud with persistent volumes, automatic TLS, ~$3-5/mo.
 
+Copy `fly.toml.example` to `fly.toml` and set `app` to the name of your own Fly app. Then run:
+
 ```bash
 fly launch --copy-config --no-deploy
 fly volumes create vault_data --region iad --size 1 --yes
@@ -47,7 +49,7 @@ fly deploy
 ```
 
 Vault is at `https://<app-name>.fly.dev/mcp`.
-The included `fly.toml` is pre-configured.
+The example retains the existing `MEMENTO_*` environment variables for compatibility.
 
 ### Cloudflare Tunnel
 

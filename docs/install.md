@@ -1,18 +1,10 @@
 # Install
 
-## Homebrew tap
-
-```bash
-brew tap sandsower/tap
-brew install memento-vault
-memento-vault install
-```
-
 ## Git/manual install
 
 ```bash
-git clone https://github.com/sandsower/memento-vault.git
-cd memento-vault
+git clone https://github.com/AndriGitDev/almanac.git
+cd almanac
 ./install.sh
 ```
 
@@ -25,15 +17,15 @@ Custom vault path:
 MEMENTO_VAULT_PATH=~/my-vault ./install.sh
 ```
 
-The installer also links the `memento-vault` CLI into `~/.local/bin` when possible, so future updates can use `memento-vault update`.
-If `~/.local/bin` is not on your `PATH`, either add it or run the repository-local `./bin/memento-vault` directly.
+The installer links both the `almanac` CLI and the compatible `memento-vault` alias into `~/.local/bin` when possible, so future updates can use `almanac update`.
+If `~/.local/bin` is not on your `PATH`, either add it or run the repository-local `./bin/almanac` directly.
 
 ## Reinstalling and forcing
 
 To safely rerun setup for the same version without discarding local edits:
 
 ```bash
-memento-vault install --reinstall
+almanac install --reinstall
 ```
 
 `--force` is reserved for recovery from broken installed files.
@@ -44,12 +36,12 @@ It overwrites memento-managed files and requires confirmation, or `MEMENTO_FORCE
 Check local vault/install health at any time:
 
 ```bash
-memento-vault health               # concise read-only diagnostics
-memento-vault doctor               # alias for health
-memento-vault retrieval-report      # local retrieval debug dashboard/report with recommendations
-memento-vault health --json        # structured output for automation
-memento-vault health --deep        # opt-in live integration probes
-memento-vault retrieval-report --html --output /tmp/retrieval.html
+almanac health               # concise read-only diagnostics
+almanac doctor               # alias for health
+almanac retrieval-report      # local retrieval debug dashboard/report with recommendations
+almanac health --json        # structured output for automation
+almanac health --deep        # opt-in live integration probes
+almanac retrieval-report --html --output /tmp/retrieval.html
 ```
 
 Warnings exit 0 by default; failures exit 1.
@@ -59,7 +51,7 @@ JSON output includes `automation_memory` readiness metadata for runner probes wi
 Add `--deep` to run bounded live probes against configured integrations.
 
 The legacy `tools/vault-health-check.sh` script remains available for direct callers that need low-level structural content checks (required vault directories, note frontmatter, wikilinks, filename conventions, and git presence).
-Prefer `memento-vault health`/`doctor` for operational install/runtime diagnostics; use the legacy script only when you specifically want those structural vault-content checks.
+Prefer `almanac health`/`doctor` for operational install/runtime diagnostics; use the legacy script only when you specifically want those structural vault-content checks.
 
 ## Full install (hooks + retrieval + consolidation)
 
@@ -104,7 +96,7 @@ On subsequent upgrades, modified files are auto-merged via three-way merge (`git
 Existing opt-outs in your Claude/Pi config continue to win; rerun `./install.sh` to pick up the default hook set after upgrading.
 
 ```bash
-cd memento-vault && git pull && ./install.sh
+cd almanac && git pull && ./install.sh
 ```
 
 ## Requirements
@@ -122,8 +114,8 @@ Use portable archives when moving a vault between machines or safely merging vau
 Archives keep Markdown as the canonical source of truth and include vault identity, `notes/`, `fleeting/`, `projects/`, `archive/`, sync ledger state, and tombstones; derived search indexes and embeddings are excluded.
 
 ```bash
-memento-vault archive export --vault ~/memento ./memento-portable.zip
-memento-vault archive import --vault ~/memento-restored ./memento-portable.zip
+almanac archive export --vault ~/memento ./memento-portable.zip
+almanac archive import --vault ~/memento-restored ./memento-portable.zip
 ```
 
 Imports default to safe conflict errors on existing divergent files.
@@ -138,19 +130,19 @@ The installer can add a background warmup to your shell rc file so the model is 
 
 ```bash
 # Added to .zshrc/.bashrc by the installer (optional)
-[ -x /path/to/memento-vault/bin/memento-vault ] && /path/to/memento-vault/bin/memento-vault warmup >/dev/null 2>&1
+[ -x /path/to/almanac/bin/almanac ] && /path/to/almanac/bin/almanac warmup >/dev/null 2>&1
 ```
 
 You can also run it manually:
 
 ```bash
-memento-vault warmup
+almanac warmup
 ```
 
 ## Uninstall
 
 ```bash
-cd memento-vault
+cd almanac
 ./uninstall.sh
 ```
 

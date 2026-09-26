@@ -1,6 +1,6 @@
 ---
 name: memento-defrag
-description: Review Memento Vault for stale low-value notes and archive confirmed candidates. Use for periodic vault maintenance.
+description: Review Almanac for stale low-value notes and archive confirmed candidates. Use for periodic vault maintenance.
 ---
 
 # Memento Defrag

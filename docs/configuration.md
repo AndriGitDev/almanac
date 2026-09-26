@@ -84,8 +84,8 @@ tool_context_diagnostics_max_candidates: 10
 Run read-only operational checks with:
 
 ```bash
-memento-vault health
-memento-vault doctor   # alias
+almanac health
+almanac doctor   # alias
 ```
 
 Default checks are cheap and local: config parse, vault directory structure, git/auto-commit readiness, selected search backend availability, automation-memory readiness metadata, install manifest state, managed hook/package file drift, Claude hook registration, MCP CLI registration, MCP config shape, optional Pi bridge config shape, stale headless Claude MCP config detection, recent triage health, basic retrieval log health, lock files, and basic Inception state when enabled. Drift checks are report-only and suggest installer repair commands such as `./install.sh --reinstall` or `./install.sh --mcp`. Use `--deep` for opt-in bounded live probes against configured integrations.
@@ -93,15 +93,15 @@ Default checks are cheap and local: config parse, vault directory structure, git
 Options:
 
 ```bash
-memento-vault health --json     # structured report
-memento-vault health --verbose  # include sanitized details in human output
-memento-vault health --strict   # exit nonzero on warnings
-memento-vault health --deep     # opt-in live integration probes
+almanac health --json     # structured report
+almanac health --verbose  # include sanitized details in human output
+almanac health --strict   # exit nonzero on warnings
+almanac health --deep     # opt-in live integration probes
 ```
 
 Exit codes: failures always exit 1; warnings exit 0 unless `--strict` is set. The command never repairs state or prints secrets. `--deep` stays read-only but may contact configured integrations with bounded timeouts.
 
-Legacy structural checker: `tools/vault-health-check.sh` is still supported for direct callers that need vault-content validation (`fleeting`/`notes`/`projects`/`archive` directories, note frontmatter, wikilinks, filename conventions, and git presence). It is intentionally not a replacement for `memento-vault health`; prefer the CLI health/doctor command for operational install/runtime diagnostics, and keep using the legacy script only for those low-level structural checks.
+Legacy structural checker: `tools/vault-health-check.sh` is still supported for direct callers that need vault-content validation (`fleeting`/`notes`/`projects`/`archive` directories, note frontmatter, wikilinks, filename conventions, and git presence). It is intentionally not a replacement for `almanac health`; prefer the CLI health/doctor command for operational install/runtime diagnostics, and keep using the legacy script only for those low-level structural checks.
 
 The JSON form includes an `automation_memory` readiness object with probe metadata for automated runners: search availability, recent recall/search failure rate, stale embedded-index hints, local sync-ledger divergence when a remote is configured, last successful automation-memory packet, and common failure reasons. It does not contact the remote vault by default.
 
@@ -269,7 +269,7 @@ tool_context_diagnostics_include_candidates: false
 tool_context_diagnostics_max_candidates: 10
 ```
 
-Use `memento-vault retrieval-report --since 7` (or `python tools/analyze-retrieval.py --since 7`) to summarize tool-context call volume, skip reasons, injection rate, injected paths, latency, cache/search split, top notes, and behavior recommendations from retrieval logs.
+Use `almanac retrieval-report --since 7` (or `python tools/analyze-retrieval.py --since 7`) to summarize tool-context call volume, skip reasons, injection rate, injected paths, latency, cache/search split, top notes, and behavior recommendations from retrieval logs.
 
 ### Multi-hop retrieval (wikilink-following)
 

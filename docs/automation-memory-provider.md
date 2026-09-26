@@ -23,7 +23,7 @@ A runner that needs to record what happened during a run (gate results, proofs, 
 | Explicit get | `memento_get` | read | fail-open: `{"error": ...}` dict, never an exception |
 | Post-run lesson capture | `memento_capture_run_lesson` (typed automated-run lesson candidate), `memento_capture` (session summary), `memento_store` (single atomic lesson) | write | queue result or error dict; runner proceeds, surfaces the failure |
 | Batch synthesis | `memento_synthesize_failures` dry-run reports; optional approved typed lesson writes; per-run `memento_capture` + Inception consolidation remains supported | write | schema error for raw dumps; write errors are surfaced and runner proceeds |
-| Availability check | `memento_status`, `memento-vault health` | read | safe partial dict; never raises, never prints secrets |
+| Availability check | `memento_status`, `almanac health` | read | safe partial dict; never raises, never prints secrets |
 
 ## Provider operations
 
@@ -278,7 +278,7 @@ Available today, via `memento_status` (read-only, secret-free, cheap):
 - `note_count`, `project_count`, `fleeting_count` — rough corpus size
 - `config` — non-secret config summary (collection, backends, feature flags)
 
-`memento-vault health` (CLI) runs deeper read-only checks — config parse, vault structure, backend availability, recent triage health from the 24-hour triage-health log, retrieval log health, lock files — with `--json` for structured output and `--strict` to exit non-zero on warnings. Its JSON includes an `automation_memory` readiness object for orchestration probes. `memento_status` exposes the same readiness object, and `memento_session_context` includes a compact probe summary in `sections.status.automation_memory`. Lifecycle packets also surface a triage-health warning inline when recent capture failure rates are high.
+`almanac health` (CLI) runs deeper read-only checks — config parse, vault structure, backend availability, recent triage health from the 24-hour triage-health log, retrieval log health, lock files — with `--json` for structured output and `--strict` to exit non-zero on warnings. Its JSON includes an `automation_memory` readiness object for orchestration probes. `memento_status` exposes the same readiness object, and `memento_session_context` includes a compact probe summary in `sections.status.automation_memory`. Lifecycle packets also surface a triage-health warning inline when recent capture failure rates are high.
 
 Automation memory readiness reports:
 

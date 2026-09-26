@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for memento-vault-vic on 2026-04-10T16:12:13Z
+# Almanac Fly.io example. Copy to fly.toml and choose your own app name.
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'memento-vault-vic'
+app = 'your-almanac-app'
 primary_region = 'fra'
 
 [build]

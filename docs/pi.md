@@ -1,6 +1,6 @@
 # Pi extension
 
-Memento ships a native pi extension from this repo.
+Almanac ships a native pi extension from this repo.
 The extension is TypeScript, but lifecycle policy stays in Python core: pi calls a short-lived JSON adapter (`python3 -m memento.pi_bridge`) for briefing, recall, and read-tool context.
 
 For local testing:
@@ -12,7 +12,7 @@ pi -e ./extensions/memento.ts
 For package installation from a checkout:
 
 ```bash
-pi install /path/to/memento-vault
+pi install /path/to/almanac
 ```
 
 The pi bridge does not start a long-lived MCP child process.

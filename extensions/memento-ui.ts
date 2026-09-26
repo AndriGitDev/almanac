@@ -122,7 +122,7 @@ export function renderMementoPanelLines(
 		? "↑↓/j/k move · i inspect · t retry failed · d dry-run · p process · r refresh · q back"
 		: "↑↓/j/k move · space select · x discard · i inspect · d dry-run · p process · r refresh · q back";
 	body.push("", help);
-	return frameLines("Memento Vault", body, Math.max(1, width));
+	return frameLines("Almanac", body, Math.max(1, width));
 }
 
 export function renderMementoStatusText(status?: Record<string, unknown>, queue?: Record<string, unknown>, options: { pinned?: boolean; process?: Record<string, unknown> } = {}): string {

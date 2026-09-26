@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Memento Vault uninstaller
+# Almanac uninstaller
 # Removes installed hooks, skills, agents, package files, MCP registrations,
 # and Claude/Codex settings entries created by install.sh.
 # Does NOT delete the vault itself (your notes are safe).
@@ -68,7 +68,7 @@ PY
     fi
 }
 
-step "Removing Memento Vault from Claude Code..."
+step "Removing Almanac from Claude Code..."
 
 load_vault_path
 

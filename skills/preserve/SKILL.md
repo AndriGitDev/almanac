@@ -1,6 +1,6 @@
 ---
 name: preserve
-description: Archive artifact bundles in Memento Vault. Use when the user says preserve, archive, or save generated artifacts, or wants evidence bundles kept intact instead of turned into atomic notes.
+description: Archive artifact bundles in Almanac. Use when the user says preserve, archive, or save generated artifacts, or wants evidence bundles kept intact instead of turned into atomic notes.
 ---
 
 # Preserve

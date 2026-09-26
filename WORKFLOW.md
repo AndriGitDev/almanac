@@ -1,13 +1,14 @@
 ---
-# Rondo execution profile — memento-vault
+# Rondo execution profile — Almanac
 # Run `./scripts/run-rondo` against this profile to execute Linear issues from the
-# "Rondo intake — memento" project. Adding an issue to that project is the
-# explicit AFK opt-in. Envelope-driven runs use `rondo run-once --manifest`
+# Almanac Linear project. Set project_slug before enabling this profile.
+# Adding an issue to that project is the explicit AFK opt-in.
+# Envelope-driven runs use `rondo run-once --manifest`
 # and override tracker polling entirely (pilot envelopes: docs/plans/envelopes/).
 tracker:
   kind: linear
   api_key: "$LINEAR_API_KEY"
-  project_slug: "rondo-intake-memento-e41ef5a4ca45"
+  project_slug: "SET_ALMANAC_LINEAR_PROJECT_SLUG"
   active_states:
     - Todo
     - In Progress
@@ -24,7 +25,7 @@ workspace:
   root: ~/code/rondo-workspaces
 hooks:
   after_create: |
-    git clone --depth 1 git@github.com:sandsower/memento-vault.git .
+    git clone --depth 1 git@github.com:AndriGitDev/almanac.git .
     git checkout -B rondo/{{ issue.identifier }}
     # Hooks run under `sh -lc`; macOS path_helper puts /usr/bin (python 3.9)
     # ahead of /opt/homebrew/bin, and memento requires python >=3.10.
@@ -88,15 +89,15 @@ model_routing:
 action_policy:
   command: beislid
   run_mode: unattended-auto
-  policy_file: /Users/vicvalenzuela/Personal/memento-vault/.beislid/action-policy.json
+  policy_file: .beislid/action-policy.json
 process_provider:
   kind: beislid
   required: true
   artifact_path: .beislid/rondo-process-artifact.json
 ---
 
-You are working on Linear ticket `{{ issue.identifier }}` in the memento-vault
-repo (Memento — memory/learning store for coding agents; never a run ledger).
+You are working on Linear ticket `{{ issue.identifier }}` in the Almanac
+repo (memory/learning store for coding agents; never a run ledger).
 
 Issue context:
 Identifier: {{ issue.identifier }}

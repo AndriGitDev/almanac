@@ -1,11 +1,11 @@
 ---
 name: concierge
-description: Search Memento Vault for day-to-day recall, past decisions, discoveries, implementation history, and prior session context. Use when the user asks "do you remember", "have we seen", "what did we decide", "what did we learn", "where was this implemented", "find prior context", "check memory", "search the vault", or any question that depends on prior work rather than current files alone.
+description: Search Almanac for day-to-day recall, past decisions, discoveries, implementation history, and prior session context. Use when the user asks "do you remember", "have we seen", "what did we decide", "what did we learn", "where was this implemented", "find prior context", "check memory", "search the vault", or any question that depends on prior work rather than current files alone.
 ---
 
 # Concierge
 
-Answer questions using Memento Vault history. This is the day-to-day retrieval workflow: use it before answering from memory when the user asks about prior decisions, discoveries, fixes, project history, recurring patterns, or whether something has been seen before.
+Answer questions using Almanac history. This is the day-to-day retrieval workflow: use it before answering from memory when the user asks about prior decisions, discoveries, fixes, project history, recurring patterns, or whether something has been seen before.
 
 ## Trigger examples
 

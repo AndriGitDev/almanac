@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Memento Vault — Remote deployment helper
+# Almanac — Remote deployment helper
 #
 # Deploys the vault as a Docker service, either locally or on a remote server.
 # Handles vault data migration, API key generation, and TLS setup.
@@ -55,7 +55,7 @@ step()  { echo -e "\n${BOLD}$1${NC}"; }
 
 # --- Preflight ---
 
-step "Memento Vault — Remote Deployment Setup"
+step "Almanac — Remote Deployment Setup"
 echo ""
 
 if ! command -v docker &>/dev/null; then
@@ -316,8 +316,8 @@ echo ""
 echo -e "${BOLD}To connect ANOTHER machine (laptop, CI, etc.):${NC}"
 echo ""
 echo -e "  ${CYAN}# Copy the API key from $ENV_FILE on this machine${NC}"
-echo -e "  ${CYAN}git clone https://github.com/sandsower/memento-vault.git${NC}"
-echo -e "  ${CYAN}cd memento-vault${NC}"
+echo -e "  ${CYAN}git clone https://github.com/AndriGitDev/almanac.git${NC}"
+echo -e "  ${CYAN}cd almanac${NC}"
 echo -e "  ${CYAN}MEMENTO_API_KEY=<key-from-env-file> ./install.sh --remote $VAULT_URL --experimental${NC}"
 echo ""
 echo -e "${BOLD}To connect from Claude Code (CLI or web):${NC}"

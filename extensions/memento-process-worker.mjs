@@ -96,7 +96,7 @@ async function fakeCurator(group, mode) {
 }
 
 function mementoSkillFallback() {
-  return `Capture durable session knowledge as atomic Memento Vault notes. Use the deterministic deduplication context first and read candidate notes with memento_get before creating overlapping memories. Use memento_capture for each durable idea with note_type, tags, and certainty (1-5). Notes should cover one decision, discovery, pattern, bugfix, or tool insight. Sanitize secrets. Skip raw transcript fragments, command chatter, session-path boilerplate, and non-durable details. Zero notes is acceptable when there is no reusable future context.`;
+  return `Capture durable session knowledge as atomic Almanac notes. Use the deterministic deduplication context first and read candidate notes with memento_get before creating overlapping memories. Use memento_capture for each durable idea with note_type, tags, and certainty (1-5). Notes should cover one decision, discovery, pattern, bugfix, or tool insight. Sanitize secrets. Skip raw transcript fragments, command chatter, session-path boilerplate, and non-durable details. Zero notes is acceptable when there is no reusable future context.`;
 }
 
 function appendBounded(buffer, chunk, maxBytes) {

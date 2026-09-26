@@ -3,12 +3,13 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "memento-vault"
+name = "almanac"
 description = "Persistent knowledge vault for coding agents."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Victor Valenzuela" }]
+maintainers = [{ name = "AndriGitDev" }]
 dynamic = ["version"]
 keywords = ["mcp", "knowledge-management", "coding-agents", "claude-code", "opencode"]
 classifiers = [
@@ -32,8 +33,9 @@ embedded = ["onnxruntime", "sqlite-vec", "numpy", "tokenizers"]
 test = ["pyyaml", "numpy", "networkx", "scipy", "hdbscan", "rank_bm25", "optuna"]
 
 [project.urls]
-Homepage = "https://github.com/sandsower/memento-vault"
-Issues = "https://github.com/sandsower/memento-vault/issues"
+Homepage = "https://github.com/AndriGitDev/almanac"
+Issues = "https://github.com/AndriGitDev/almanac/issues"
+Upstream = "https://github.com/sandsower/memento-vault"
 
 [tool.setuptools.dynamic]
 version = { file = "VERSION" }

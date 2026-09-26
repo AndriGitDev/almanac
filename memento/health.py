@@ -367,7 +367,7 @@ def _check_deep_remote_probe(*, probe_timeout_seconds: int) -> CheckResult:
 def render_human(report: HealthReport, verbose: bool = False) -> str:
     """Render a concise human-readable report."""
     lines = [
-        f"Memento Vault health: {report.status.upper()} "
+        f"Almanac health: {report.status.upper()} "
         f"({report.summary[PASS]} pass, {report.summary[WARN]} warn, {report.summary[FAIL]} fail)"
     ]
     for check in report.checks:
@@ -389,7 +389,7 @@ def exit_code(report: HealthReport, strict: bool = False) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Check memento-vault operational health")
+    parser = argparse.ArgumentParser(description="Check Almanac operational health")
     parser.add_argument("--json", action="store_true", help="Emit structured JSON")
     parser.add_argument("--verbose", action="store_true", help="Include sanitized details in human output")
     parser.add_argument("--strict", action="store_true", help="Exit nonzero when warnings are present")

@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# almanac CLI wrapper
+# Entry point for Homebrew and manual installations.
+#
+# Usage:
+#   almanac install [--experimental] [--mcp] [--remote URL] [--reinstall] [--force]
+#   almanac uninstall
+#   almanac update          # git pull + reinstall
+#   almanac warmup          # warm optional local dependencies quietly
+#   almanac search "query" # local non-MCP vault search
+#   almanac recall "prompt" # local production prompt-recall path
+#   almanac tools --markdown # print generated MCP tool inventory
+#   almanac tools --check    # check tool inventory against MCP registrations
+#   almanac archive export ARCHIVE.zip [--vault PATH]
+#   almanac archive import ARCHIVE.zip [--vault PATH] [--conflict error|skip|overwrite]
+#   almanac health          # run read-only vault diagnostics
+#   almanac doctor          # alias for health
+#   almanac version
+set -euo pipefail
+
+# Resolve the repo root (bin/ lives one level below it), following symlinks.
+SCRIPT_PATH="${BASH_SOURCE[0]}"
+while [ -L "$SCRIPT_PATH" ]; do
+    SCRIPT_LINK_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+    SCRIPT_TARGET="$(readlink "$SCRIPT_PATH")"
+    case "$SCRIPT_TARGET" in
+        /*) SCRIPT_PATH="$SCRIPT_TARGET" ;;
+        *) SCRIPT_PATH="$SCRIPT_LINK_DIR/$SCRIPT_TARGET" ;;
+    esac
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
+
+# Homebrew installs to a prefix — check both layouts
+if [ ! -f "$SCRIPT_DIR/install.sh" ]; then
+    # Homebrew cellar layout: libexec/almanac/install.sh
+    if [ -f "$SCRIPT_DIR/libexec/almanac/install.sh" ]; then
+        SCRIPT_DIR="$SCRIPT_DIR/libexec/almanac"
+    else
+        echo "Error: cannot find almanac installation at $SCRIPT_DIR" >&2
+        exit 1
+    fi
+fi
+
+usage() {
+    echo "Usage: almanac <command> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  install     Install hooks, skills, and agents into Claude Code"
+    echo "  uninstall   Remove almanac from Claude Code"
+    echo "  update      Pull latest version and reinstall"
+    echo "  warmup      Warm optional local dependencies quietly (defaults to QMD)"
+    echo "  search      Search the vault locally without MCP"
+    echo "  recall      Run the production prompt-recall path locally without MCP"
+    echo "  reindex     Rebuild the configured local search backend index"
+    echo "  tools       Print or check the generated MCP tool inventory"
+    echo "  archive     Export/import portable vault archives"
+    echo "  health      Run read-only vault diagnostics"
+    echo "  doctor      Alias for health"
+    echo "  retrieval-report  Generate a local retrieval debug report/dashboard"
+    echo "  version     Show installed version"
+    echo ""
+    echo "Install options:"
+    echo "  --experimental   Enable Tenet retrieval + Inception consolidation"
+    echo "  --mcp            Install MCP server config"
+    echo "  --remote URL     Connect to a remote vault"
+    echo "  --reinstall      Safely rerun same-version install"
+    echo "  --force          DANGEROUS: overwrite local edits to memento-managed files"
+}
+
+cmd="${1:-}"
+shift 2>/dev/null || true
+
+case "$cmd" in
+    install)
+        exec "$SCRIPT_DIR/install.sh" "$@"
+        ;;
+    uninstall)
+        exec "$SCRIPT_DIR/uninstall.sh" "$@"
+        ;;
+    update)
+        if [ -d "$SCRIPT_DIR/.git" ]; then
+            echo "Updating almanac..."
+            git -C "$SCRIPT_DIR" pull --ff-only 2>/dev/null || git -C "$SCRIPT_DIR" pull --rebase
+            echo ""
+            exec "$SCRIPT_DIR/install.sh" "$@"
+        else
+            echo "Error: not a git checkout — reinstall via brew or bootstrap" >&2
+            exit 1
+        fi
+        ;;
+    warmup)
+        for opt in "$@"; do
+            case "$opt" in
+                --qmd|--quiet|-q) ;;
+                --help|-h)
+                    echo "Usage: almanac warmup [--qmd] [--quiet]"
+                    echo ""
+                    echo "Warms optional local dependencies quietly. Defaults to QMD."
+                    exit 0
+                    ;;
+                *)
+                    echo "Unknown warmup option: $opt" >&2
+                    exit 1
+                    ;;
+            esac
+        done
+
+        if ! qmd_path="$(command -v qmd 2>/dev/null)"; then
+            exit 0
+        fi
+
+        nohup "$qmd_path" vsearch "warmup" -c "${MEMENTO_QMD_COLLECTION:-memento}" -n 1 </dev/null >/dev/null 2>&1 &
+        exit 0
+        ;;
+    search|recall|reindex)
+        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+        exec python3 -m memento "$cmd" "$@"
+        ;;
+    tools)
+        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+        exec python3 -m memento.mcp_inventory "$@"
+        ;;
+    archive)
+        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+        exec python3 -m memento.archive "$@"
+        ;;
+    health|doctor)
+        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+        exec python3 -m memento.health "$@"
+        ;;
+    retrieval-report|retrieval-dashboard)
+        export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
+        exec python3 -m memento.retrieval_dashboard "$@"
+        ;;
+    version|-v|--version)
+        cat "$SCRIPT_DIR/VERSION" 2>/dev/null || echo "unknown"
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    "")
+        usage
+        exit 1
+        ;;
+    *)
+        echo "Unknown command: $cmd" >&2
+        echo ""
+        usage
+        exit 1
+        ;;
+esac

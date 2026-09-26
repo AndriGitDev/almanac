@@ -93,8 +93,10 @@ save_manifest() {
 # --- CLI setup ---
 
 setup_cli() {
+    local almanac_src="$SCRIPT_DIR/bin/almanac"
     local cli_src="$SCRIPT_DIR/bin/memento-vault"
     local cli_bin_dir="${MEMENTO_CLI_BIN_DIR:-$HOME/.local/bin}"
+    local almanac_dest="$cli_bin_dir/almanac"
     local cli_dest="$cli_bin_dir/memento-vault"
 
     if [ ! -x "$cli_src" ]; then
@@ -102,14 +104,24 @@ setup_cli() {
         return
     fi
 
+    mkdir -p "$cli_bin_dir"
+
+    if [ -x "$almanac_src" ]; then
+        if { [ -e "$almanac_dest" ] || [ -L "$almanac_dest" ]; } \
+            && { [ ! -L "$almanac_dest" ] || [ "$(readlink "$almanac_dest")" != "$almanac_src" ]; }; then
+            warn "CLI already exists at $almanac_dest; leaving it unchanged"
+        else
+            ln -sfn "$almanac_src" "$almanac_dest"
+            info "Almanac CLI linked to $almanac_dest"
+        fi
+    fi
+
     local existing_cli
     existing_cli=$(command -v memento-vault 2>/dev/null || true)
     if [ -n "$existing_cli" ] && [ "$existing_cli" != "$cli_dest" ]; then
-        info "CLI already available at $existing_cli"
+        info "Legacy CLI already available at $existing_cli"
         return
     fi
-
-    mkdir -p "$cli_bin_dir"
 
     if [ -e "$cli_dest" ] && [ ! -L "$cli_dest" ]; then
         warn "CLI already exists at $cli_dest and is not a symlink; leaving it unchanged"
