@@ -82,6 +82,7 @@ def _truncate_and_normalize(vectors: np.ndarray, target_dim: int) -> np.ndarray:
 _DEFAULT_MODEL = "nomic-embed-text-v1.5"
 _DEFAULT_DIMS = 512
 _NATIVE_DIMS = 768
+_MAX_LOCAL_INFERENCE_BATCH = 4
 _HF_REPO = "nomic-ai/nomic-embed-text-v1.5"
 _ONNX_FILENAME = "onnx/model_quantized.onnx"
 _TOKENIZER_FILENAME = "tokenizer.json"
@@ -120,10 +121,15 @@ class NomicLocalProvider(EmbeddingProvider):
         if not texts:
             return []
         self._ensure_runtime()
-        prefixed = [self._format_document(t) for t in texts]
-        raw = self._run_inference(prefixed)
-        truncated = _truncate_and_normalize(raw, self._dims)
-        return truncated.tolist()
+        vectors: list[list[float]] = []
+        for start in range(0, len(texts), _MAX_LOCAL_INFERENCE_BATCH):
+            prefixed = [self._format_document(t) for t in texts[start : start + _MAX_LOCAL_INFERENCE_BATCH]]
+            raw = self._run_inference(prefixed)
+            vectors.extend(_truncate_and_normalize(raw, self._dims).tolist())
+            # The ONNX output is much larger than the final vectors. Release it
+            # before allocating the next batch's inference tensors.
+            del raw
+        return vectors
 
     def embed_query(self, text: str) -> list[float]:
         """Embed a single query (prefixed with ``search_query: ``)."""
