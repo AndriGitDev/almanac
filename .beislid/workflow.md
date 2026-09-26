@@ -1,6 +1,6 @@
 <!-- beislid-workflow: v1 -->
 
-# Beislið workflow config — memento-vault
+# Beislið workflow config — almanac
 
 ## Issue tracker
 
@@ -50,13 +50,13 @@ risk:
   high_risk_paths:
     - '**/config/**'
     - '**/.github/workflows/**'
-    - 'memento/mcp_server.py'
-    - 'memento/lifecycle.py'
-    - 'memento/pi_bridge.py'
-    - 'memento/capture_runtime.py'
-    - 'memento/search*.py'
-    - 'memento/embedded_search.py'
-    - 'memento/graph.py'
+    - 'almanac/mcp_server.py'
+    - 'almanac/lifecycle.py'
+    - 'almanac/pi_bridge.py'
+    - 'almanac/capture_runtime.py'
+    - 'almanac/search*.py'
+    - 'almanac/embedded_search.py'
+    - 'almanac/graph.py'
     - 'hooks/**'
     - 'install.sh'
     - 'setup-remote.sh'
@@ -99,7 +99,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   mutates: false
   parallel_safe: true
   changed_file_selector:
-    include: ['memento/**/*.py', 'hooks/**/*.py', 'scripts/**/*.py', 'tests/**/*.py']
+    include: ['almanac/**/*.py', 'hooks/**/*.py', 'scripts/**/*.py', 'tests/**/*.py']
   output:
     parser: generic-text
     agent_summary: true
@@ -117,7 +117,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   mutates: false
   parallel_safe: true
   changed_file_selector:
-    include: ['memento/**/*.py', 'hooks/**/*.py', 'scripts/**/*.py', 'tests/**/*.py']
+    include: ['almanac/**/*.py', 'hooks/**/*.py', 'scripts/**/*.py', 'tests/**/*.py']
   output:
     parser: generic-text
     agent_summary: true
@@ -129,13 +129,13 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   stage: pre-pr
   kind: sensor
   execution: computational
-  command: '.venv/bin/python -m compileall -q memento hooks scripts'
+  command: '.venv/bin/python -m compileall -q almanac memento hooks scripts'
   timeout_seconds: 120
   cost: cheap
   mutates: false
   parallel_safe: true
   changed_file_selector:
-    include: ['memento/**/*.py', 'hooks/**/*.py', 'scripts/**/*.py']
+    include: ['almanac/**/*.py', 'hooks/**/*.py', 'scripts/**/*.py']
   output:
     parser: generic-text
     agent_summary: true
@@ -152,7 +152,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: cheap
   mutates: false
   changed_file_selector:
-    include: ['docs/frontmatter-schema.md', 'memento/types.py', 'scripts/check_frontmatter_schema.py', 'tests/test_frontmatter_schema.py']
+    include: ['docs/frontmatter-schema.md', 'almanac/types.py', 'scripts/check_frontmatter_schema.py', 'tests/test_frontmatter_schema.py']
   output:
     parser: generic-text
     agent_summary: true
@@ -169,7 +169,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: medium
   mutates: false
   changed_file_selector:
-    include: ['.beislid/**', 'WORKFLOW.md', 'docs/**', 'memento/**/*.py', 'hooks/**/*.py', 'scripts/**/*.py', 'tests/**/*.py']
+    include: ['.beislid/**', 'WORKFLOW.md', 'docs/**', 'almanac/**/*.py', 'hooks/**/*.py', 'scripts/**/*.py', 'tests/**/*.py']
   output:
     parser: pytest
     agent_summary: true
@@ -188,7 +188,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: expensive
   mutates: false
   changed_file_selector:
-    include: ['memento/search*.py', 'memento/embedded_search.py', 'memento/graph.py', 'hooks/tenet_reranker.py', 'tests/test_tenet_*.py', 'tests/test_multi_hop.py', 'tests/test_deep_recall.py']
+    include: ['almanac/search*.py', 'almanac/embedded_search.py', 'almanac/graph.py', 'hooks/tenet_reranker.py', 'tests/test_tenet_*.py', 'tests/test_multi_hop.py', 'tests/test_deep_recall.py']
   output:
     parser: pytest
     agent_summary: true
@@ -207,7 +207,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: expensive
   mutates: false
   changed_file_selector:
-    include: ['memento/mcp_server.py', 'memento/remote_client.py', 'memento/auth.py', 'tests/test_mcp_server.py', 'tests/test_remote_client.py', 'tests/test_integration_remote.py']
+    include: ['almanac/mcp_server.py', 'almanac/remote_client.py', 'almanac/auth.py', 'tests/test_mcp_server.py', 'tests/test_remote_client.py', 'tests/test_integration_remote.py']
   output:
     parser: pytest
     agent_summary: true
@@ -243,7 +243,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: medium
   mutates: false
   changed_file_selector:
-    include: ['VERSION', 'package.json', 'Formula/**', 'scripts/release_smoke.py', 'install.sh', 'lib/**', 'memento/**/*.py']
+    include: ['VERSION', 'package.json', 'Formula/**', 'scripts/release_smoke.py', 'install.sh', 'lib/**', 'almanac/**/*.py']
   output:
     parser: generic-text
     agent_summary: true
@@ -279,7 +279,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: medium
   mutates: false
   changed_file_selector:
-    include: ['evals/**', 'tests/test_evals.py', 'memento/retrieval_policy.py', 'memento/lifecycle.py']
+    include: ['evals/**', 'tests/test_evals.py', 'almanac/retrieval_policy.py', 'almanac/lifecycle.py']
   output:
     parser: pytest
     agent_summary: true
@@ -298,7 +298,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: medium
   mutates: false
   changed_file_selector:
-    include: ['memento/search*.py', 'memento/embedded_search.py', 'memento/config.py', 'memento/retrieval_policy.py', 'memento/lifecycle.py', 'evals/retrieval_probe.py', 'evals/golden/fixtures/vault/**']
+    include: ['almanac/search*.py', 'almanac/embedded_search.py', 'almanac/config.py', 'almanac/retrieval_policy.py', 'almanac/lifecycle.py', 'evals/retrieval_probe.py', 'evals/golden/fixtures/vault/**']
   output:
     parser: generic-text
     agent_summary: true
@@ -307,7 +307,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
     max_fix_iterations: 2
     stop_if_patterns:
       - 'No module named'
-    hint: 'Hermetic ranking-policy regression; the failing check id in the JSON output names the behavior in memento/search.py that broke. Never run --mode live in gates.'
+    hint: 'Hermetic ranking-policy regression; the failing check id in the JSON output names the behavior in almanac/search.py that broke. Never run --mode live in gates.'
 - name: capture-e2e-hermetic
   stage: pre-pr
   kind: sensor
@@ -317,7 +317,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: medium
   mutates: false
   changed_file_selector:
-    include: ['hooks/memento-triage.py', 'evals/suites/capture_e2e.py', 'evals/thresholds.yml']
+    include: ['hooks/almanac-triage.py', 'evals/suites/capture_e2e.py', 'evals/thresholds.yml']
   output:
     parser: generic-text
     agent_summary: true
@@ -326,7 +326,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
     max_fix_iterations: 2
     stop_if_patterns:
       - 'No module named'
-    hint: 'The triage substantiality gate misclassified a labeled session; check hooks/memento-triage.py and its thresholds. Never run with --llm in gates.'
+    hint: 'The triage substantiality gate misclassified a labeled session; check hooks/almanac-triage.py and its thresholds. Never run with --llm in gates.'
 - name: capture-retrieve-loop-hermetic
   stage: pre-pr
   kind: sensor
@@ -336,7 +336,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
   cost: medium
   mutates: false
   changed_file_selector:
-    include: ['memento/store.py', 'memento/smart_store.py', 'memento/mcp_server.py', 'memento/embedded_search.py', 'memento/search.py', 'memento/retrieval_policy.py', 'memento/lifecycle.py', 'evals/capture_retrieve_probe.py', 'evals/suites/capture_retrieve_loop.py', 'evals/thresholds.yml']
+    include: ['almanac/store.py', 'almanac/smart_store.py', 'almanac/mcp_server.py', 'almanac/embedded_search.py', 'almanac/search.py', 'almanac/retrieval_policy.py', 'almanac/lifecycle.py', 'evals/capture_retrieve_probe.py', 'evals/suites/capture_retrieve_loop.py', 'evals/thresholds.yml']
   output:
     parser: generic-text
     agent_summary: true
@@ -345,7 +345,7 @@ pre-PR command surface. Older orchestrators may still treat each entry as a flat
     max_fix_iterations: 2
     stop_if_patterns:
       - 'No module named'
-    hint: 'A freshly stored note did not surface for its golden query -- check memento/smart_store.py, memento/mcp_server.py (store path) and memento/embedded_search.py (index build) for a broken handoff. Never run with --llm in gates.'
+    hint: 'A freshly stored note did not surface for its golden query -- check almanac/smart_store.py, almanac/mcp_server.py (store path) and almanac/embedded_search.py (index build) for a broken handoff. Never run with --llm in gates.'
 ```
 
 ## Action policy

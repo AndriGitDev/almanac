@@ -141,7 +141,7 @@ class TestLoadConfig:
             config = load_config()
 
         captured = capsys.readouterr()
-        assert "[memento] warning: failed to parse config" in captured.err
+        assert "[almanac] warning: failed to parse config" in captured.err
         # Should still return defaults
         assert config["llm_backend"] == "claude"
 

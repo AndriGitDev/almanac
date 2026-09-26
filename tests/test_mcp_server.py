@@ -24,11 +24,8 @@ from memento.mcp_server import (
     _strip_injection,
     memento_capture,
     memento_capture_run_lesson,
-    memento_contradictions,
-    memento_daily_snapshot,
     memento_get,
     memento_list,
-    memento_preserve,
     memento_query,
     memento_related,
     memento_replace_note,
@@ -169,7 +166,7 @@ class TestMementoSearch:
         assert result["results"] == []
         assert result["miss"]["reason"] == "empty_vault"
         assert result["metadata"]["expandable_paths"] == []
-        assert "memento_status" in result["miss"]["recovery_hints"][1]
+        assert "almanac_status" in result["miss"]["recovery_hints"][1]
 
     @patch("memento.mcp_server.log_retrieval")
     @patch("memento.mcp_server.enhance_results", side_effect=lambda r, **kw: r)
@@ -240,7 +237,7 @@ class TestMementoSearch:
         assert result["results"] == []
         assert result["miss"]["reason"] == "backend_unavailable"
         assert result["metadata"]["detail_level"] == "summary"
-        assert "memento_status" in result["miss"]["recovery_hints"][0]
+        assert "almanac_status" in result["miss"]["recovery_hints"][0]
 
     @patch("memento.mcp_server.log_retrieval")
     @patch("memento.mcp_server.enhance_results", side_effect=lambda r, **kw: r)
@@ -290,7 +287,7 @@ class TestMementoSearch:
         assert result["miss"]["reason"] == "no_concrete_match"
         assert result["metadata"]["expandable_paths"] == []
         assert "broader" in result["miss"]["recovery_hints"][0]
-        assert "memento_get" in result["miss"]["recovery_hints"][1]
+        assert "almanac_get" in result["miss"]["recovery_hints"][1]
 
     @patch("memento.mcp_server.log_retrieval")
     @patch("memento.mcp_server.enhance_results")
@@ -372,7 +369,7 @@ class TestMementoSearch:
         with patch("memento.mcp_server.get_vault", return_value=tmp_vault):
             result = memento_search("long note", detail_level="full", token_budget=10)
 
-        assert result["results"][0]["content"].endswith("use memento_get for full note")
+        assert result["results"][0]["content"].endswith("use almanac_get for full note")
         assert result["metadata"]["truncated"] is True
         assert result["metadata"]["expandable_paths"] == ["notes/long.md"]
 
@@ -763,7 +760,7 @@ class TestMementoSearchInvalidatedExclusion:
         assert result["results"] == []
         assert result["miss"]["reason"] == "filters_eliminated_all"
         assert result["miss"]["details"]["filters_applied"]["type"] == "decision"
-        assert "memento_query" in " ".join(result["miss"]["recovery_hints"])
+        assert "almanac_query" in " ".join(result["miss"]["recovery_hints"])
         assert result["metadata"]["filters_applied"]["type"] == "decision"
 
     @patch("memento.mcp_server.log_retrieval")
@@ -1110,31 +1107,31 @@ class TestMcpToolInventoryDocs:
 
 class TestToolSelectionDescriptions:
     def test_search_docstring_guides_when_to_search_and_get(self):
-        doc = memento_search.__doc__ or ""
+        doc = mcp_server.almanac_search.__doc__ or ""
 
         assert "past decisions" in doc
         assert "prior bug fixes" in doc
         assert "exact identifier" in doc
         assert "Do not use this to read a known note path/name" in doc
-        assert "call memento_get" in doc
+        assert "call almanac_get" in doc
 
     def test_query_docstring_differentiates_structured_queries_from_search(self):
-        doc = memento_query.__doc__ or ""
+        doc = mcp_server.almanac_query.__doc__ or ""
 
         assert "typed metadata filters and aggregations" in doc
         assert "without retrieving full note bodies" in doc
         assert "not a semantic" in doc
-        assert "use memento_search" in doc
+        assert "use almanac_search" in doc
 
     def test_get_docstring_guides_search_then_get(self):
-        doc = memento_get.__doc__ or ""
+        doc = mcp_server.almanac_get.__doc__ or ""
 
         assert "full content" in doc
-        assert "Use this after memento_search" in doc
-        assert "search first with memento_search" in doc
+        assert "Use this after almanac_search" in doc
+        assert "search first with almanac_search" in doc
 
     def test_contradictions_docstring_guides_comparison_use(self):
-        doc = memento_contradictions.__doc__ or ""
+        doc = mcp_server.almanac_contradictions.__doc__ or ""
 
         assert "validity chains" in doc
         assert "invalidated" in doc
@@ -1150,22 +1147,22 @@ class TestToolSelectionDescriptions:
             doc = tool.__doc__ or ""
             assert "Host-adapter primitive" in doc
             assert "not a general user-answering search tool" in doc
-            assert "memento_search" in doc
+            assert "almanac_search" in doc
 
     def test_write_tool_docstrings_separate_low_level_from_interactive_workflows(self):
-        store_doc = memento_store.__doc__ or ""
+        store_doc = mcp_server.almanac_store.__doc__ or ""
         smart_store_doc = mcp_server.memento_store_smart.__doc__ or ""
-        capture_doc = memento_capture.__doc__ or ""
-        daily_snapshot_doc = memento_daily_snapshot.__doc__ or ""
-        preserve_doc = memento_preserve.__doc__ or ""
+        capture_doc = mcp_server.almanac_capture.__doc__ or ""
+        daily_snapshot_doc = mcp_server.almanac_daily_snapshot.__doc__ or ""
+        preserve_doc = mcp_server.almanac_preserve.__doc__ or ""
 
         assert "low-level primitive" in store_doc
-        assert "/memento" in store_doc
+        assert "/almanac" in store_doc
         assert "Smart-store" in smart_store_doc
         assert "duplicate/update/supersede" in smart_store_doc
         assert "low-level write primitive" in capture_doc
         assert "ordinary interactive" in capture_doc
-        assert "/memento" in capture_doc
+        assert "/almanac" in capture_doc
         assert "low-level write primitive" in daily_snapshot_doc
         assert "deterministic path-controlled" in daily_snapshot_doc
         assert "ordinary notes" in daily_snapshot_doc
@@ -1174,9 +1171,9 @@ class TestToolSelectionDescriptions:
         assert "remote HTTP" in preserve_doc
 
     def test_status_and_maintenance_docstrings_are_not_recall_tools(self):
-        status_doc = memento_status.__doc__ or ""
-        list_doc = memento_list.__doc__ or ""
-        reindex_doc = memento_reindex.__doc__ or ""
+        status_doc = mcp_server.almanac_status.__doc__ or ""
+        list_doc = mcp_server.almanac_list.__doc__ or ""
+        reindex_doc = mcp_server.almanac_reindex.__doc__ or ""
 
         assert "operational checks" in status_doc
         assert "Do not use it to answer questions about" in status_doc

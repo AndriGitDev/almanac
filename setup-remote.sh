@@ -18,8 +18,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_DIR="$HOME/.config/memento-vault"
-PORT="${MEMENTO_PORT:-8745}"
+PORT="${ALMANAC_PORT:-${MEMENTO_PORT:-8745}}"
 HOST=""
 ENABLE_TLS=false
 SKIP_MIGRATE=false
@@ -124,17 +123,21 @@ fi
 step "Step 2: Detect existing vault"
 
 VAULT_PATH=""
-if [ -f "$CONFIG_DIR/memento.yml" ]; then
+if [ -f "$HOME/.config/almanac/almanac.yml" ] || [ -f "$HOME/.config/memento-vault/memento.yml" ]; then
     VAULT_PATH=$(python3 -c "
 import sys
 sys.path.insert(0, '$SCRIPT_DIR')
-from memento.config import load_config
+from almanac.config import load_config
 print(load_config()['vault_path'])
 " 2>/dev/null || echo "")
 fi
 
 if [ -z "$VAULT_PATH" ]; then
-    VAULT_PATH="$HOME/memento"
+    if [ -d "$HOME/memento/notes" ] && [ ! -d "$HOME/almanac/notes" ]; then
+        VAULT_PATH="$HOME/memento"
+    else
+        VAULT_PATH="$HOME/almanac"
+    fi
 fi
 
 if [ -d "$VAULT_PATH/notes" ]; then
@@ -149,16 +152,19 @@ fi
 
 step "Step 3: Configure authentication"
 
-API_KEY="${MEMENTO_API_KEY:-}"
+API_KEY="${ALMANAC_API_KEY:-${MEMENTO_API_KEY:-}}"
 ENV_FILE="$SCRIPT_DIR/.env"
+if [ -z "$API_KEY" ] && [ -f "$ENV_FILE" ]; then
+    API_KEY=$(sed -n 's/^ALMANAC_API_KEY=//p; s/^MEMENTO_API_KEY=//p' "$ENV_FILE" | head -1)
+fi
 if [ -z "$API_KEY" ]; then
     API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
     info "Generated new API key and saved to $ENV_FILE"
 else
-    info "Using existing MEMENTO_API_KEY from environment"
+    info "Using existing ALMANAC_API_KEY from environment"
 fi
 # Always persist key to env file with restricted permissions
-echo "MEMENTO_API_KEY=$API_KEY" > "$ENV_FILE"
+echo "ALMANAC_API_KEY=$API_KEY" > "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
 # --- Generate vault identity ---
@@ -168,7 +174,7 @@ step "Step 4: Vault identity"
 python3 -c "
 import sys
 sys.path.insert(0, '$SCRIPT_DIR')
-from memento.config import get_vault_id
+from almanac.config import get_vault_id
 vid = get_vault_id()
 print(f'  Vault ID: {vid}')
 " 2>/dev/null && info "Vault identity ready" || warn "Could not generate vault identity (non-fatal)"
@@ -190,13 +196,13 @@ services:
       - "8745"
     volumes:
       - vault-data:/vault
-      - vault-config:/home/memento/.config/memento-vault
+      - vault-config:/home/almanac/.config/almanac
     environment:
-      - MEMENTO_VAULT_PATH=/vault
-      - MEMENTO_TRANSPORT=streamable-http
-      - MEMENTO_HOST=0.0.0.0
-      - MEMENTO_PORT=8745
-      - MEMENTO_API_KEY=\${MEMENTO_API_KEY:-}
+      - ALMANAC_VAULT_PATH=/vault
+      - ALMANAC_TRANSPORT=streamable-http
+      - ALMANAC_HOST=0.0.0.0
+      - ALMANAC_PORT=8745
+      - ALMANAC_API_KEY=\${ALMANAC_API_KEY:-}
     restart: unless-stopped
 
   caddy:
@@ -228,8 +234,8 @@ fi
 
 step "Step 6: Build and start"
 
-export MEMENTO_API_KEY="$API_KEY"
-export MEMENTO_PORT="$PORT"
+export ALMANAC_API_KEY="$API_KEY"
+export ALMANAC_PORT="$PORT"
 
 docker compose -f "$COMPOSE_FILE" build
 info "Docker image built"
@@ -253,7 +259,7 @@ for i in $(seq 1 20); do
     if python3 -c "
 import os, urllib.request
 req = urllib.request.Request('$CHECK_URL')
-key = os.environ.get('MEMENTO_API_KEY', '')
+key = os.environ.get('ALMANAC_API_KEY', '')
 if key:
     req.add_header('Authorization', f'Bearer {key}')
 urllib.request.urlopen(req, timeout=3)
@@ -287,7 +293,7 @@ if [ "$SKIP_MIGRATE" != true ] && [ "$NOTE_COUNT" -gt 0 ]; then
                     docker cp "$VAULT_PATH/$dir/." "$CONTAINER_ID:/vault/$dir/"
                 fi
             done
-            for file in memento.yml vault-identity.json; do
+            for file in almanac.yml memento.yml vault-identity.json; do
                 if [ -f "$VAULT_PATH/$file" ]; then
                     docker cp "$VAULT_PATH/$file" "$CONTAINER_ID:/vault/$file"
                 fi
@@ -311,32 +317,32 @@ echo ""
 echo -e "${BOLD}To connect THIS machine:${NC}"
 echo ""
 echo -e "  ${CYAN}cd $SCRIPT_DIR${NC}"
-echo -e "  ${CYAN}source .env && MEMENTO_API_KEY=\$MEMENTO_API_KEY ./install.sh --remote $VAULT_URL --experimental${NC}"
+echo -e "  ${CYAN}source .env && ALMANAC_API_KEY=\$ALMANAC_API_KEY ./install.sh --remote $VAULT_URL --experimental${NC}"
 echo ""
 echo -e "${BOLD}To connect ANOTHER machine (laptop, CI, etc.):${NC}"
 echo ""
 echo -e "  ${CYAN}# Copy the API key from $ENV_FILE on this machine${NC}"
 echo -e "  ${CYAN}git clone https://github.com/AndriGitDev/almanac.git${NC}"
 echo -e "  ${CYAN}cd almanac${NC}"
-echo -e "  ${CYAN}MEMENTO_API_KEY=<key-from-env-file> ./install.sh --remote $VAULT_URL --experimental${NC}"
+echo -e "  ${CYAN}ALMANAC_API_KEY=<key-from-env-file> ./install.sh --remote $VAULT_URL --experimental${NC}"
 echo ""
 echo -e "${BOLD}To connect from Claude Code (CLI or web):${NC}"
 echo ""
-echo -e "  ${CYAN}claude mcp add -s user --transport http memento-vault $VAULT_URL/mcp \\${NC}"
+echo -e "  ${CYAN}claude mcp add -s user --transport http almanac $VAULT_URL/mcp \\${NC}"
 echo -e "  ${CYAN}  --header \"Authorization: Bearer <key-from-$ENV_FILE>\"${NC}"
 echo ""
 echo -e "${BOLD}To connect from Codex:${NC}"
 echo ""
-echo -e "  ${CYAN}export MEMENTO_API_KEY=<key-from-$ENV_FILE>${NC}"
-echo -e "  ${CYAN}codex mcp add memento-vault \\${NC}"
+echo -e "  ${CYAN}export ALMANAC_API_KEY=<key-from-$ENV_FILE>${NC}"
+echo -e "  ${CYAN}codex mcp add almanac \\${NC}"
 echo -e "  ${CYAN}  --url $VAULT_URL/mcp \\${NC}"
-echo -e "  ${CYAN}  --bearer-token-env-var MEMENTO_API_KEY${NC}"
+echo -e "  ${CYAN}  --bearer-token-env-var ALMANAC_API_KEY${NC}"
 echo ""
 
 if [ "$IS_REMOTE" != true ]; then
     read -rp "Reconfigure this machine now? [Y/n] " reconfig
     if [[ ! "$reconfig" =~ ^[Nn] ]]; then
-        MEMENTO_API_KEY="$API_KEY" "$SCRIPT_DIR/install.sh" --remote "$VAULT_URL" --experimental --force
+        ALMANAC_API_KEY="$API_KEY" "$SCRIPT_DIR/install.sh" --remote "$VAULT_URL" --experimental --force
     fi
 fi
 

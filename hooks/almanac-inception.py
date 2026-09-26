@@ -1,0 +1,2189 @@
+#!/usr/bin/env python3
+"""
+Inception — background consolidation agent for almanac-vault.
+Clusters vault notes by embedding similarity and produces pattern notes.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import os
+import re
+import sqlite3
+import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+
+# Add repo root and hooks dir to path for local imports
+_repo_root = Path(__file__).parent.parent
+sys.path.insert(0, str(_repo_root))
+sys.path.insert(0, str(Path(__file__).parent))
+from almanac.config import RUNTIME_DIR, get_config, slugify  # noqa: E402
+from almanac.contradictions import _normalize_note_ref, apply_invalidation  # noqa: E402
+from almanac.embedded_search import EmbeddedSearchBackend  # noqa: E402
+from almanac.llm import llm_complete  # noqa: E402
+from almanac.search import has_qmd  # noqa: E402
+from almanac.search_backend import QMDBackend, get_backend  # noqa: E402
+from almanac.store import (  # noqa: E402
+    INCEPTION_STATE_PATH,
+    acquire_inception_lock,
+    load_inception_state,
+    release_inception_lock,
+    save_inception_state,
+)
+
+
+@dataclass
+class NoteRecord:
+    stem: str
+    path: Path
+    title: str
+    note_type: str
+    tags: list
+    date: str
+    certainty: int | None = None
+    project: str | None = None
+    source: str | None = None
+    synthesized_from: list = field(default_factory=list)
+    body: str = ""
+    wikilinks: list = field(default_factory=list)
+    # MEM-148 resurfacing signal (frontmatter resurfaced_count/last_resurfaced,
+    # folded from the access log). Not consumed by any reader on this branch
+    # yet -- MEM-148 landed on a separate branch -- but Inception reads them
+    # here so pattern notes can inherit the signal (see write_pattern_note).
+    resurfaced_count: int = 0
+    last_resurfaced: str | None = None
+    # MEM-163 bitemporal supersession: `supersedes` (this note's declared
+    # older note, note-ref stem) and `invalidated_by` (set once this note's
+    # validity has been explicitly closed out, by the sweeper backlink pass
+    # or by contradiction-adjudication auto-apply). Both None when absent --
+    # a note is invalid once invalidated_by is set.
+    supersedes: str | None = None
+    invalidated_by: str | None = None
+
+
+def parse_note(path: Path) -> NoteRecord | None:
+    """Parse a note file into a NoteRecord. Returns None on failure."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    # Parse frontmatter
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != "---":
+        return NoteRecord(
+            stem=path.stem,
+            path=path,
+            title=path.stem,
+            note_type="unknown",
+            tags=[],
+            date="",
+            body=text,
+        )
+
+    fm_end = None
+    for i, line in enumerate(lines[1:], 1):
+        if line.strip() == "---":
+            fm_end = i
+            break
+
+    if fm_end is None:
+        return NoteRecord(
+            stem=path.stem,
+            path=path,
+            title=path.stem,
+            note_type="unknown",
+            tags=[],
+            date="",
+            body=text,
+        )
+
+    fm_lines = lines[1:fm_end]
+    body = "\n".join(lines[fm_end + 1 :]).strip()
+
+    # Simple frontmatter parser
+    meta = {}
+    current_key = None
+    current_list = None
+    for line in fm_lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("- ") and current_key:
+            if current_list is None:
+                current_list = []
+            val = stripped[2:].strip().strip("'\"")
+            # Strip wikilink syntax
+            if val.startswith("[[") and val.endswith("]]"):
+                val = val[2:-2]
+            current_list.append(val)
+            meta[current_key] = current_list
+            continue
+
+        if ":" in stripped:
+            current_list = None
+            key, _, val = stripped.partition(":")
+            key = key.strip()
+            val = val.strip()
+            current_key = key
+
+            # Handle inline list: [a, b, c]
+            if val.startswith("[") and val.endswith("]"):
+                items = [v.strip().strip("'\"") for v in val[1:-1].split(",") if v.strip()]
+                meta[key] = items
+            elif val:
+                meta[key] = val
+            # If val is empty, might be a multi-line list (handled by "- " above)
+
+    # Extract wikilinks from body
+    wikilinks = re.findall(r"\[\[([^\]]+)\]\]", body)
+
+    # Parse certainty as int
+    certainty = None
+    if meta.get("certainty"):
+        try:
+            certainty = int(meta["certainty"])
+        except (ValueError, TypeError):
+            pass
+
+    # Parse resurfaced_count as int (MEM-148 signal; defaults to 0 when absent)
+    resurfaced_count = 0
+    if meta.get("resurfaced_count"):
+        try:
+            resurfaced_count = int(meta["resurfaced_count"])
+        except (ValueError, TypeError):
+            resurfaced_count = 0
+
+    supersedes = _normalize_note_ref(meta.get("supersedes")) if meta.get("supersedes") else None
+    invalidated_by = _normalize_note_ref(meta.get("invalidated_by")) if meta.get("invalidated_by") else None
+
+    return NoteRecord(
+        stem=path.stem,
+        path=path,
+        title=meta.get("title", path.stem),
+        note_type=meta.get("type", "unknown"),
+        tags=meta.get("tags", []),
+        date=meta.get("date", ""),
+        certainty=certainty,
+        project=meta.get("project"),
+        source=meta.get("source"),
+        synthesized_from=meta.get("synthesized_from", []),
+        body=body,
+        wikilinks=wikilinks,
+        resurfaced_count=resurfaced_count,
+        last_resurfaced=meta.get("last_resurfaced") or None,
+        supersedes=supersedes,
+        invalidated_by=invalidated_by,
+    )
+
+
+def _parse_naive_dt(value):
+    """Parse an ISO datetime string to a naive datetime (tz stripped).
+
+    Vault frontmatter mixes tz-aware (``…+00:00`` / ``…Z``) and naive
+    date-only values; comparing the two raises TypeError. Normalizing to
+    naive lets ordering/eligibility comparisons work regardless of format.
+    """
+    dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if dt.tzinfo is not None:
+        dt = dt.replace(tzinfo=None)
+    return dt
+
+
+def collect_eligible_notes(config, state, full=False):
+    """Collect notes eligible for Inception clustering.
+
+    Filters:
+    - Only notes/*.md (no archive, fleeting, projects)
+    - Skip notes with source: inception (prevent recursion)
+    - Skip notes with excluded tags
+    - Skip already-processed notes (unless full=True)
+    """
+    vault = Path(config["vault_path"])
+    notes_dir = vault / "notes"
+
+    if not notes_dir.exists():
+        return []
+
+    exclude_tags = set(config.get("inception_exclude_tags", []))
+    processed = set(state.get("processed_notes", []))
+    last_run = state.get("last_run_iso")
+
+    notes = []
+    for md_file in sorted(notes_dir.glob("*.md")):
+        # Skip dotfiles (temp files from atomic writes)
+        if md_file.name.startswith("."):
+            continue
+
+        record = parse_note(md_file)
+        if record is None:
+            continue
+
+        # Skip inception-generated notes (prevent recursion)
+        if record.source == "inception":
+            continue
+
+        # Skip notes with excluded tags
+        if exclude_tags and exclude_tags.intersection(record.tags):
+            continue
+
+        # Skip already processed (unless full backfill)
+        if not full and record.stem in processed:
+            continue
+
+        # For incremental runs, only include notes newer than last run.
+        # Falls back to file mtime when frontmatter date is missing or
+        # unparseable — otherwise an unconsolidated note with a bad date
+        # would re-enter every incremental run forever.
+        if not full and last_run:
+            try:
+                if record.date:
+                    note_dt = _parse_naive_dt(record.date)
+                else:
+                    note_dt = datetime.fromtimestamp(md_file.stat().st_mtime)
+                last_dt = _parse_naive_dt(last_run)
+                if note_dt <= last_dt:
+                    continue
+            except (ValueError, OSError):
+                try:
+                    note_dt = datetime.fromtimestamp(md_file.stat().st_mtime)
+                    last_dt = _parse_naive_dt(last_run)
+                    if note_dt <= last_dt:
+                        continue
+                except (ValueError, OSError):
+                    pass  # include notes where both sources failed
+
+        notes.append(record)
+
+    return notes
+
+
+def _detect_qmd_vector_dim(conn, default=768):
+    """Best-effort detection of QMD's embedding dimensionality from its own
+    sqlite-vec schema, instead of assuming a fixed constant.
+
+    sqlite-vec's vec0 virtual tables declare their column width directly in
+    the CREATE VIRTUAL TABLE statement (e.g. ``embedding float[768]``), which
+    is recorded verbatim in ``sqlite_master.sql``. QMD's chunk-storage shadow
+    tables (``vectors_vec_rowids``, ``vectors_vec_vector_chunks00``) are
+    generated from a parent vec0 table conventionally named ``vectors_vec``;
+    read the dimension straight from there.
+
+    Falls back to *default* if the parent table isn't present or its SQL
+    can't be parsed (older/nonstandard QMD schemas), so behavior degrades to
+    the previous fixed assumption rather than misreading the vector layout.
+    """
+    try:
+        row = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'vectors_vec'").fetchone()
+        if row and row[0]:
+            match = re.search(r"float\[(\d+)\]", row[0])
+            if match:
+                return int(match.group(1))
+    except sqlite3.Error:
+        pass
+    return default
+
+
+def load_embeddings(note_stems, db_path=None, collection="almanac"):
+    """Load document-level embeddings from QMD's SQLite database.
+
+    QMD stores chunk-level float32 embeddings (768-dim for the default
+    model). This function mean-pools chunks into a single vector per
+    document. This is one of several possible vector sources for Inception
+    -- see load_active_backend_embeddings(), which selects between this
+    QMD reader, the embedded search backend, and no source at all based on
+    the vault's configured search backend.
+
+    Args:
+        note_stems: list of note filename stems (e.g. ["redis-cache-ttl"])
+        db_path: path to QMD SQLite database. Default: ~/.cache/qmd/index.sqlite
+        collection: QMD collection name
+
+    Returns:
+        dict mapping stem -> np.ndarray (L2-normalized). Dimensionality is
+        detected from QMD's own schema (see _detect_qmd_vector_dim), not
+        hardcoded.
+
+    Notes without embeddings are silently skipped.
+    """
+    if db_path is None:
+        db_path = Path.home() / ".cache" / "qmd" / "index.sqlite"
+
+    if not Path(db_path).exists():
+        return {}
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        # Build path -> stem mapping (QMD stores relative paths, not URIs)
+        path_to_stem = {}
+        for stem in note_stems:
+            path_to_stem[f"notes/{stem}.md"] = stem
+
+        if not path_to_stem:
+            return {}
+
+        # Step 1: Get document hashes for our notes
+        placeholders = ",".join("?" * len(path_to_stem))
+        doc_rows = conn.execute(
+            f"SELECT path, hash FROM documents WHERE collection = ? AND path IN ({placeholders})",
+            [collection] + list(path_to_stem.keys()),
+        ).fetchall()
+
+        if not doc_rows:
+            return {}
+
+        hash_to_stem = {}
+        for path, doc_hash in doc_rows:
+            stem = path_to_stem.get(path)
+            if stem:
+                hash_to_stem.setdefault(doc_hash, stem)
+
+        # Step 2: Get chunk info from content_vectors
+        hash_placeholders = ",".join("?" * len(hash_to_stem))
+        cv_rows = conn.execute(
+            f"SELECT hash, seq FROM content_vectors WHERE hash IN ({hash_placeholders})",
+            list(hash_to_stem.keys()),
+        ).fetchall()
+
+        if not cv_rows:
+            return {}
+
+        # Step 3: Look up vector locations in chunk storage
+        # vec0 stores vectors in chunks; vectors_vec_rowids maps id -> (chunk_id, chunk_offset)
+        # The id format is "{hash}_{seq}" (underscore separator)
+        vec_ids = [f"{h}_{s}" for h, s in cv_rows]
+        hash_seq_to_stem = {f"{h}_{s}": hash_to_stem[h] for h, s in cv_rows if h in hash_to_stem}
+
+        # Batch lookup chunk locations
+        vid_placeholders = ",".join("?" * len(vec_ids))
+        rowid_rows = conn.execute(
+            f"SELECT id, chunk_id, chunk_offset FROM vectors_vec_rowids WHERE id IN ({vid_placeholders})",
+            vec_ids,
+        ).fetchall()
+
+        if not rowid_rows:
+            return {}
+
+        # Step 4: Group by chunk_id for efficient blob reads
+        chunk_reads = {}  # chunk_id -> [(vec_id, offset)]
+        for vec_id, chunk_id, chunk_offset in rowid_rows:
+            chunk_reads.setdefault(chunk_id, []).append((vec_id, chunk_offset))
+
+        # Step 5: Read chunk blobs and extract individual vectors
+        # Each chunk stores up to 1024 vectors of dim floats (dim * 4 bytes
+        # each). Detect dim from QMD's own schema rather than assuming.
+        dim = _detect_qmd_vector_dim(conn)
+        vec_size = dim * 4  # float32
+
+        doc_chunks = {}
+        for chunk_id, entries in chunk_reads.items():
+            blob_row = conn.execute(
+                "SELECT vectors FROM vectors_vec_vector_chunks00 WHERE rowid = ?",
+                (chunk_id,),
+            ).fetchone()
+            if not blob_row or not blob_row[0]:
+                continue
+            blob = blob_row[0]
+            for vec_id, chunk_offset in entries:
+                start = chunk_offset * vec_size
+                end = start + vec_size
+                if end > len(blob):
+                    continue
+                vec = np.frombuffer(blob[start:end], dtype=np.float32).copy()
+                stem = hash_seq_to_stem.get(vec_id)
+                if stem:
+                    doc_chunks.setdefault(stem, []).append(vec)
+
+        # Mean-pool and normalize
+        result = {}
+        for stem, chunks in doc_chunks.items():
+            mean_vec = np.mean(chunks, axis=0)
+            norm = np.linalg.norm(mean_vec)
+            if norm > 0:
+                mean_vec = mean_vec / norm
+            result[stem] = mean_vec
+
+        return result
+    finally:
+        conn.close()
+
+
+def load_embedded_vectors(note_stems, backend):
+    """Load per-note embeddings from the embedded search backend's vector index.
+
+    Unlike QMD, the embedded backend (almanac/embedded_search.py) stores
+    exactly one whole-document vector per note keyed by path -- notes_vec has
+    no chunking, so no mean-pooling is needed here. Dimensionality comes from
+    the backend's own provider/index metadata (MEM-46 embedding-dimension
+    tracking), never a hardcoded constant, so it stays correct whether the
+    embedding provider emits 512-dim (default Matryoshka-truncated nomic) or
+    any other size.
+
+    Args:
+        note_stems: list of note filename stems (e.g. ["redis-cache-ttl"])
+        backend: an EmbeddedSearchBackend instance
+
+    Returns:
+        dict mapping stem -> np.ndarray. Notes without a stored vector, or
+        whose stored vector doesn't match the backend's declared dimension,
+        are silently skipped (mirrors load_embeddings' QMD behavior).
+    """
+    dim = backend.vector_dimensions()
+    if not dim:
+        return {}
+
+    path_to_stem = {f"notes/{stem}.md": stem for stem in note_stems}
+    if not path_to_stem:
+        return {}
+
+    raw = backend.get_note_vectors(list(path_to_stem.keys()))
+    if not raw:
+        return {}
+
+    result = {}
+    for path, vec in raw.items():
+        stem = path_to_stem.get(path)
+        if stem is None:
+            continue
+        arr = np.array(vec, dtype=np.float32)
+        if arr.shape != (dim,):
+            continue
+        result[stem] = arr
+    return result
+
+
+def load_active_backend_embeddings(note_stems, config, db_path=None):
+    """Select and load note embeddings from the vault's active search backend.
+
+    Inception must not assume QMD is present -- the default, QMD-less install
+    uses the embedded search backend (almanac/embedded_search.py), which
+    stores 512-dim vectors in .search/search.db rather than QMD's private
+    768-dim SQLite cache. This resolves the vector source using the same
+    backend selection as almanac.search_backend.get_backend() (QMD ->
+    Embedded -> Grep) instead of duplicating that heuristic here.
+
+    Args:
+        note_stems: list of note filename stems to load vectors for
+        config: the loaded almanac config dict
+        db_path: optional explicit QMD SQLite path. When given, this forces
+            the QMD reader against that literal path (used by callers/tests
+            that want to bypass backend auto-detection entirely); when None,
+            the active backend is resolved and used.
+
+    Returns:
+        (embeddings, source, reason) where:
+          - embeddings: dict stem -> np.ndarray (possibly empty)
+          - source: "qmd", "embedded", or "none"
+          - reason: short machine-readable string explaining an empty
+            result, e.g. "qmd-empty", "embedded-empty", "no-vector-backend".
+            None when embeddings were found.
+    """
+    if db_path is not None:
+        collection = config.get("qmd_collection", "almanac")
+        embeddings = load_embeddings(note_stems, db_path=db_path, collection=collection)
+        return (embeddings, "qmd", None if embeddings else "qmd-empty")
+
+    backend = get_backend()
+
+    if isinstance(backend, QMDBackend) and backend.is_available():
+        collection = config.get("qmd_collection", "almanac")
+        embeddings = load_embeddings(note_stems, collection=collection)
+        return (embeddings, "qmd", None if embeddings else "qmd-empty")
+
+    if isinstance(backend, EmbeddedSearchBackend):
+        embeddings = load_embedded_vectors(note_stems, backend)
+        return (embeddings, "embedded", None if embeddings else "embedded-empty")
+
+    # Grep backend (or no backend at all) has no vectors to offer. Inception
+    # cannot cluster without embeddings -- surface this explicitly rather
+    # than silently no-op-ing (the QMD-only assumption this replaces used to
+    # do exactly that on QMD-less installs).
+    return ({}, "none", "no-vector-backend")
+
+
+def score_cluster(stems, notes_dict):
+    """Score a cluster for synthesis priority. Higher = more interesting.
+
+    Components:
+      1. Size bonus: log2(n) -- diminishing returns past 8 notes
+      2. Tag diversity: unique_tags / total_tag_mentions
+      3. Temporal spread: days between earliest and latest note / 30, capped at 1.0
+      4. Project diversity: 0.5 bonus if notes span 2+ projects
+      5. Mean certainty: normalized to 0-1 (divided by 5)
+
+    Weights: size*1.0, diversity*0.8, temporal*0.6, project*0.5, certainty*0.3
+    """
+    records = [notes_dict[s] for s in stems if s in notes_dict]
+    if not records:
+        return 0.0
+
+    # 1. Size (log scale)
+    size_score = math.log2(len(records))
+
+    # 2. Tag diversity
+    all_tags = []
+    for r in records:
+        all_tags.extend(r.tags)
+    unique_tags = len(set(all_tags))
+    tag_diversity = unique_tags / max(len(all_tags), 1)
+
+    # 3. Temporal spread (days / 30, capped at 1.0)
+    dates = []
+    for r in records:
+        if r.date:
+            try:
+                dates.append(_parse_naive_dt(r.date))
+            except ValueError:
+                pass
+    if len(dates) >= 2:
+        spread_days = (max(dates) - min(dates)).days
+        temporal_score = min(spread_days / 30.0, 1.0)
+    else:
+        temporal_score = 0.0
+
+    # 4. Project diversity
+    projects = set(r.project for r in records if r.project)
+    project_bonus = 0.5 if len(projects) >= 2 else 0.0
+
+    # 5. Mean certainty (normalized to 0-1)
+    certainties = [r.certainty for r in records if r.certainty is not None]
+    certainty_score = (sum(certainties) / len(certainties) / 5.0) if certainties else 0.5
+
+    return size_score * 1.0 + tag_diversity * 0.8 + temporal_score * 0.6 + project_bonus * 0.5 + certainty_score * 0.3
+
+
+def compute_inception_budget(config, notes_ingested):
+    """Derive this run's note-processing budget from capture volume (MEM-154).
+
+    Consolidation was falling behind ingest (10 runs processed 271 of ~4,788
+    notes while capture adds ~145 notes/day) because the per-run limit was a
+    fixed cluster count, blind to how much backlog had actually accumulated.
+    This ties the budget to ingest volume instead:
+
+        budget = min(max(inception_budget_floor, notes_ingested), inception_budget_cap)
+
+    inception_budget_cap is always the hard ceiling -- even a misconfigured
+    floor above the cap can't exceed it.
+
+    ``notes_ingested`` is the count of eligible notes newly dated since the
+    last Inception run (``len(new_notes)`` from ``collect_eligible_notes``,
+    already computed by ``main()`` for its own eligibility filtering -- the
+    cheapest available signal, since it requires no extra file scans beyond
+    what the run already does).
+
+    Returns:
+        int: the number of notes this run should aim to consolidate.
+    """
+    floor = max(0, int(config.get("inception_budget_floor", 20)))
+    cap = max(0, int(config.get("inception_budget_cap", 200)))
+    budget = max(floor, int(notes_ingested))
+    # cap is a hard ceiling: if a misconfigured floor exceeds it, cap still
+    # wins rather than silently disabling the ceiling.
+    return min(budget, cap)
+
+
+def select_clusters_within_budget(scored_clusters, note_budget):
+    """Greedily select scored clusters (highest score first) up to a note budget.
+
+    Replaces the old fixed ``scored[:max_clusters]`` slice: instead of always
+    processing a fixed number of clusters, this keeps adding the next
+    highest-scored cluster while the cumulative note count is still under
+    budget. Always includes at least one cluster (if any are available) so a
+    run still makes progress when a single cluster already exceeds the
+    budget.
+
+    Args:
+        scored_clusters: list of (cid, stems, score), already sorted by score
+            descending (as produced by the caller's ``scored.sort(...)``).
+        note_budget: max cumulative notes to select for, from
+            compute_inception_budget().
+
+    Returns:
+        list: the selected prefix of scored_clusters.
+    """
+    selected = []
+    notes_so_far = 0
+    for item in scored_clusters:
+        if selected and notes_so_far >= note_budget:
+            break
+        selected.append(item)
+        notes_so_far += len(item[1])
+    return selected
+
+
+def build_synthesis_prompt(cluster_stems, notes_dict, merge_target=None):
+    """Build a prompt for the LLM to synthesize a pattern note from a cluster.
+
+    Args:
+        cluster_stems: list of note stems in the cluster
+        notes_dict: dict mapping stem -> NoteRecord
+        merge_target: if set, the stem of an existing pattern note to update
+
+    Returns:
+        str: the full prompt to send to codex/claude
+    """
+    system = (
+        "You are the Inception, a consolidation agent for a personal knowledge vault. "
+        "You receive a cluster of related atomic notes from different sessions and produce "
+        "a single pattern note that captures the higher-order insight connecting them.\n\n"
+        "Rules:\n"
+        "- If the connection is trivial, obvious, or just 'these are about the same topic,' respond with exactly: SKIP\n"
+        "- The pattern note should capture a recurring approach, common root cause, or cross-cutting insight "
+        "that is NOT obvious from any single source note alone.\n"
+        "- Write 2-5 sentences for the body. Be specific and concrete.\n"
+        "- Return your response as a JSON object (no markdown fencing) with these fields:\n"
+        "  - title: string (concise pattern title)\n"
+        "  - body: string (the 2-5 sentence synthesis)\n"
+        "  - tags: list of strings (union of relevant source tags, plus any new cross-cutting tags)\n"
+        "  - certainty: int 1-5 (your confidence this is a real pattern)\n"
+        "  - related: list of strings (ONLY use the exact source note stems provided below, never invent note names)\n"
+    )
+
+    source_blocks = []
+    for stem in cluster_stems:
+        note = notes_dict.get(stem)
+        if note is None:
+            continue
+        block = (
+            f"### {note.title}\n"
+            f"Type: {note.note_type} | Tags: {', '.join(note.tags)} | "
+            f"Date: {note.date} | Certainty: {note.certainty or '?'} | "
+            f"Project: {note.project or 'none'}\n\n"
+            f"{note.body.strip()}"
+        )
+        source_blocks.append(block)
+
+    user_content = system + "\n---\n\nHere are the clustered source notes:\n\n" + "\n\n---\n\n".join(source_blocks)
+
+    if merge_target:
+        user_content += (
+            f"\n\n---\n\nAn existing pattern note already covers a subset of these sources: "
+            f"[[{merge_target}]]. Revise and expand it to incorporate the new sources. "
+            f"Keep the existing insight but add what the new notes contribute."
+        )
+
+    return user_content
+
+
+def build_synthesized_from_ledger(notes_dir):
+    """Scan existing source:inception notes and build a ledger of what's been consolidated.
+
+    Returns:
+        dict mapping pattern_note_stem -> set of source stems
+    """
+    ledger = {}
+    notes_path = Path(notes_dir)
+    if not notes_path.exists():
+        return ledger
+
+    for md_file in notes_path.glob("*.md"):
+        record = parse_note(md_file)
+        if record is None:
+            continue
+        if record.source != "inception":
+            continue
+        if record.synthesized_from:
+            ledger[record.stem] = set(record.synthesized_from)
+
+    return ledger
+
+
+def check_ledger_dedup(cluster_stems, ledger):
+    """Check if a cluster is already covered by existing pattern notes.
+
+    Returns:
+        ("skip", None) — cluster already fully covered
+        ("create", None) — cluster is novel, create new pattern note
+        ("merge", existing_stem) — cluster is a superset of existing, update it
+    """
+    cluster_set = set(cluster_stems)
+
+    for pattern_stem, source_set in ledger.items():
+        # Exact match or cluster is a subset — already covered
+        if cluster_set == source_set or cluster_set.issubset(source_set):
+            return ("skip", None)
+        # Cluster is a superset — merge into existing
+        if source_set.issubset(cluster_set) and len(cluster_set) > len(source_set):
+            return ("merge", pattern_stem)
+
+    return ("create", None)
+
+
+def check_title_overlap(slug, existing_stems):
+    """Check if a slugified title overlaps too much with existing note stems.
+
+    Returns True if overlap > 0.70 with any existing stem (token Jaccard),
+    or if one slug is a substring of the other (catches prefix dupes like
+    "decouple-safety-controls" vs "decouple-safety-controls-and-trust-boundaries").
+    """
+    if not slug:
+        return False
+
+    slug_tokens = set(slug.split("-"))
+    if not slug_tokens:
+        return False
+
+    for existing in existing_stems:
+        if not existing:
+            continue
+        # Substring containment: catches "foo-bar" vs "foo-bar-baz-qux"
+        if slug in existing or existing in slug:
+            return True
+
+        existing_tokens = set(existing.split("-"))
+        if not existing_tokens:
+            continue
+        intersection = slug_tokens & existing_tokens
+        # Jaccard similarity (union-based) instead of min-based overlap.
+        # More robust for slugs of different lengths.
+        union = slug_tokens | existing_tokens
+        jaccard = len(intersection) / len(union)
+        if jaccard > 0.70:
+            return True
+
+    return False
+
+
+def cluster_notes(embedding_matrix, stem_index, config):
+    """Cluster notes using HDBSCAN on their embedding vectors.
+
+    Args:
+        embedding_matrix: np.ndarray of shape (N, D) -- one row per note
+        stem_index: list of stem names, parallel to embedding_matrix rows
+        config: dict with inception_min_cluster_size, inception_cluster_threshold, inception_max_clusters
+
+    Returns:
+        dict mapping cluster_id -> list of stems
+        Noise points (label -1) are excluded.
+        Only clusters with >= min_cluster_size members are returned.
+        Sorted by cluster size descending, limited to max_clusters.
+    """
+    import hdbscan
+
+    min_cluster_size = config.get("inception_min_cluster_size", 3)
+    max_clusters = config.get("inception_max_clusters", 10)
+
+    if len(stem_index) < min_cluster_size:
+        return {}
+
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=min_cluster_size,
+        min_samples=2,
+        metric="euclidean",  # on normalized vectors, euclidean is proportional to cosine
+        cluster_selection_method="leaf",
+    )
+
+    labels = clusterer.fit_predict(embedding_matrix)
+
+    # Group stems by cluster label, excluding noise (-1)
+    clusters = {}
+    for i, label in enumerate(labels):
+        if label == -1:
+            continue
+        clusters.setdefault(int(label), []).append(stem_index[i])
+
+    # Filter by min size and sort by size descending
+    clusters = {cid: stems for cid, stems in clusters.items() if len(stems) >= min_cluster_size}
+
+    # Sort by size descending, limit to max_clusters
+    sorted_clusters = dict(sorted(clusters.items(), key=lambda x: len(x[1]), reverse=True)[:max_clusters])
+
+    return sorted_clusters
+
+
+def _parse_resurfaced_ts(value):
+    """Parse a last_resurfaced frontmatter value into a datetime for comparison.
+
+    MEM-148 writes this as ``YYYY-MM-DDTHH:MM:SSZ`` (UTC). Tolerate bare
+    ``Z`` suffixes (not accepted by fromisoformat on all supported Python
+    versions) and any other unparseable value by returning None, so a
+    malformed timestamp on one source note never breaks aggregation.
+    """
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def aggregate_resurfacing_signal(cluster_stems, notes_dict):
+    """Sum resurfaced_count and take the max last_resurfaced across a cluster.
+
+    Carries the MEM-148 resurfacing signal (frontmatter resurfaced_count/
+    last_resurfaced, folded from the access log) forward onto synthesis
+    pattern notes, so consolidating source notes into a pattern doesn't
+    erase how often or how recently they were resurfaced. Nothing on this
+    branch reads these fields back yet (MEM-148 landed on a separate
+    branch), but writing them now means the signal survives once the
+    branches merge.
+
+    Returns:
+        (resurfaced_count, last_resurfaced) -- resurfaced_count is an int
+        (0 if no source note has one), last_resurfaced is the raw string
+        value from whichever source note has the latest timestamp, or None.
+    """
+    total = 0
+    latest_raw = None
+    latest_dt = None
+    for stem in cluster_stems:
+        record = (notes_dict or {}).get(stem)
+        if record is None:
+            continue
+        total += record.resurfaced_count or 0
+        dt = _parse_resurfaced_ts(record.last_resurfaced)
+        if dt is None:
+            continue
+        if latest_dt is None or dt > latest_dt:
+            latest_dt = dt
+            latest_raw = record.last_resurfaced
+    return total, latest_raw
+
+
+def write_pattern_note(synthesis, cluster_stems, vault_path, merge_target=None, notes_dict=None):
+    """Write a pattern note to the vault using atomic write.
+
+    Args:
+        synthesis: dict with keys: title, body, tags, certainty, related
+        cluster_stems: list of source note stems
+        vault_path: Path to vault root
+        merge_target: if set, overwrite this existing note stem instead of creating new
+        notes_dict: optional dict mapping stem -> NoteRecord, used to inherit
+            the MEM-148 resurfacing signal (see aggregate_resurfacing_signal).
+            When omitted, the pattern note gets resurfaced_count: 0.
+
+    Returns:
+        Path to the written note, or None if write failed
+    """
+    notes_dir = Path(vault_path) / "notes"
+    now = datetime.now().strftime("%Y-%m-%dT%H:%M")
+
+    if merge_target:
+        # Refresh: overwrite the existing note with updated content
+        slug = merge_target
+    else:
+        # Build slug, detect duplicates vs genuine collisions
+        base_slug = slugify(synthesis["title"])
+        slug = base_slug
+
+        if (notes_dir / f"{slug}.md").exists():
+            # An existing note has the exact same slug. This is almost certainly
+            # a duplicate synthesis, not a genuine collision. Return None to skip
+            # rather than creating a -2 suffixed duplicate.
+            return None
+
+    # Build frontmatter
+    tags_str = "[" + ", ".join(synthesis.get("tags", [])) + "]"
+    synth_lines = "\n".join(f"  - {s}" for s in cluster_stems)
+    resurfaced_count, last_resurfaced = aggregate_resurfacing_signal(cluster_stems, notes_dict)
+    # No trailing newline: the template below supplies the literal "\n---"
+    # terminator that scripts/check_frontmatter_schema.py anchors on.
+    resurfacing_lines = f"resurfaced_count: {resurfaced_count}"
+    if last_resurfaced:
+        resurfacing_lines += f"\nlast_resurfaced: {last_resurfaced}"
+
+    content = f"""---
+title: {synthesis["title"]}
+type: pattern
+tags: {tags_str}
+source: inception
+certainty: {min(synthesis.get("certainty", 3), 3)}
+synthesized_from:
+{synth_lines}
+date: {now}
+{resurfacing_lines}
+---
+
+{synthesis["body"].strip()}
+
+## Related
+
+"""
+    # Add wikilinks to related notes (only existing notes, never hallucinated names)
+    existing_stems = {f.stem for f in notes_dir.glob("*.md")}
+    related = synthesis.get("related", cluster_stems)
+    seen_links = set()
+    for r in related:
+        if r in existing_stems and r not in seen_links:
+            content += f"- [[{r}]]\n"
+            seen_links.add(r)
+    # Always include source stems even if LLM forgot them
+    for s in cluster_stems:
+        if s not in seen_links:
+            content += f"- [[{s}]]\n"
+
+    # Atomic write: temp file then rename
+    target = notes_dir / f"{slug}.md"
+    tmp = notes_dir / f".inception-tmp-{slug}.md"
+    try:
+        tmp.write_text(content)
+        os.replace(str(tmp), str(target))
+        return target
+    except OSError:
+        # Clean up temp file on failure
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        return None
+
+
+def backlink_sources(pattern_stem, source_stems, vault_path):
+    """Append [[pattern_stem]] to each source note's ## Related section.
+
+    Creates ## Related section if missing. Skips if link already exists.
+    """
+    notes_dir = Path(vault_path) / "notes"
+    link = f"[[{pattern_stem}]]"
+
+    for stem in source_stems:
+        note_path = notes_dir / f"{stem}.md"
+        if not note_path.exists():
+            continue
+
+        text = note_path.read_text()
+
+        # Skip if link already present
+        if link in text:
+            continue
+
+        # Find ## Related section
+        if "## Related" in text:
+            # Append after the last line in the Related section
+            text = text.rstrip() + f"\n- {link}\n"
+        else:
+            # Create Related section at the end
+            text = text.rstrip() + f"\n\n## Related\n\n- {link}\n"
+
+        note_path.write_text(text)
+
+
+def call_llm(prompt, config):
+    """Call the LLM backend to synthesize a pattern note.
+
+    Args:
+        prompt: the full prompt string
+        config: dict with inception_backend ("codex" or "claude")
+
+    Returns:
+        str: raw LLM response text, or empty string on failure
+    """
+    result = llm_complete(
+        prompt,
+        {
+            "llm_backend": config.get("inception_backend", "codex"),
+            "llm_model": config.get("inception_model"),
+        },
+    )
+    return result.text if result.ok else ""
+
+
+def parse_synthesis(raw):
+    """Parse the LLM's response into a synthesis dict.
+
+    Returns:
+        dict with keys: title, body, tags, certainty, related
+        or None if SKIP or malformed
+    """
+    if not raw:
+        return None
+
+    stripped = raw.strip()
+
+    # Check for SKIP response
+    if stripped == "SKIP" or stripped.startswith("SKIP"):
+        return None
+
+    # Strip markdown code fences if present
+    if stripped.startswith("```"):
+        lines = stripped.split("\n")
+        # Remove first line (```json or ```) and last line (```)
+        if lines[-1].strip() == "```":
+            lines = lines[1:-1]
+        else:
+            lines = lines[1:]
+        stripped = "\n".join(lines)
+
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+
+    # Validate required fields
+    if not isinstance(data, dict) or "title" not in data or "body" not in data:
+        return None
+
+    return {
+        "title": data["title"],
+        "body": data["body"],
+        "tags": data.get("tags", []),
+        "certainty": data.get("certainty", 3),
+        "related": data.get("related", []),
+    }
+
+
+# --- Contradiction detection v2 (MEM-163) ---
+#
+# Background candidate pass (embedding-similarity pairs, same project scope,
+# both non-invalidated) + LLM adjudication, riding this hook's cadence and
+# reusing the same embeddings/notes_dict already loaded for clustering (the
+# MEM-157 backend-aware vector access above -- never a second embedding
+# load). Auto-applies `invalidated_by` (via almanac.contradictions.
+# apply_invalidation) only when the LLM verdict says the pair contradicts,
+# the newer note wins, and confidence clears the configured threshold;
+# everything else queues to a review-queue file for human triage. Gated by
+# `contradiction_detection_enabled` (config, default False).
+
+DEFAULT_CONTRADICTION_SIMILARITY_THRESHOLD = 0.85
+DEFAULT_CONTRADICTION_MAX_PAIRS_PER_RUN = 20
+DEFAULT_CONTRADICTION_CONFIDENCE_THRESHOLD = 0.75
+CONTRADICTION_REVIEW_QUEUE_PATH = os.path.join(RUNTIME_DIR, "contradiction-review-queue.jsonl")
+
+
+def find_contradiction_candidates(stem_index, embedding_matrix, notes_dict, config):
+    """Find embedding-similarity candidate pairs for contradiction adjudication.
+
+    Scope: both notes in the same project (``NoteRecord.project``, compared
+    as-is -- two notes with no project are treated as sharing scope), cosine
+    similarity at or above ``contradiction_similarity_threshold`` (config),
+    and both notes non-invalidated (``NoteRecord.invalidated_by`` empty).
+    Pairs with an existing direct ``supersedes`` edge between them are
+    excluded -- the sweeper backlink pass already resolves those
+    deterministically without needing LLM adjudication.
+
+    Returns a list of ``(stem_a, stem_b, similarity)`` tuples sorted by
+    similarity descending.
+    """
+    n = len(stem_index)
+    if n < 2:
+        return []
+
+    threshold = config.get("contradiction_similarity_threshold", DEFAULT_CONTRADICTION_SIMILARITY_THRESHOLD)
+    try:
+        from sklearn.metrics.pairwise import cosine_similarity
+
+        sims = cosine_similarity(embedding_matrix)
+    except ImportError:
+        # Vectors from load_active_backend_embeddings are L2-normalized, so
+        # a plain dot product is an equivalent fallback if sklearn is ever
+        # unavailable in a stripped environment.
+        sims = embedding_matrix @ embedding_matrix.T
+
+    candidates = []
+    for i in range(n):
+        stem_a = stem_index[i]
+        rec_a = notes_dict.get(stem_a)
+        if rec_a is None or rec_a.invalidated_by:
+            continue
+        for j in range(i + 1, n):
+            stem_b = stem_index[j]
+            rec_b = notes_dict.get(stem_b)
+            if rec_b is None or rec_b.invalidated_by:
+                continue
+            if (rec_a.project or None) != (rec_b.project or None):
+                continue
+            if rec_a.supersedes == stem_b or rec_b.supersedes == stem_a:
+                continue
+            score = float(sims[i][j])
+            if score >= threshold:
+                candidates.append((stem_a, stem_b, score))
+
+    candidates.sort(key=lambda item: item[2], reverse=True)
+    return candidates
+
+
+def _order_by_date(rec_a, rec_b):
+    """Return ``(older, newer)`` NoteRecords by parsed date, or ``(None, None)`` if unorderable."""
+    try:
+        date_a = _parse_naive_dt(rec_a.date) if rec_a.date else None
+        date_b = _parse_naive_dt(rec_b.date) if rec_b.date else None
+    except ValueError:
+        return None, None
+    if date_a is None or date_b is None or date_a == date_b:
+        return None, None
+    return (rec_a, rec_b) if date_a < date_b else (rec_b, rec_a)
+
+
+def build_contradiction_prompt(older, newer, similarity):
+    """Build a strict-JSON-verdict adjudication prompt for one candidate pair."""
+    return f"""You are checking whether two notes in a knowledge vault contradict each other.
+
+OLDER note (written {older.date or "unknown date"}):
+Title: {older.title}
+{older.body[:1200]}
+
+NEWER note (written {newer.date or "unknown date"}):
+Title: {newer.title}
+{newer.body[:1200]}
+
+Embedding similarity: {similarity:.3f}
+
+Decide:
+1. contradicts: do these two notes make incompatible claims about the same thing?
+2. newer_wins: IF they contradict, does the newer note represent the correct/current
+   belief (true), or does the older note still hold and the newer one is wrong/unrelated
+   (false)?
+3. confidence: your confidence in this verdict, 0.0 to 1.0.
+
+Respond with ONLY a JSON object, no markdown fences, no other text:
+{{"contradicts": true or false, "newer_wins": true or false, "confidence": 0.0 to 1.0}}"""
+
+
+def parse_contradiction_verdict(raw):
+    """Parse a strict ``{contradicts, newer_wins, confidence}`` JSON verdict.
+
+    Returns the validated dict, or ``None`` on any malformed/out-of-range
+    input (missing keys, non-bool verdict fields, unparseable or
+    out-of-[0,1]-range confidence) -- callers must route ``None`` to the
+    review queue rather than guess.
+    """
+    if not raw:
+        return None
+    stripped = raw.strip()
+    if stripped.startswith("```"):
+        lines = stripped.split("\n")
+        if lines[-1].strip() == "```":
+            lines = lines[1:-1]
+        else:
+            lines = lines[1:]
+        stripped = "\n".join(lines)
+
+    try:
+        data = json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+
+    contradicts = data.get("contradicts")
+    newer_wins = data.get("newer_wins")
+    if not isinstance(contradicts, bool) or not isinstance(newer_wins, bool):
+        return None
+
+    confidence = data.get("confidence")
+    try:
+        confidence = float(confidence)
+    except (TypeError, ValueError):
+        return None
+    if not (0.0 <= confidence <= 1.0):
+        return None
+
+    return {"contradicts": contradicts, "newer_wins": newer_wins, "confidence": confidence}
+
+
+def _append_review_queue(queue_path, entry):
+    """Append one JSON line to the contradiction review queue (best-effort)."""
+    try:
+        os.makedirs(os.path.dirname(queue_path), mode=0o700, exist_ok=True)
+        record = {"ts": datetime.now().isoformat(timespec="seconds"), **entry}
+        with open(queue_path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, sort_keys=True) + "\n")
+    except OSError:
+        pass  # review-queue write failure must never break the run
+
+
+def run_contradiction_detection(
+    stem_index,
+    embedding_matrix,
+    notes_dict,
+    config,
+    vault_path,
+    *,
+    review_queue_path=None,
+    verbose=False,
+):
+    """MEM-163 candidate pass + adjudication for one Inception run.
+
+    Returns a report dict: ``candidates_found``, ``pairs_adjudicated``,
+    ``auto_applied`` (list), ``queued_for_review`` (list), ``malformed``
+    (count of unparseable verdicts).
+    """
+    report = {
+        "candidates_found": 0,
+        "pairs_adjudicated": 0,
+        "auto_applied": [],
+        "queued_for_review": [],
+        "malformed": 0,
+    }
+
+    candidates = find_contradiction_candidates(stem_index, embedding_matrix, notes_dict, config)
+    report["candidates_found"] = len(candidates)
+    if not candidates:
+        return report
+
+    max_pairs = config.get("contradiction_max_pairs_per_run", DEFAULT_CONTRADICTION_MAX_PAIRS_PER_RUN)
+    try:
+        max_pairs = max(0, int(max_pairs))
+    except (TypeError, ValueError):
+        max_pairs = DEFAULT_CONTRADICTION_MAX_PAIRS_PER_RUN
+    bounded = candidates[:max_pairs]
+
+    queue_path = review_queue_path or CONTRADICTION_REVIEW_QUEUE_PATH
+    confidence_threshold = config.get("contradiction_confidence_threshold", DEFAULT_CONTRADICTION_CONFIDENCE_THRESHOLD)
+
+    for stem_a, stem_b, similarity in bounded:
+        rec_a = notes_dict[stem_a]
+        rec_b = notes_dict[stem_b]
+        older, newer = _order_by_date(rec_a, rec_b)
+        if older is None:
+            entry = {
+                "stem_a": stem_a,
+                "stem_b": stem_b,
+                "similarity": similarity,
+                "reason": "unparseable-or-tied-dates",
+            }
+            _append_review_queue(queue_path, entry)
+            report["queued_for_review"].append(entry)
+            continue
+
+        prompt = build_contradiction_prompt(older, newer, similarity)
+        raw = call_llm(prompt, config)
+        report["pairs_adjudicated"] += 1
+        verdict = parse_contradiction_verdict(raw)
+
+        if verdict is None:
+            report["malformed"] += 1
+            entry = {
+                "stem_a": older.stem,
+                "stem_b": newer.stem,
+                "similarity": similarity,
+                "reason": "malformed-verdict",
+                "raw": (raw or "")[:500],
+            }
+            _append_review_queue(queue_path, entry)
+            report["queued_for_review"].append(entry)
+            continue
+
+        if verdict["contradicts"] and verdict["newer_wins"] and verdict["confidence"] >= confidence_threshold:
+            applied = apply_invalidation(vault_path, older.path, newer.stem)
+            report["auto_applied"].append(
+                {"older": older.stem, "newer": newer.stem, "confidence": verdict["confidence"], "applied": applied}
+            )
+            if applied:
+                print(
+                    f"[almanac] contradiction auto-applied: {older.stem} invalidated_by {newer.stem} "
+                    f"(confidence={verdict['confidence']:.2f})",
+                    file=sys.stderr,
+                )
+        else:
+            entry = {
+                "stem_a": older.stem,
+                "stem_b": newer.stem,
+                "similarity": similarity,
+                "verdict": verdict,
+                "reason": "below-policy-threshold",
+            }
+            _append_review_queue(queue_path, entry)
+            report["queued_for_review"].append(entry)
+
+    if verbose:
+        print(
+            f"Contradiction detection: {report['candidates_found']} candidates, "
+            f"{report['pairs_adjudicated']} adjudicated, {len(report['auto_applied'])} auto-applied, "
+            f"{len(report['queued_for_review'])} queued for review",
+            file=sys.stderr,
+        )
+
+    return report
+
+
+# --- Main Pipeline ---
+
+import argparse  # noqa: E402
+
+
+def check_dependencies():
+    """Check that required ML packages are installed.
+
+    Returns list of missing package names, or empty list if all present.
+    """
+    missing = []
+    for pkg in ("numpy", "hdbscan", "sklearn"):
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    return missing
+
+
+def parse_args(argv=None):
+    """Parse CLI arguments."""
+    parser = argparse.ArgumentParser(
+        description="Inception — background consolidation agent for almanac-vault",
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Log clusters and proposed notes, write nothing")
+    parser.add_argument("--full", action="store_true", help="Process all notes, ignoring threshold and processed list")
+    parser.add_argument("--max-clusters", type=int, default=None, help="Override inception_max_clusters config")
+    parser.add_argument("--verbose", action="store_true", help="Print progress to stderr")
+    return parser.parse_args(argv)
+
+
+def main(args=None, state_path=None, db_path=None, lock_path=None, contradiction_review_queue_path=None):
+    """Run the Inception pipeline.
+
+    Returns exit code: 0=success, 1=locked, 2=missing deps,
+    3=no vector source available or no embeddings found (see
+    load_active_backend_embeddings), 5=config error.
+
+    ``contradiction_review_queue_path`` overrides where MEM-163's
+    contradiction-detection stage appends its human-triage review queue
+    (defaults to ``CONTRADICTION_REVIEW_QUEUE_PATH`` under ``RUNTIME_DIR``) --
+    tests should always pass an isolated path.
+    """
+    if args is None:
+        args = parse_args()
+
+    config = get_config()
+
+    # Gate: inception must be enabled (unless --full forces it)
+    if not config.get("inception_enabled", False) and not args.full:
+        return 0
+
+    # Check dependencies
+    missing = check_dependencies()
+    if missing:
+        print(f"Missing: {', '.join(missing)}", file=sys.stderr)
+        print("Install: pip install numpy hdbscan scikit-learn", file=sys.stderr)
+        return 2
+
+    # Acquire lock
+    _lock_path = lock_path or os.path.join(RUNTIME_DIR, "inception.lock")
+    if not acquire_inception_lock(lock_path=_lock_path):
+        if args.verbose:
+            print("Another Inception instance is running", file=sys.stderr)
+        return 1
+
+    try:
+        _state_path = state_path or INCEPTION_STATE_PATH
+        state = load_inception_state(state_path=_state_path)
+        vault_path = Path(config["vault_path"])
+
+        # Collect NEW notes (for tracking what changed since last run)
+        new_notes = collect_eligible_notes(config, state, full=args.full)
+        if args.verbose:
+            print(f"New notes since last run: {len(new_notes)}", file=sys.stderr)
+
+        if not new_notes:
+            if args.verbose:
+                print("No new notes to process", file=sys.stderr)
+            return 0
+
+        new_stems = {n.stem for n in new_notes}
+
+        # Collect ALL clusterable notes (everything except inception-sourced)
+        # This is the key difference from the old approach: we cluster the
+        # full vault so cross-temporal patterns are detected.
+        all_notes = collect_eligible_notes(config, state, full=True)
+        if args.verbose:
+            print(f"Total clusterable notes: {len(all_notes)}", file=sys.stderr)
+
+        if len(all_notes) < config.get("inception_min_cluster_size", 3):
+            if args.verbose:
+                print("Not enough notes to cluster", file=sys.stderr)
+            _record_run(state, _state_path, len(new_notes), 0, 0, args.dry_run, total_notes=len(all_notes))
+            return 0
+
+        # Build notes dict for lookups (all notes)
+        notes_dict = {n.stem: n for n in all_notes}
+
+        # Load embeddings for all notes from whichever search backend is
+        # active (QMD, embedded, or none) -- never assume QMD is present.
+        embeddings, source, reason = load_active_backend_embeddings(
+            list(notes_dict.keys()),
+            config,
+            db_path=db_path,
+        )
+
+        if not embeddings:
+            message = {
+                "qmd-empty": "No embeddings found in QMD index — is QMD indexed?",
+                "embedded-empty": (
+                    "No embeddings found in the embedded search index — run almanac_reindex "
+                    "to build vectors, or check that an embedding provider is configured."
+                ),
+                "no-vector-backend": (
+                    "No vector-capable search backend is configured (active backend has no "
+                    "embeddings) — Inception cannot cluster without vectors. Configure "
+                    "search_backend: embedded or qmd to enable clustering."
+                ),
+            }.get(reason, "No embeddings found.")
+            # Always surfaced (not gated behind --verbose): a silent skip here
+            # is exactly the QMD-only failure mode this resolution replaces.
+            print(f"Skipping clustering: {message}", file=sys.stderr)
+            _record_run(
+                state, _state_path, len(new_notes), 0, 0, args.dry_run, skip_reason=reason, total_notes=len(all_notes)
+            )
+            return 3
+
+        if args.verbose:
+            print(f"Embeddings loaded from '{source}' backend ({len(embeddings)} notes)", file=sys.stderr)
+
+        # Build matrix (all notes with embeddings)
+        stem_index = [s for s in notes_dict if s in embeddings]
+        if len(stem_index) < config.get("inception_min_cluster_size", 3):
+            if args.verbose:
+                print(f"Only {len(stem_index)} notes have embeddings", file=sys.stderr)
+            return 0
+
+        embedding_matrix = np.array([embeddings[s] for s in stem_index])
+
+        if not args.dry_run and config.get("contradiction_detection_enabled", False):
+            try:
+                # MEM-163: background candidate pass + LLM adjudication,
+                # reusing the SAME embeddings/notes_dict this run already
+                # loaded for clustering. Failure-isolated -- never blocks
+                # clustering/synthesis below.
+                run_contradiction_detection(
+                    stem_index,
+                    embedding_matrix,
+                    notes_dict,
+                    config,
+                    vault_path,
+                    review_queue_path=contradiction_review_queue_path,
+                    verbose=args.verbose,
+                )
+            except Exception:
+                pass
+
+        # Cluster ALL notes
+        max_clusters = args.max_clusters or config.get("inception_max_clusters", 10)
+        cluster_config = dict(config)
+        cluster_config["inception_max_clusters"] = max_clusters * 3  # over-fetch, filter below
+        clusters = cluster_notes(embedding_matrix, stem_index, cluster_config)
+
+        if args.verbose:
+            print(f"Found {len(clusters)} total clusters", file=sys.stderr)
+
+        if not clusters:
+            _record_run(state, _state_path, len(new_notes), 0, 0, args.dry_run, total_notes=len(all_notes))
+            return 0
+
+        # Filter: only clusters containing at least 1 new note OR
+        # clusters that overlap with existing patterns (refresh candidates)
+        ledger = build_synthesized_from_ledger(vault_path / "notes")
+
+        relevant_clusters = {}
+        for cid, stems in clusters.items():
+            has_new = any(s in new_stems for s in stems)
+            # Check if this cluster is a superset of an existing pattern (refresh)
+            action, merge_target = check_ledger_dedup(stems, ledger)
+            is_refresh = action == "merge"
+
+            if has_new or is_refresh:
+                relevant_clusters[cid] = stems
+
+        if args.verbose:
+            print(f"Clusters with new notes or refresh candidates: {len(relevant_clusters)}", file=sys.stderr)
+
+        if not relevant_clusters:
+            _record_run(state, _state_path, len(new_notes), 0, 0, args.dry_run, total_notes=len(all_notes))
+            return 0
+
+        # Score, rank, and select within this run's note-processing budget.
+        # inception_max_clusters/--max-clusters still bounds how many
+        # clusters HDBSCAN is allowed to surface (the over-fetch multiplier
+        # above); the note budget then decides how many of those
+        # already-found clusters this run actually consolidates, so a
+        # backlogged vault isn't stuck processing the same fixed cluster
+        # count as a quiet one. Setting inception_budget_cap high (so the
+        # budget never binds) reproduces the old fixed-max_clusters
+        # behavior exactly.
+        scored = []
+        for cid, stems in relevant_clusters.items():
+            score = score_cluster(stems, notes_dict)
+            scored.append((cid, stems, score))
+        scored.sort(key=lambda x: x[2], reverse=True)
+        note_budget = compute_inception_budget(config, len(new_notes))
+        scored = select_clusters_within_budget(scored, note_budget)
+        if args.verbose:
+            print(
+                f"Note budget: {note_budget} (ingested {len(new_notes)} since last run); "
+                f"selected {len(scored)} of {len(relevant_clusters)} relevant clusters",
+                file=sys.stderr,
+            )
+
+        all_existing_stems = [p.stem for p in (vault_path / "notes").glob("*.md")]
+
+        notes_written = 0
+        notes_refreshed = 0
+        clusters_processed = 0
+        written_pattern_paths = []
+        # Stems that are genuinely consolidated this run — only these are
+        # added to processed_notes. See _mark_consolidated.
+        consolidated_stems: set[str] = set()
+
+        # --- Phase 1: collect clusters that need LLM synthesis ---
+        synthesis_queue = []  # (cid, stems, score, prompt, action, merge_target)
+
+        for cid, stems, score in scored:
+            clusters_processed += 1
+
+            # Dedup check
+            action, merge_target = check_ledger_dedup(stems, ledger)
+            if action == "skip":
+                if args.verbose:
+                    print(f"  Cluster {cid}: skipped (already consolidated)", file=sys.stderr)
+                # Ledger confirmed these stems are already in another
+                # pattern's synthesized_from — genuinely consolidated.
+                consolidated_stems.update(stems)
+                continue
+
+            if args.dry_run:
+                label = " [refresh]" if action == "merge" else ""
+                print(f"Cluster {cid} (score={score:.2f}){label}:", file=sys.stderr)
+                for s in stems:
+                    marker = " *NEW*" if s in new_stems else ""
+                    title = notes_dict[s].title if s in notes_dict else s
+                    print(f"  - {title}{marker}", file=sys.stderr)
+                continue
+
+            prompt = build_synthesis_prompt(stems, notes_dict, merge_target=merge_target)
+            synthesis_queue.append((cid, stems, score, prompt, action, merge_target))
+
+        # --- Phase 2: parallel LLM synthesis ---
+        max_workers = config.get("inception_parallel", 4)
+        llm_results = {}  # cid -> raw LLM response
+
+        if synthesis_queue:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_cid = {executor.submit(call_llm, item[3], config): item[0] for item in synthesis_queue}
+                for future in as_completed(future_to_cid):
+                    cid = future_to_cid[future]
+                    try:
+                        llm_results[cid] = future.result()
+                    except Exception:
+                        llm_results[cid] = ""
+
+        # --- Phase 3: sequential post-processing ---
+        for cid, stems, score, prompt, action, merge_target in synthesis_queue:
+            raw = llm_results.get(cid, "")
+            synthesis = parse_synthesis(raw)
+
+            if synthesis is None:
+                if args.verbose:
+                    print(f"  Cluster {cid}: SKIP (trivial or failed)", file=sys.stderr)
+                continue
+
+            # Title overlap dedup (skip for refresh — we're updating an existing note)
+            if action != "merge":
+                new_slug = slugify(synthesis["title"])
+                if check_title_overlap(new_slug, all_existing_stems):
+                    if args.verbose:
+                        print(f"  Cluster {cid}: skipped (title overlap)", file=sys.stderr)
+                    continue
+
+            # Ensure related includes all source stems
+            synthesis["related"] = list(set(synthesis.get("related", []) + stems))
+
+            # Write (or refresh existing)
+            note_path = write_pattern_note(
+                synthesis,
+                stems,
+                vault_path,
+                merge_target=merge_target if action == "merge" else None,
+                notes_dict=notes_dict,
+            )
+            if note_path:
+                if action == "merge":
+                    notes_refreshed += 1
+                    if args.verbose:
+                        print(f"  Refreshed: {note_path.name}", file=sys.stderr)
+                else:
+                    notes_written += 1
+                    if args.verbose:
+                        print(f"  Wrote: {note_path.name}", file=sys.stderr)
+                all_existing_stems.append(note_path.stem)
+                consolidated_stems.update(stems)
+
+                # Backlink
+                backlink_sources(note_path.stem, stems, vault_path)
+
+                # Track for pre-reasoning
+                written_pattern_paths.append(note_path)
+            elif action != "merge":
+                # write_pattern_note returns None when the target slug
+                # already exists (line ~585). If that existing file is
+                # itself an inception pattern, our cluster was subsumed —
+                # mark stems consolidated to avoid a reprocess loop.
+                new_slug = slugify(synthesis["title"])
+                existing_path = vault_path / "notes" / f"{new_slug}.md"
+                if existing_path.exists():
+                    try:
+                        existing_rec = parse_note(existing_path)
+                        if existing_rec and existing_rec.source == "inception":
+                            if args.verbose:
+                                print(
+                                    f"  Cluster {cid}: subsumed by existing pattern {new_slug}",
+                                    file=sys.stderr,
+                                )
+                            consolidated_stems.update(stems)
+                    except Exception:
+                        pass  # best-effort — leave stems eligible
+
+        # Sleep-time pre-reasoning
+        if not args.dry_run and written_pattern_paths:
+            pattern_records = []
+            for pp in written_pattern_paths:
+                rec = parse_note(pp)
+                if rec:
+                    pattern_records.append(rec)
+            if pattern_records:
+                try:
+                    qp, cp = pre_reason(pattern_records, notes_dict, config)
+                    if args.verbose and qp:
+                        print(f"Pre-reason: wrote {qp.name} and {cp.name}", file=sys.stderr)
+                except Exception:
+                    pass  # Non-fatal
+
+        # Mark consolidated stems (ledger-skip, written, or subsumed by
+        # existing pattern) *before* recording run metadata, so the
+        # processed_notes_total captured in this run's history entry
+        # reflects what this run actually consolidated.
+        if not args.dry_run and consolidated_stems:
+            _mark_consolidated(state, _state_path, consolidated_stems)
+        _record_run(
+            state,
+            _state_path,
+            len(new_notes),
+            clusters_processed,
+            notes_written,
+            args.dry_run,
+            total_notes=len(all_notes),
+        )
+
+        # Commit and reindex
+        total_changes = notes_written + notes_refreshed
+        if total_changes > 0 and not args.dry_run:
+            _commit_and_reindex(total_changes, config)
+
+            try:
+                maps = build_project_maps(vault_path)
+                write_project_maps(maps)
+            except Exception:
+                pass  # Non-fatal
+
+            # Build retrieval indexes for Tenet
+            try:
+                index = build_concept_index(vault_path)
+                write_concept_index(index)
+            except Exception:
+                pass  # Non-fatal — retrieval degrades gracefully
+
+        if args.verbose:
+            parts = [f"{clusters_processed} clusters"]
+            if notes_written:
+                parts.append(f"{notes_written} new")
+            if notes_refreshed:
+                parts.append(f"{notes_refreshed} refreshed")
+            if not notes_written and not notes_refreshed:
+                parts.append("0 notes written")
+            print(f"Done: {', '.join(parts)}", file=sys.stderr)
+
+        return 0
+
+    finally:
+        release_inception_lock(lock_path=_lock_path)
+
+
+def _record_run(
+    state, state_path, note_count, clusters_processed, notes_written, dry_run, skip_reason=None, total_notes=None
+):
+    """Update run metadata. Always called on exit, regardless of outcome.
+
+    Does NOT touch processed_notes — that is the job of _mark_consolidated,
+    which is only invoked when pattern notes were actually written. Callers
+    that also call _mark_consolidated this run should do so *before*
+    calling _record_run, so processed_notes_total below reflects this run's
+    consolidation rather than the count from before it.
+
+    skip_reason (e.g. "no-vector-backend", "qmd-empty", "embedded-empty")
+    records why a run produced no clusters when the cause was a missing
+    vector source, so the reason is surfaced in the persisted summary and
+    not just a transient stderr line.
+
+    total_notes (MEM-154), when given, is the size of the clusterable note
+    pool this run considered (``len(all_notes)`` -- already computed by the
+    caller, no extra scan). Recording it alongside the post-run
+    processed_notes count on every run entry lets almanac/health.py compute
+    a coverage ratio and backlog trend (processed_notes_total / total_notes,
+    and whether the gap is growing run over run) without re-scanning the
+    vault itself.
+    """
+    now = datetime.now().isoformat(timespec="seconds")
+    state["last_run_iso"] = now
+    state["last_run_note_count"] = note_count
+    run_entry = {
+        "iso": now,
+        "clusters_found": clusters_processed,
+        "notes_written": notes_written,
+        "dry_run": dry_run,
+    }
+    if skip_reason:
+        run_entry["skip_reason"] = skip_reason
+    if total_notes is not None:
+        run_entry["total_notes"] = total_notes
+        run_entry["processed_notes_total"] = len(state.get("processed_notes", []))
+    state.setdefault("runs", []).append(run_entry)
+    save_inception_state(state, state_path=state_path)
+
+
+def _mark_consolidated(state, state_path, stems):
+    """Extend processed_notes with stems that were actually consolidated.
+
+    A stem is consolidated when it appears in a pattern note's
+    synthesized_from list — either because this run wrote/refreshed that
+    pattern, or because the ledger confirmed the cluster was already fully
+    represented (check_ledger_dedup → "skip").
+
+    No-op when stems is empty, so callers can pass an unfiltered set.
+    """
+    if not stems:
+        return
+    merged = set(state.get("processed_notes", [])) | set(stems)
+    state["processed_notes"] = sorted(merged)
+    save_inception_state(state, state_path=state_path)
+
+
+def build_project_maps(vault_path):
+    """Scan all notes and group them by project field.
+
+    Returns:
+        dict mapping project_slug -> [{stem, title, certainty, date}, ...]
+        Ranked by certainty desc then date desc, capped at 20 per project.
+    """
+    notes_dir = Path(vault_path) / "notes"
+    if not notes_dir.exists():
+        return {}
+
+    projects = {}  # project_path -> list of dicts
+    for md_file in sorted(notes_dir.glob("*.md")):
+        if md_file.name.startswith("."):
+            continue
+        record = parse_note(md_file)
+        if record is None or not record.project:
+            continue
+        slug = slugify(Path(record.project).name)
+        if not slug:
+            continue
+        projects.setdefault(slug, []).append(
+            {
+                "stem": record.stem,
+                "title": record.title,
+                "certainty": record.certainty if record.certainty is not None else 2,
+                "date": record.date or "",
+            }
+        )
+
+    # Rank each project's notes: certainty desc, date desc
+    for slug in projects:
+        projects[slug].sort(key=lambda e: (e["certainty"], e["date"]), reverse=True)
+        projects[slug] = projects[slug][:20]
+
+    return projects
+
+
+def write_project_maps(maps, config_dir=None):
+    """Atomic write of project maps to config dir.
+
+    JSON format: {"version": 1, "built_at": ISO, "maps": {slug: [...]}}
+    """
+    if config_dir is None:
+        config_dir = os.path.join(
+            os.environ.get("XDG_CONFIG_HOME", os.path.join(str(Path.home()), ".config")),
+            "almanac-vault",
+        )
+    config_dir = Path(config_dir)
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "version": 1,
+        "built_at": datetime.now().isoformat(timespec="seconds"),
+        "maps": maps,
+    }
+
+    target = config_dir / "project-maps.json"
+    tmp = config_dir / ".project-maps.json.tmp"
+    tmp.write_text(json.dumps(payload, indent=2))
+    os.replace(str(tmp), str(target))
+
+
+# Stopwords for concept index tokenization (same set used by retrieval)
+_CONCEPT_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "but",
+        "by",
+        "for",
+        "from",
+        "had",
+        "has",
+        "have",
+        "he",
+        "her",
+        "his",
+        "how",
+        "if",
+        "in",
+        "into",
+        "is",
+        "it",
+        "its",
+        "may",
+        "no",
+        "not",
+        "of",
+        "on",
+        "or",
+        "our",
+        "out",
+        "per",
+        "she",
+        "so",
+        "than",
+        "that",
+        "the",
+        "their",
+        "them",
+        "then",
+        "there",
+        "these",
+        "they",
+        "this",
+        "to",
+        "too",
+        "use",
+        "very",
+        "was",
+        "we",
+        "were",
+        "what",
+        "when",
+        "which",
+        "who",
+        "why",
+        "will",
+        "with",
+        "you",
+        "your",
+        "all",
+        "also",
+        "any",
+        "been",
+        "can",
+        "could",
+        "did",
+        "do",
+        "does",
+        "each",
+        "get",
+        "got",
+        "just",
+        "more",
+        "most",
+        "much",
+        "must",
+        "need",
+        "new",
+        "now",
+        "old",
+        "one",
+        "only",
+        "other",
+        "own",
+        "same",
+        "set",
+        "should",
+        "some",
+        "such",
+        "take",
+        "two",
+        "way",
+        "well",
+        "would",
+        # common markdown / note words
+        "cross",
+        "project",
+        "patterns",
+        "pattern",
+        "notes",
+        "note",
+    }
+)
+
+
+def _tokenize_keywords(text):
+    """Tokenize text into lowercase keywords, stripping punctuation."""
+    words = re.sub(r"[^a-zA-Z0-9\s-]", "", text.lower()).split()
+    return [w for w in words if len(w) >= 3 and w not in _CONCEPT_STOPWORDS]
+
+
+def build_concept_index(vault_path):
+    """Scan notes/*.md for inception pattern notes and build an inverted keyword index.
+
+    Returns:
+        dict mapping keyword -> [{stem, title, score}, ...]
+    """
+    notes_dir = Path(vault_path) / "notes"
+    if not notes_dir.exists():
+        return {}
+
+    index = {}  # keyword -> list of {stem, title, score}
+
+    for md_file in sorted(notes_dir.glob("*.md")):
+        if md_file.name.startswith("."):
+            continue
+        record = parse_note(md_file)
+        if record is None or record.source != "inception":
+            continue
+
+        # Score from certainty: certainty / 5, default 0.6
+        score = record.certainty / 5.0 if record.certainty is not None else 0.6
+
+        # Collect keywords from: title words, tags, synthesized_from stems
+        keywords = set()
+
+        # Title words
+        keywords.update(_tokenize_keywords(record.title))
+
+        # Tags (lowercased, as-is — already single words)
+        for tag in record.tags:
+            tag_lower = tag.lower().strip()
+            if len(tag_lower) >= 3 and tag_lower not in _CONCEPT_STOPWORDS:
+                keywords.add(tag_lower)
+
+        # synthesized_from stems: split on hyphens to get words
+        for stem in record.synthesized_from:
+            for word in stem.split("-"):
+                word = word.lower().strip()
+                if len(word) >= 3 and word not in _CONCEPT_STOPWORDS:
+                    keywords.add(word)
+
+        entry = {"stem": record.stem, "title": record.title, "score": score}
+        for kw in keywords:
+            index.setdefault(kw, []).append(entry)
+
+    return index
+
+
+def write_concept_index(index, config_dir=None):
+    """Atomic write of concept index to config dir.
+
+    JSON format: {"version": 1, "built_at": ISO, "index": {keyword: [{stem, title, score}]}}
+    """
+    if config_dir is None:
+        config_dir = os.path.join(
+            os.environ.get("XDG_CONFIG_HOME", os.path.join(str(Path.home()), ".config")),
+            "almanac-vault",
+        )
+    config_dir = Path(config_dir)
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "version": 1,
+        "built_at": datetime.now().isoformat(timespec="seconds"),
+        "index": index,
+    }
+
+    target = config_dir / "concept-index.json"
+    tmp = config_dir / ".concept-index.json.tmp"
+    tmp.write_text(json.dumps(payload, indent=2))
+    os.replace(str(tmp), str(target))
+
+
+# --- Sleep-time pre-reasoning ---
+
+_FILE_PATH_RE = re.compile(
+    r"(?:^|[\s`\"'(])"  # boundary before path
+    r"((?:/[\w.+-]+){2,})"  # at least 2 slash-separated segments
+    r"(?:[\s`\"').,;:]|$)",  # boundary after path
+)
+
+
+def _predict_queries(pattern_record, source_records):
+    """Generate predicted search queries for a pattern note.
+
+    Uses title variants, tags, and source note titles — no LLM call.
+
+    Returns:
+        list of query strings (3-5 items)
+    """
+    queries = set()
+
+    # 1. Title as-is (lowercased)
+    title = pattern_record.title.strip()
+    if title:
+        queries.add(title.lower())
+
+    # 2. Individual tags
+    for tag in pattern_record.tags:
+        tag = tag.strip()
+        if len(tag) >= 3:
+            queries.add(tag.lower())
+
+    # 3. Tag pairs (if 2+ tags)
+    tags = [t.strip().lower() for t in pattern_record.tags if len(t.strip()) >= 3]
+    for i in range(len(tags)):
+        for j in range(i + 1, len(tags)):
+            queries.add(f"{tags[i]} {tags[j]}")
+
+    # 4. Source note title keywords (skip short/stop words)
+    for src in source_records:
+        words = _tokenize_keywords(src.title)
+        if words:
+            queries.add(" ".join(words[:4]))
+
+    # 5. Title keywords only (without stopwords)
+    title_kw = _tokenize_keywords(title)
+    if title_kw:
+        queries.add(" ".join(title_kw))
+
+    # Deduplicate and cap at 5
+    return sorted(queries)[:5]
+
+
+def _extract_connections(pattern_record, source_records):
+    """Extract projects and code areas from source notes.
+
+    Projects come from frontmatter `project` fields.
+    Code areas come from file paths found in note bodies.
+
+    Returns:
+        dict with keys: projects (list[str]), code_areas (list[str])
+    """
+    projects = set()
+    code_areas = set()
+
+    for src in source_records:
+        if src.project:
+            projects.add(src.project)
+
+        # Extract file paths from body
+        for match in _FILE_PATH_RE.finditer(src.body):
+            path = match.group(1)
+            # Only keep paths that look like code (have a file extension or known dir)
+            if "." in path.split("/")[-1] or any(seg in path for seg in ("src", "lib", "pkg", "cmd", "hooks", "tests")):
+                code_areas.add(path)
+
+    return {
+        "projects": sorted(projects),
+        "code_areas": sorted(code_areas),
+    }
+
+
+def pre_reason(pattern_notes, notes_dict, config):
+    """Sleep-time pre-reasoning: build retrieval artifacts from pattern notes.
+
+    Generates two JSON files in {vault}/notes/:
+    - .inception-queries.json: maps pattern note stems to predicted search queries
+    - .inception-connections.json: maps pattern note stems to related projects/code areas
+
+    Args:
+        pattern_notes: list of NoteRecord for newly written pattern notes
+        notes_dict: dict mapping stem -> NoteRecord for all notes
+        config: dict with vault_path and inception_pre_reason
+
+    Returns:
+        tuple (queries_path, connections_path) or (None, None) if disabled/empty
+    """
+    if not config.get("inception_pre_reason", True):
+        return None, None
+
+    if not pattern_notes:
+        return None, None
+
+    vault_path = Path(config["vault_path"])
+    notes_dir = vault_path / "notes"
+
+    queries_map = {}
+    connections_map = {}
+
+    for pattern in pattern_notes:
+        # Gather source records for this pattern
+        source_records = []
+        for stem in pattern.synthesized_from:
+            src = notes_dict.get(stem)
+            if src:
+                source_records.append(src)
+
+        queries_map[pattern.stem] = _predict_queries(pattern, source_records)
+        connections_map[pattern.stem] = _extract_connections(pattern, source_records)
+
+    # Merge with existing files (don't clobber previous runs' data)
+    queries_path = notes_dir / ".inception-queries.json"
+    connections_path = notes_dir / ".inception-connections.json"
+
+    existing_queries = {}
+    if queries_path.exists():
+        try:
+            existing_queries = json.loads(queries_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    existing_connections = {}
+    if connections_path.exists():
+        try:
+            existing_connections = json.loads(connections_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    existing_queries.update(queries_map)
+    existing_connections.update(connections_map)
+
+    # Atomic writes
+    tmp_q = notes_dir / ".inception-queries.json.tmp"
+    tmp_q.write_text(json.dumps(existing_queries, indent=2))
+    os.replace(str(tmp_q), str(queries_path))
+
+    tmp_c = notes_dir / ".inception-connections.json.tmp"
+    tmp_c.write_text(json.dumps(existing_connections, indent=2))
+    os.replace(str(tmp_c), str(connections_path))
+
+    return queries_path, connections_path
+
+
+def _commit_and_reindex(notes_written, config):
+    """Commit vault changes and trigger QMD reindex."""
+    vault = Path(config["vault_path"])
+    commit_script = Path.home() / ".claude" / "hooks" / "vault-commit.sh"
+
+    if config.get("auto_commit", True) and commit_script.exists():
+        noun = "note" if notes_written == 1 else "notes"
+        try:
+            subprocess.Popen(
+                [str(commit_script), f"inception: {notes_written} pattern {noun}"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                cwd=str(vault),
+            )
+        except OSError:
+            pass
+
+    if has_qmd():
+        collection = config.get("qmd_collection", "almanac")
+        try:
+            subprocess.Popen(
+                ["sh", "-c", f"qmd update -c {collection} && qmd embed"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError:
+            pass
+
+
+if __name__ == "__main__":
+    sys.exit(main())

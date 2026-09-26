@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict smoke test for memento's sandboxed Claude CLI worker.
+"""Strict smoke test for Almanac's sandboxed Claude CLI worker.
 
 This intentionally exercises the same shared Claude backend used by detached
 SessionEnd structured-note extraction. It is a local Beislið gate, not a
@@ -19,7 +19,7 @@ if str(REPO_ROOT) not in sys.path:
 
 
 def main() -> int:
-    from memento.llm import llm_complete
+    from almanac.llm import llm_complete
 
     result = llm_complete(
         'Return JSON only, exactly: {"ok": true}',

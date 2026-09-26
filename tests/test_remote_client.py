@@ -50,6 +50,23 @@ class TestCallTool:
 
     @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
     @patch("memento.remote_client.request.urlopen")
+    def test_legacy_server_retry_only_after_unknown_tool(self, mock_urlopen, _mock_url):
+        unknown = MagicMock()
+        unknown.read.return_value = json.dumps(
+            {"jsonrpc": "2.0", "id": 1, "error": {"message": "Unknown tool: almanac_status"}}
+        ).encode()
+        unknown.__enter__ = MagicMock(return_value=unknown)
+        unknown.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.side_effect = [unknown, self._mock_response({"status": "ok"})]
+
+        assert status() == {"status": "ok"}
+        assert [json.loads(call.args[0].data)["params"]["name"] for call in mock_urlopen.call_args_list] == [
+            "almanac_status",
+            "memento_status",
+        ]
+
+    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("memento.remote_client.request.urlopen")
     def test_search(self, mock_urlopen, mock_url):
         results = [
             {"path": "notes/foo.md", "title": "Foo", "score": 0.9, "snippet": "test"},
@@ -65,7 +82,7 @@ class TestCallTool:
         req = call_args[0][0]
         body = json.loads(req.data)
         assert body["method"] == "tools/call"
-        assert body["params"]["name"] == "memento_search"
+        assert body["params"]["name"] == "almanac_search"
         assert body["params"]["arguments"]["query"] == "test query"
         assert body["params"]["arguments"]["concrete"] == "auto"
         assert body["params"]["arguments"]["detail_level"] == "summary"
@@ -181,7 +198,7 @@ class TestCallTool:
         assert result == payload
         req = mock_urlopen.call_args[0][0]
         body = json.loads(req.data)
-        assert body["params"]["name"] == "memento_query"
+        assert body["params"]["name"] == "almanac_query"
         assert body["params"]["arguments"]["project"] == "/repo/api"
         assert body["params"]["arguments"]["tag"] == "cache"
         assert body["params"]["arguments"]["aggregate_by"] == "type"
@@ -217,7 +234,7 @@ class TestCallTool:
 
         req = mock_urlopen.call_args[0][0]
         body = json.loads(req.data)
-        assert body["params"]["name"] == "memento_store_smart"
+        assert body["params"]["name"] == "almanac_store_smart"
 
     @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
     @patch("memento.remote_client.request.urlopen")
@@ -231,7 +248,7 @@ class TestCallTool:
 
         req = mock_urlopen.call_args[0][0]
         body = json.loads(req.data)
-        assert body["params"]["name"] == "memento_capture_run_lesson"
+        assert body["params"]["name"] == "almanac_capture_run_lesson"
         assert body["params"]["arguments"]["candidate"] == candidate
         assert body["params"]["arguments"]["approve_write"] is True
 
@@ -246,7 +263,7 @@ class TestCallTool:
 
         req = mock_urlopen.call_args[0][0]
         body = json.loads(req.data)
-        assert body["params"]["name"] == "memento_synthesize_failures"
+        assert body["params"]["name"] == "almanac_synthesize_failures"
         assert body["params"]["arguments"]["project"] == "/repo"
         assert body["params"]["arguments"]["approve_writes"] is False
 
@@ -324,7 +341,7 @@ class TestCallTool:
         assert result[1]["hash"] == "def456"
 
         body = json.loads(mock_urlopen.call_args[0][0].data)
-        assert body["params"]["name"] == "memento_list"
+        assert body["params"]["name"] == "almanac_list"
 
     @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
     @patch("memento.remote_client.request.urlopen")

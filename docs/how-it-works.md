@@ -11,7 +11,7 @@ Session ends
 SessionEnd hook fires
     |
     v
-memento-triage.py reads the transcript
+almanac-triage.py reads the transcript
     |
     +---> write_fleeting()
     |     One-liner in fleeting/YYYY-MM-DD.md
@@ -56,7 +56,7 @@ vault-briefing.py (SessionStart hook)
     |       else: fall through to async vsearch
     +---> ASYNC: spawn background subprocess for QMD vsearch
     |       if agentic_retrieval_enabled: try a bounded ReAct loop first
-    |       (memento/retrieval_agent.py -- search/query/related/get tools,
+    |       (almanac/retrieval_agent.py -- search/query/related/get tools,
     |       max 6 calls / 60s); any protocol/provider failure falls back to
     |       the one-shot vsearch below, byte-identically
     |     writes results to a session/project-scoped deferred file with a short TTL
@@ -89,7 +89,7 @@ vault-recall.py (UserPromptSubmit hook)
     +---> deep recall: if low confidence + deep_recall_enabled,
     |       spawn a background worker; results injected on the next prompt
     |       if agentic_retrieval_enabled: the worker runs the bounded ReAct
-    |       loop (memento/retrieval_agent.py) instead of a single
+    |       loop (almanac/retrieval_agent.py) instead of a single
     |       suggest-titles completion; falls back on any failure
     +---> dedup: skip if same top result as last injection (within 3 prompts)
     +---> print [vault] related memories to stdout --> Claude sees them
@@ -111,7 +111,7 @@ vault-tool-context.py (PreToolUse hook, Read matcher)
     +---> return JSON with additionalContext --> Claude sees it before the file
 ```
 
-All three hooks are zero-cost when they have nothing relevant to say -- no output, no context overhead. When `retrieval_log: true` or `MEMENTO_DEBUG=1` is enabled, tool context records one terminal `tool-context/decision` event per call so usefulness can be audited from skip reasons, injected paths, cache/search source, latency, and optional candidate summaries. When the hooks do inject, overhead is ~150 input units per session on average. See [performance-analysis.md](performance-analysis.md) for benchmarks.
+All three hooks are zero-cost when they have nothing relevant to say -- no output, no context overhead. When `retrieval_log: true` or `ALMANAC_DEBUG=1` is enabled, tool context records one terminal `tool-context/decision` event per call so usefulness can be audited from skip reasons, injected paths, cache/search source, latency, and optional candidate summaries. When the hooks do inject, overhead is ~150 input units per session on average. See [performance-analysis.md](performance-analysis.md) for benchmarks.
 
 ## What gets captured
 
@@ -149,7 +149,7 @@ Every knowledge system hits the same scaling problem: as notes accumulate, retri
 Session ends
     |
     v
-memento-triage.py (existing)
+almanac-triage.py (existing)
     |
     +---> maybe_trigger_inception()
           |
@@ -158,7 +158,7 @@ memento-triage.py (existing)
           +---> >= 5 new notes? spawn detached inception process
                 |
                 v
-          memento-inception.py (background, non-blocking)
+          almanac-inception.py (background, non-blocking)
                 |
                 +---> Phase 1: Local clustering (zero LLM cost)
                 |     Read note vectors from the active search backend:
@@ -302,9 +302,9 @@ Use `/inception` to run manually, or `/inception --dry-run` to preview clusters 
 
 | Skill | What it does |
 |-------|-------------|
-| `/memento` | Capture insights from the current session |
+| `/almanac` | Capture insights from the current session |
 | `/inception` | Find cross-session patterns and synthesize pattern notes |
-| `/memento-defrag` | Archive stale notes (low certainty, old bugfixes, superseded) |
+| `/almanac-defrag` | Archive stale notes (low certainty, old bugfixes, superseded) |
 | `/preserve` | Archive artifact bundles intact with manifests and project links |
 | `/start-fresh` | Capture session + save pending work + prompt to clear context |
 | `/continue-work` | Recover context from git state, MEMORY.md, and optionally the vault |
@@ -317,7 +317,7 @@ Uses QMD for semantic search, falls back to grep if QMD is not installed.
 
 ## Defrag (knowledge decay)
 
-Notes accumulate. `/memento-defrag` handles decay:
+Notes accumulate. `/almanac-defrag` handles decay:
 
 - Certainty 1-2 notes older than 60 days -> archive
 - Bugfixes older than 90 days -> archive
@@ -331,18 +331,18 @@ Archived notes and preserved bundles move to `archive/`, are removed from the QM
 
 `projects/<slug>.md` hub files used to grow by free-text append on every MCP store/replace/capture — a session-summary line hand-appended under `## Sessions` (or `## Activity log`) with no cap and no structural guarantee across format drift. Left running, that turns into exactly what happened in the real vault: a 300+ line file with duplicate `## Sessions` headers, truncated entries, and stray agent-output fragments — nothing curated it, and nothing navigated from it.
 
-`memento/hub.py` replaces that with mechanical, idempotent regeneration:
+`almanac/hub.py` replaces that with mechanical, idempotent regeneration:
 
 - `regenerate_project_hub` rebuilds `projects/<slug>.md` **from scratch** every time — it never reads or parses the previous hub file, so whatever corruption accumulated there is discarded outright rather than patched around. Calling it twice with the same vault state produces byte-identical output.
-- The hub has a fixed, always-present section schema: a `# <project>` header (note count + generated-at), `## Top notes` (ranked by PageRank, falling back to a plain inbound-wikilink-count scan when `networkx` is unavailable), `## Recent decisions` (`type: decision` notes from the last 30 days), `## Recent activity` (the most recently dated notes — the bounded replacement for the old unbounded `## Sessions` append), and `## Overflow` (explicit "N notes not shown; use `memento_search --project <slug>`" counts — truncation is never silent).
+- The hub has a fixed, always-present section schema: a `# <project>` header (note count + generated-at), `## Top notes` (ranked by PageRank, falling back to a plain inbound-wikilink-count scan when `networkx` is unavailable), `## Recent decisions` (`type: decision` notes from the last 30 days), `## Recent activity` (the most recently dated notes — the bounded replacement for the old unbounded `## Sessions` append), and `## Overflow` (explicit "N notes not shown; use `almanac_search --project <slug>`" counts — truncation is never silent).
 - The whole hub is capped at `hub_max_bytes` (default 25KB); sections are trimmed in reverse priority order (Recent activity first, then Recent decisions, then Top notes) to fit, and every trim is folded into the `## Overflow` counts.
 - `vault_map()` layers a second tier on top: the regenerated hub plus up to 10 of the highest-centrality notes from *other* projects, capped at `vault_map_max_bytes` (default 25KB), designed for briefing injection. Everything else stays read-on-demand via search/get.
 
-Both knobs are off by default (`hub_regeneration_enabled`, `vault_map_in_briefing`) — see [configuration.md](configuration.md) for the periodic sweep cadence and the briefing wiring. `memento/store.py`'s `update_project_index` no longer writes a session-summary line at all; only the `[[note_name]]` link under `## Notes` remains.
+Both knobs are off by default (`hub_regeneration_enabled`, `vault_map_in_briefing`) — see [configuration.md](configuration.md) for the periodic sweep cadence and the briefing wiring. `almanac/store.py`'s `update_project_index` no longer writes a session-summary line at all; only the `[[note_name]]` link under `## Notes` remains.
 
 ## Contradiction detection and validity chains (MEM-163)
 
-The sparse `supersedes` field alone can't answer "what did we believe on date X" or deterministically close out an invalidated fact. `valid_from`/`invalidated_by` frontmatter give deterministic validity intervals: a note is invalid once `invalidated_by` is set (never backfilled, never a hard delete -- history stays greppable). A backlink pass in the periodic sweeper turns every `supersedes` edge into the target's `invalidated_by`; a background stage inside Inception's run (gated by `contradiction_detection_enabled`, default off) additionally finds embedding-similar note pairs and asks an LLM for a strict contradicts/newer-wins/confidence verdict, auto-applying only high-confidence same-project cases and queuing everything else for human review. This only ever touches atomic notes -- Inception's own generated pattern notes are still excluded from clustering/candidate scope, so the "no invalidation of wrong patterns" limitation above still applies to Inception's synthesized output specifically. `memento_search`/`memento_query` exclude invalidated notes by default (`include_invalidated` opts back in); `memento_contradictions` reports the resulting validity chains. Full field semantics and the apply policy live in [frontmatter-schema.md](frontmatter-schema.md#bitemporal-supersession-mem-163).
+The sparse `supersedes` field alone can't answer "what did we believe on date X" or deterministically close out an invalidated fact. `valid_from`/`invalidated_by` frontmatter give deterministic validity intervals: a note is invalid once `invalidated_by` is set (never backfilled, never a hard delete -- history stays greppable). A backlink pass in the periodic sweeper turns every `supersedes` edge into the target's `invalidated_by`; a background stage inside Inception's run (gated by `contradiction_detection_enabled`, default off) additionally finds embedding-similar note pairs and asks an LLM for a strict contradicts/newer-wins/confidence verdict, auto-applying only high-confidence same-project cases and queuing everything else for human review. This only ever touches atomic notes -- Inception's own generated pattern notes are still excluded from clustering/candidate scope, so the "no invalidation of wrong patterns" limitation above still applies to Inception's synthesized output specifically. `almanac_search`/`almanac_query` exclude invalidated notes by default (`include_invalidated` opts back in); `almanac_contradictions` reports the resulting validity chains. Full field semantics and the apply policy live in [frontmatter-schema.md](frontmatter-schema.md#bitemporal-supersession-mem-163).
 
 ## Automation consumption
 

@@ -20,14 +20,14 @@ class TestPreserveTool:
         archive_root = tmp_vault / result["archive_path"]
         assert (archive_root / source.name).read_text() == "artifact body"
 
-        manifest = json.loads((archive_root / ".memento" / "manifest.json").read_text())
+        manifest = json.loads((archive_root / ".almanac" / "manifest.json").read_text())
         assert manifest["source_path"] == str(source)
         assert manifest["archive_path"] == result["archive_path"]
         assert manifest["move"] is False
         assert manifest["file_count"] == 1
         assert manifest["files"][0]["path"] == source.name
-        assert result["manifest_path"] == f"{result['archive_path']}/.memento/manifest.json"
-        assert result["index_path"] == f"{result['archive_path']}/.memento/index.md"
+        assert result["manifest_path"] == f"{result['archive_path']}/.almanac/manifest.json"
+        assert result["index_path"] == f"{result['archive_path']}/.almanac/index.md"
 
     def test_preserve_preserves_directory_tree_structure(self, tmp_vault, tmp_path):
         source = tmp_path / "bundle"
@@ -39,7 +39,7 @@ class TestPreserveTool:
 
         archive_root = tmp_vault / result["archive_path"]
         assert (archive_root / source.name / "nested" / "deeper" / "file.md").read_text() == "hello"
-        manifest = json.loads((archive_root / ".memento" / "manifest.json").read_text())
+        manifest = json.loads((archive_root / ".almanac" / "manifest.json").read_text())
         assert manifest["source_kind"] == "directory"
         assert manifest["files"][0]["path"] == f"{source.name}/nested/deeper/file.md"
 
@@ -97,7 +97,7 @@ class TestPreserveTool:
 
         assert result["warnings"]
         assert any("secrets" in warning for warning in result["warnings"])
-        manifest = json.loads((tmp_vault / result["archive_path"] / ".memento" / "manifest.json").read_text())
+        manifest = json.loads((tmp_vault / result["archive_path"] / ".almanac" / "manifest.json").read_text())
         assert manifest["sensitive_files"] == [source.name]
 
     def test_preserve_rejects_remote_paths_outside_allowed_roots(self, tmp_vault, tmp_path):

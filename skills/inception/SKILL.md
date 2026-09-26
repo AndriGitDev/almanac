@@ -5,7 +5,7 @@ description: Run the Inception — background consolidation agent that clusters 
 
 # Inception
 
-Runs the Inception consolidation agent against the memento vault. It clusters notes by semantic similarity (HDBSCAN on QMD embeddings) and synthesizes pattern notes via the configured LLM backend.
+Runs the Inception consolidation agent against the Almanac vault. It clusters notes by semantic similarity (HDBSCAN on QMD embeddings) and synthesizes pattern notes via the configured LLM backend.
 
 ## Process
 
@@ -28,8 +28,8 @@ python3 ~/.claude/hooks/inception.py --verbose [--dry-run] [--full] [--max-clust
 | 0 | Success | Parse stderr output for cluster count and notes written. Report to user. |
 | 1 | Lock held | "Another Inception instance is already running. Try again in a few minutes." |
 | 2 | Missing deps | "Inception dependencies are missing. Install them with: `pip install numpy hdbscan scikit-learn`" |
-| 3 | No embeddings | "No embeddings found in QMD. Make sure the vault is indexed: `qmd update -c memento && qmd embed`" |
-| 5 | Config error | "Configuration error. Check your memento.yml for invalid Inception settings." |
+| 3 | No embeddings | "No embeddings found in QMD. Make sure the vault is indexed: `qmd update -c almanac && qmd embed`" |
+| 5 | Config error | "Configuration error. Check your almanac.yml for invalid Inception settings." |
 
 4. For exit 0, summarize:
    - How many clusters were found

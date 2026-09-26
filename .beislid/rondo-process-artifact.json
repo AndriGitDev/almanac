@@ -8,7 +8,7 @@
       "id": "frontmatter-schema",
       "paths": [
         "docs/frontmatter-schema.md",
-        "memento/types.py",
+        "almanac/types.py",
         "scripts/check_frontmatter_schema.py",
         "tests/test_frontmatter_schema.py"
       ],
@@ -53,10 +53,10 @@
     {
       "id": "lifecycle-bridges",
       "paths": [
-        "memento/lifecycle.py",
-        "memento/adapters/",
-        "memento/pi_bridge.py",
-        "hooks/memento-*.py",
+        "almanac/lifecycle.py",
+        "almanac/adapters/",
+        "almanac/pi_bridge.py",
+        "hooks/almanac-*.py",
         "hooks/vault-*.py",
         "hooks/agent-wrapper.py",
         "hooks/vault-commit.sh",
@@ -85,9 +85,9 @@
     {
       "id": "mcp-remote",
       "paths": [
-        "memento/mcp_server.py",
-        "memento/remote_client.py",
-        "memento/auth.py",
+        "almanac/mcp_server.py",
+        "almanac/remote_client.py",
+        "almanac/auth.py",
         "tests/test_mcp_server.py",
         "tests/test_remote_client.py",
         "tests/test_integration_remote.py"
@@ -108,9 +108,9 @@
     {
       "id": "retrieval",
       "paths": [
-        "memento/search*.py",
-        "memento/embedded_search.py",
-        "memento/graph.py",
+        "almanac/search*.py",
+        "almanac/embedded_search.py",
+        "almanac/graph.py",
         "hooks/tenet_reranker.py",
         "tests/test_tenet_*.py",
         "tests/test_multi_hop.py",
@@ -132,8 +132,8 @@
     {
       "id": "evals",
       "paths": [
-        "memento/retrieval_policy.py",
-        "memento/lifecycle.py",
+        "almanac/retrieval_policy.py",
+        "almanac/lifecycle.py",
         "evals/**"
       ],
       "reason": "matched eval framework and retrieval policy/lifecycle paths",
@@ -163,7 +163,7 @@
           "action_id": "gate.capture-retrieve-loop-hermetic",
           "action_classes": ["read"],
           "stage": "post_turn",
-          "reason": "selected for capture-retrieve loop coverage (memento.mcp_server imports memento.lifecycle and memento.retrieval_policy)"
+          "reason": "selected for capture-retrieve loop coverage (almanac.mcp_server imports almanac.lifecycle and almanac.retrieval_policy)"
         }
       ]
     },
@@ -216,7 +216,7 @@
     {
       "id": "python-core",
       "paths": [
-        "memento/**/*.py",
+        "almanac/**/*.py",
         "hooks/**/*.py",
         "scripts/**/*.py",
         "tests/**/*.py"

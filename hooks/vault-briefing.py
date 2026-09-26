@@ -2,7 +2,7 @@
 """
 Vault briefing — SessionStart hook.
 
-Thin Claude Code adapter over memento.lifecycle build/worker functions.
+Thin Claude Code adapter over almanac.lifecycle build/worker functions.
 """
 
 import sys
@@ -12,9 +12,9 @@ from pathlib import Path
 _repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(_repo_root))
 
-from memento.lifecycle import build_briefing, run_deferred_briefing_search  # noqa: E402
-from memento.store import log_retrieval  # noqa: E402
-from memento.utils import read_hook_input  # noqa: E402
+from almanac.lifecycle import build_briefing, run_deferred_briefing_search  # noqa: E402
+from almanac.store import log_retrieval  # noqa: E402
+from almanac.utils import read_hook_input  # noqa: E402
 
 
 def main() -> None:

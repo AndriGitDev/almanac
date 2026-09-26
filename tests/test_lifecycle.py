@@ -116,7 +116,7 @@ def test_empty_result_defaults_to_no_results_reason():
 def test_build_session_context_combines_briefing_recall_status_and_queue(tmp_path, monkeypatch):
     vault = tmp_path / "vault"
     xdg_state = tmp_path / "state"
-    queue_file = xdg_state / "memento" / "pi" / "queue" / "pi-captures.jsonl"
+    queue_file = xdg_state / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
     queue_file.parent.mkdir(parents=True)
     queue_file.write_text('{"id":"q1"}\n')
     monkeypatch.delenv("MEMENTO_PI_STATE_HOME", raising=False)
@@ -179,15 +179,15 @@ def test_lifecycle_queue_path_resolution_characterization(tmp_path, monkeypatch)
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "ignored-xdg"))
     assert lifecycle._pi_queue_file() == tmp_path / "pi-state" / "queue" / "pi-captures.jsonl"
     assert lifecycle._legacy_pi_queue_file(vault) == vault / "queue" / "pi-captures.jsonl"
-    assert lifecycle._pi_queue_path_source() == "memento_pi_state_home"
+    assert lifecycle._pi_queue_path_source() == "almanac_pi_state_home"
 
     monkeypatch.delenv("MEMENTO_PI_STATE_HOME")
-    assert lifecycle._pi_queue_file() == tmp_path / "ignored-xdg" / "memento" / "pi" / "queue" / "pi-captures.jsonl"
+    assert lifecycle._pi_queue_file() == tmp_path / "ignored-xdg" / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
     assert lifecycle._pi_queue_path_source() == "xdg_state_home"
 
     monkeypatch.delenv("XDG_STATE_HOME")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    default_root = tmp_path / "home" / ".local" / "state" / "memento" / "pi"
+    default_root = tmp_path / "home" / ".local" / "state" / "almanac" / "pi"
     assert lifecycle._pi_queue_file() == default_root / "queue" / "pi-captures.jsonl"
     assert lifecycle._pi_queue_path_source() == "default_xdg_state"
 
@@ -210,7 +210,7 @@ def test_build_session_context_explicitly_reports_legacy_queue_fallback(tmp_path
     ):
         payload = build_session_context("/repo", "", "s1", token_budget=200, include_recall=False)
 
-    current_queue_file = xdg_state / "memento" / "pi" / "queue" / "pi-captures.jsonl"
+    current_queue_file = xdg_state / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
     queue_section = payload["sections"]["queue"]
     assert queue_section["queued_capture_count"] == 1
     assert queue_section["count"] == 1
@@ -224,7 +224,7 @@ def test_build_session_context_explicitly_reports_legacy_queue_fallback(tmp_path
     assert "legacy" in queue_section["queue_status_note"]
 
 
-def test_build_session_context_reports_memento_pi_state_home_queue_source(tmp_path, monkeypatch):
+def test_build_session_context_reports_almanac_pi_state_home_queue_source(tmp_path, monkeypatch):
     vault = tmp_path / "vault"
     state_home = tmp_path / "pi-state"
     queue_file = state_home / "queue" / "pi-captures.jsonl"
@@ -248,13 +248,13 @@ def test_build_session_context_reports_memento_pi_state_home_queue_source(tmp_pa
     assert queue_section["queued_capture_count_source"] == "current"
     assert queue_section["current_queued_capture_count"] == 1
     assert queue_section["queue_path"] == str(queue_file)
-    assert queue_section["queue_path_source"] == "memento_pi_state_home"
+    assert queue_section["queue_path_source"] == "almanac_pi_state_home"
 
 
 def test_build_session_context_counts_current_plus_unmigrated_legacy_queue(tmp_path, monkeypatch):
     vault = tmp_path / "vault"
     xdg_state = tmp_path / "state"
-    current_queue_file = xdg_state / "memento" / "pi" / "queue" / "pi-captures.jsonl"
+    current_queue_file = xdg_state / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
     current_queue_file.parent.mkdir(parents=True)
     current_queue_file.write_text('{"id":"q1"}\n')
     legacy_queue_file = vault / "queue" / "pi-captures.jsonl"
@@ -285,7 +285,7 @@ def test_build_session_context_counts_current_plus_unmigrated_legacy_queue(tmp_p
 def test_build_session_context_mirrors_bridge_migration_count_for_malformed_queue_rows(tmp_path, monkeypatch):
     vault = tmp_path / "vault"
     xdg_state = tmp_path / "state"
-    current_queue_file = xdg_state / "memento" / "pi" / "queue" / "pi-captures.jsonl"
+    current_queue_file = xdg_state / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
     current_queue_file.parent.mkdir(parents=True)
     current_queue_file.write_text('not json\n{"title":"current no id"}\n')
     legacy_queue_file = vault / "queue" / "pi-captures.jsonl"
@@ -1082,7 +1082,7 @@ def test_build_recall_backend_unavailable_includes_miss_metadata(_config, mock_v
     assert result.should_inject is False
     assert result.reason == "backend_unavailable"
     assert result.metadata["miss"]["reason"] == "backend_unavailable"
-    assert any("memento_status" in hint for hint in result.metadata["miss"]["recovery_hints"])
+    assert any("almanac_status" in hint for hint in result.metadata["miss"]["recovery_hints"])
 
 
 @patch("memento.remote_client.is_remote", return_value=False)
@@ -1703,7 +1703,7 @@ def test_triage_health_warning_adds_stale_certainty_hint(tmp_path):
 
     assert warning is not None
     assert "triage failing 3/3" in warning
-    assert "stale installed memento package" in warning
+    assert "stale installed Almanac package" in warning
     assert "./install.sh --reinstall" in warning
     assert "certainty labels like confirmed" in warning
 
@@ -1733,7 +1733,7 @@ def test_triage_health_warning_detects_other_accepted_certainty_labels(tmp_path)
         warning = triage_health_warning()
 
     assert warning is not None
-    assert "stale installed memento package" in warning
+    assert "stale installed Almanac package" in warning
     assert "./install.sh --reinstall" in warning
 
 

@@ -28,7 +28,7 @@ hooks:
     git clone --depth 1 git@github.com:AndriGitDev/almanac.git .
     git checkout -B rondo/{{ issue.identifier }}
     # Hooks run under `sh -lc`; macOS path_helper puts /usr/bin (python 3.9)
-    # ahead of /opt/homebrew/bin, and memento requires python >=3.10.
+    # ahead of /opt/homebrew/bin, and Almanac requires Python >=3.10.
     /opt/homebrew/bin/python3 -m venv .venv
     .venv/bin/python -m pip install --quiet --upgrade pip
     .venv/bin/python -m pip install --quiet -e '.[mcp,embedded,test]' pytest ruff

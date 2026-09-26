@@ -10,10 +10,10 @@ primary_region = 'fra'
   dockerfile = 'Dockerfile'
 
 [env]
-  MEMENTO_HOST = '0.0.0.0'
-  MEMENTO_PORT = '8745'
-  MEMENTO_TRANSPORT = 'streamable-http'
-  MEMENTO_VAULT_PATH = '/vault'
+  ALMANAC_HOST = '0.0.0.0'
+  ALMANAC_PORT = '8745'
+  ALMANAC_TRANSPORT = 'streamable-http'
+  ALMANAC_VAULT_PATH = '/vault'
   PYTHONPATH = '/app'
 
 [[mounts]]

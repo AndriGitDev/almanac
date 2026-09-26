@@ -1,42 +1,11 @@
-"""Shared type definitions for memento vault.
+"""Compatibility alias for :mod:`almanac.types`."""
 
-Stubs for PR3 — will be used as return type annotations on MCP tools
-and as parameter types in store/search once the full typing pass lands.
-"""
+if __name__ == "__main__":
+    from runpy import run_module
 
-from __future__ import annotations
+    run_module("almanac.types", run_name="__main__", alter_sys=True)
+else:
+    from importlib import import_module as _import_module
+    from sys import modules as _modules
 
-from typing import TypedDict
-
-
-class SearchResult(TypedDict, total=False):
-    path: str
-    title: str
-    score: float
-    snippet: str
-
-
-class NoteMetadata(TypedDict, total=False):
-    title: str
-    note_type: str
-    tags: list[str]
-    certainty: int | None
-    source: str
-    origin: str | None
-    date: str
-    project: str | None
-    branch: str | None
-    session_id: str | None
-    validity_context: str | None
-    supersedes: str | None
-
-
-class SessionMeta(TypedDict, total=False):
-    cwd: str | None
-    git_branch: str | None
-    exchange_count: int
-    user_messages: int
-    files_edited: list[str]
-    files_read: list[str]
-    first_prompt: str | None
-    last_outcome: str | None
+    _modules[__name__] = _import_module("almanac.types")

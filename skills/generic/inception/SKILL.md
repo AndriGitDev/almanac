@@ -17,16 +17,16 @@ Run Almanac consolidation to find patterns across notes.
 2. Prefer the installed local script when available:
 
 ```bash
-python3 ~/.claude/hooks/memento-inception.py --verbose [--dry-run] [--full]
+python3 ~/.claude/hooks/almanac-inception.py --verbose [--dry-run] [--full]
 ```
 
-3. If the script is unavailable, explain that Inception requires a local Memento install with the consolidation hook.
+3. If the script is unavailable, explain that Inception requires a local Almanac install with the consolidation hook.
 
 4. Interpret common outcomes:
    - Lock held: another run is active
    - Missing dependencies: install `numpy hdbscan scikit-learn`
    - No embeddings: reindex and embed the vault
-   - Config error: inspect `memento.yml`
+   - Config error: inspect `almanac.yml`
 
 5. Report clusters found, notes written, and whether it was a dry run.
 

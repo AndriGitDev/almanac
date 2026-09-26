@@ -1,13 +1,13 @@
 # Architecture
 
-The `almanac` Python namespace exposes the existing agent-agnostic `memento/` implementation. Both import paths resolve to the same module objects during migration.
+The `almanac` Python namespace exposes the existing agent-agnostic `almanac/` implementation. Both import paths resolve to the same module objects during migration.
 Modules handle config, search, graph algorithms, vault I/O, LLM abstraction, and type definitions.
 Hooks and MCP tools are thin wrappers around this package.
 
 ## Module map
 
 ```
-memento/
+almanac/
   config.py          Configuration, project detection, vault identity
   search.py          Search pipeline: PRF, RRF, temporal decay, PageRank
   search_backend.py  Abstract search backend (QMD, Embedded, Grep -- auto-detected)
@@ -38,7 +38,7 @@ flowchart LR
     CC --> Core
     MCP --> Core
     Remote -->|HTTP + bearer auth| Core
-    subgraph Core[memento/ package]
+    subgraph Core[almanac/ package]
         Search[search.py + search_backend.py]
         Graph[graph.py]
         Store[store.py + archive.py]

@@ -1,8 +1,8 @@
 # Automation MemoryProvider Contract
 
-How automated runners (Rondo, Beislið, or any orchestrator) consume Memento as automation memory. This is a contract: the normative sections below use MUST / MUST NOT / SHOULD / MAY in the RFC 2119 sense, and downstream adapters are expected to hold to them.
+How automated runners (Rondo, Beislið, or any orchestrator) consume Almanac as automation memory. This is a contract: the normative sections below use MUST / MUST NOT / SHOULD / MAY in the RFC 2119 sense, and downstream adapters are expected to hold to them.
 
-If you remember one thing: **the vault is never a run ledger.** Memento owns curated memory and learning. Run state belongs elsewhere.
+If you remember one thing: **the vault is never a run ledger.** Almanac owns curated memory and learning. Run state belongs elsewhere.
 
 ## Ownership boundary
 
@@ -10,20 +10,20 @@ If you remember one thing: **the vault is never a run ledger.** Memento owns cur
 |--------|------|
 | Beislið | Work-contract, autonomy, and proof semantics |
 | Rondo | Execution, run evidence, run ledger, coordination |
-| Memento | Curated memory and learning — nothing else |
+| Almanac | Curated memory and learning — nothing else |
 
-A runner that needs to record what happened during a run (gate results, proofs, retries, locks, queues) records it in its own ledger. Memento stores what was *learned*, after the run, in sanitized form.
+A runner that needs to record what happened during a run (gate results, proofs, retries, locks, queues) records it in its own ledger. Almanac stores what was *learned*, after the run, in sanitized form.
 
 ## Contract at a glance
 
 | Operation | Tool(s) | Direction | On failure |
 |-----------|---------|-----------|------------|
-| Pre-run context packet | `memento_session_context` (preferred); `memento_briefing`, `memento_recall`, `memento_tool_context` as host primitives | read | fail-open: `should_inject: false` / empty packet |
-| Explicit search | `memento_search` | read | fail-open: miss envelope with structured reason |
-| Explicit get | `memento_get` | read | fail-open: `{"error": ...}` dict, never an exception |
-| Post-run lesson capture | `memento_capture_run_lesson` (typed automated-run lesson candidate), `memento_capture` (session summary), `memento_store` (single atomic lesson) | write | queue result or error dict; runner proceeds, surfaces the failure |
-| Batch synthesis | `memento_synthesize_failures` dry-run reports; optional approved typed lesson writes; per-run `memento_capture` + Inception consolidation remains supported | write | schema error for raw dumps; write errors are surfaced and runner proceeds |
-| Availability check | `memento_status`, `almanac health` | read | safe partial dict; never raises, never prints secrets |
+| Pre-run context packet | `almanac_session_context` (preferred); `almanac_briefing`, `almanac_recall`, `almanac_tool_context` as host primitives | read | fail-open: `should_inject: false` / empty packet |
+| Explicit search | `almanac_search` | read | fail-open: miss envelope with structured reason |
+| Explicit get | `almanac_get` | read | fail-open: `{"error": ...}` dict, never an exception |
+| Post-run lesson capture | `almanac_capture_run_lesson` (typed automated-run lesson candidate), `almanac_capture` (session summary), `almanac_store` (single atomic lesson) | write | queue result or error dict; runner proceeds, surfaces the failure |
+| Batch synthesis | `almanac_synthesize_failures` dry-run reports; optional approved typed lesson writes; per-run `almanac_capture` + Inception consolidation remains supported | write | schema error for raw dumps; write errors are surfaced and runner proceeds |
+| Availability check | `almanac_status`, `almanac health` | read | safe partial dict; never raises, never prints secrets |
 
 ## Provider operations
 
@@ -32,7 +32,7 @@ A runner that needs to record what happened during a run (gate results, proofs, 
 Before a run starts, a runner SHOULD fetch one compact, budgeted context packet:
 
 ```json
-memento_session_context({
+almanac_session_context({
   "cwd": "/path/to/repo",
   "prompt": "MEM-17: document the MemoryProvider contract",
   "session_id": "run-identifier-for-traceability",
@@ -42,7 +42,7 @@ memento_session_context({
 
 The packet combines a project briefing, prompt-relevant recall, and vault status in a single call, trimmed to `token_budget`. The `include_status`, `include_recent`, and `include_recall` flags (all default `true`) switch sections off when a runner wants less (`include_recent` gates the briefing section); `include_tool_context_preview` (default `false`) adds a tool-context preview section.
 
-`memento_briefing`, `memento_recall`, and `memento_tool_context` are the underlying host-adapter primitives (session start, prompt time, and around file reads respectively). They return a `LifecycleResult` payload: `should_inject`, `content`, `source`, `results`, and optionally `reason` and `metadata`. Runners MAY call them individually; `memento_session_context` is preferred because it is budgeted and one round-trip. None of these are general user-answering search tools.
+`almanac_briefing`, `almanac_recall`, and `almanac_tool_context` are the underlying host-adapter primitives (session start, prompt time, and around file reads respectively). They return a `LifecycleResult` payload: `should_inject`, `content`, `source`, `results`, and optionally `reason` and `metadata`. Runners MAY call them individually; `almanac_session_context` is preferred because it is budgeted and one round-trip. None of these are general user-answering search tools.
 
 Runners SHOULD pass a stable `session_id` on every call in a run. It is a traceability marker inside note frontmatter and logs — it is not, and must not become, a run-ledger key.
 
@@ -51,16 +51,16 @@ Runners SHOULD pass a stable `session_id` on every call in a run. It is a tracea
 During a run, a runner MAY search the vault for prior decisions, fixes, and patterns:
 
 ```json
-memento_search({
+almanac_search({
   "query": "how did we configure the release smoke gate",
   "cwd": "/path/to/repo",
   "limit": 5
 })
 ```
 
-On hits, results carry `path`, `title`, `score`, `snippet`, and (when readable) full `content`, so a follow-up `memento_get` round-trip is usually unnecessary. `memento_get` reads a known note by path or name.
+On hits, results carry `path`, `title`, `score`, `snippet`, and (when readable) full `content`, so a follow-up `almanac_get` round-trip is usually unnecessary. `almanac_get` reads a known note by path or name.
 
-A miss is data, not an error. On a miss, `memento_search` returns a structured envelope instead of raising:
+A miss is data, not an error. On a miss, `almanac_search` returns a structured envelope instead of raising:
 
 ```json
 {
@@ -86,7 +86,7 @@ After a run, a runner SHOULD capture what was learned — as a typed sanitized l
 
 #### Typed automated-run lesson candidate schema
 
-`memento_capture_run_lesson` accepts a single `automated_run_lesson_candidate/v1` object. Required fields are `external_system`, `run_id`, `title`, and `evidence_summary`. The full normalized shape is:
+`almanac_capture_run_lesson` accepts a single `automated_run_lesson_candidate/v1` object. Required fields are `external_system`, `run_id`, `title`, and `evidence_summary`. The full normalized shape is:
 
 | Field | Required | Meaning |
 |-------|----------|---------|
@@ -110,10 +110,10 @@ The schema rejects raw run stores, ledgers, event streams, transcripts, proof/ev
 
 #### CLI ingest: `pi_bridge run-lesson`
 
-Runners without MCP transport (Rondo running headless, or an operator working from a shell) MAY ingest a lesson through the CLI adapter instead of `memento_capture_run_lesson`. This is an explicit, one-shot command — nothing about a run's completion triggers it automatically; the caller decides when a run produced a lesson worth keeping, then runs:
+Runners without MCP transport (Rondo running headless, or an operator working from a shell) MAY ingest a lesson through the CLI adapter instead of `almanac_capture_run_lesson`. This is an explicit, one-shot command — nothing about a run's completion triggers it automatically; the caller decides when a run produced a lesson worth keeping, then runs:
 
 ```bash
-python3 -m memento.pi_bridge run-lesson --payload /path/to/lesson.json
+python3 -m almanac.pi_bridge run-lesson --payload /path/to/lesson.json
 ```
 
 `--payload` points at a JSON file (a JSON object) with this contract:
@@ -127,9 +127,9 @@ python3 -m memento.pi_bridge run-lesson --payload /path/to/lesson.json
 | `evidence_paths` | no | List of artifact references/URLs/IDs — references only, never artifact bodies |
 | `tags` | no | Extra tags merged onto the automatic `automation`, `automated-run`, lesson-type, outcome, and ticket tags |
 
-The command always writes a curated note — unlike `memento_capture_run_lesson`, there is no queue-for-review mode here, because a queued-only candidate cannot satisfy the recall guarantee below. Internally it maps the payload onto the same typed `automated_run_lesson_candidate/v1` shape (`ticket_id` → `ticket`, `lesson_text` → `body`/`evidence_summary`, `evidence_paths` → `artifact_refs`) and calls the same `capture_automated_run_lesson(..., approve_write=True)` used by the MCP tool, so the same raw-dump/patch-blob rejection and secret redaction apply. A payload may also include any of the optional typed-schema fields (`repo`, `project`, `branch`, `slice`, `outcome`, `lesson_type`, `note_type`, `certainty`, `validity_context`, `related_refs`, `external_system`) to enrich the note; unrecognized fields are ignored.
+The command always writes a curated note — unlike `almanac_capture_run_lesson`, there is no queue-for-review mode here, because a queued-only candidate cannot satisfy the recall guarantee below. Internally it maps the payload onto the same typed `automated_run_lesson_candidate/v1` shape (`ticket_id` → `ticket`, `lesson_text` → `body`/`evidence_summary`, `evidence_paths` → `artifact_refs`) and calls the same `capture_automated_run_lesson(..., approve_write=True)` used by the MCP tool, so the same raw-dump/patch-blob rejection and secret redaction apply. A payload may also include any of the optional typed-schema fields (`repo`, `project`, `branch`, `slice`, `outcome`, `lesson_type`, `note_type`, `certainty`, `validity_context`, `related_refs`, `external_system`) to enrich the note; unrecognized fields are ignored.
 
-**Recall guarantee.** The produced note's `## Automated run provenance` section embeds `run_id` and `ticket_id` verbatim (for example `` - Run ID: `RON-160-20260705T031413Z-d846d0b8` `` and `- Ticket: MEM-145`), and `ticket_id` is also added as a frontmatter tag. Identifiers shaped like these (hyphenated run ids, `PROJECT-123`-style tickets) trip `search.is_literal_like_query`'s digit/hyphen heuristics, so `memento_search`/`pi_bridge search` route a query for either identifier to literal/concrete matching and return the note deterministically — this is what closes the MEM-145 gap where a finished run left nothing queued or recallable.
+**Recall guarantee.** The produced note's `## Automated run provenance` section embeds `run_id` and `ticket_id` verbatim (for example `` - Run ID: `RON-160-20260705T031413Z-d846d0b8` `` and `- Ticket: MEM-145`), and `ticket_id` is also added as a frontmatter tag. Identifiers shaped like these (hyphenated run ids, `PROJECT-123`-style tickets) trip `search.is_literal_like_query`'s digit/hyphen heuristics, so `almanac_search`/`pi_bridge search` route a query for either identifier to literal/concrete matching and return the note deterministically — this is what closes the MEM-145 gap where a finished run left nothing queued or recallable.
 
 Example payload:
 
@@ -146,10 +146,10 @@ Example payload:
 
 Today this command is invoked explicitly by an operator or a Rondo step that calls out to it; automatic emission straight from Rondo's own run lifecycle (so a run always ends with an ingest call with no manual step) is tracked as a separate Rondo-side follow-up, not part of this contract.
 
-For older integrations, `memento_capture` remains available for session-summary style capture:
+For older integrations, `almanac_capture` remains available for session-summary style capture:
 
 ```json
-memento_capture({
+almanac_capture({
   "session_summary": "MEM-17 docs run: contract doc landed; learned that docs-only changes still require the full gate suite.",
   "cwd": "/path/to/repo",
   "branch": "vic/mem-17-...",
@@ -159,20 +159,20 @@ memento_capture({
 })
 ```
 
-`memento_capture` is the MCP equivalent of the SessionEnd hook. It writes a fleeting log entry and (for substantial sessions) an atomic note, and updates the project index. Captures are idempotent per `session_id`: a retried call returns `"deduplicated": true` instead of writing twice, so runners MAY safely retry on transport timeouts. `fleeting_only: true` records just the daily-log line for non-substantial runs.
+`almanac_capture` is the MCP equivalent of the SessionEnd hook. It writes a fleeting log entry and (for substantial sessions) an atomic note, and updates the project index. Captures are idempotent per `session_id`: a retried call returns `"deduplicated": true` instead of writing twice, so runners MAY safely retry on transport timeouts. `fleeting_only: true` records just the daily-log line for non-substantial runs.
 
 `transcript_path` mode (full triage from a transcript file) is local/stdio-only; HTTP callers are rejected and must send `session_summary` instead. Even locally, automation SHOULD prefer summaries — see the transcript prohibition below.
 
-For a single, well-formed lesson, `memento_store` writes one atomic note with typed frontmatter (`note_type`: discovery, decision, pattern, debugging, or architecture; `certainty` 1–5; optional `validity_context` and `supersedes`). The server does not validate `note_type` against that list — callers SHOULD stick to the five listed types so notes stay queryable. It is also idempotent: storing an identical payload returns the existing path with `"idempotent": true`.
+For a single, well-formed lesson, `almanac_store` writes one atomic note with typed frontmatter (`note_type`: discovery, decision, pattern, debugging, or architecture; `certainty` 1–5; optional `validity_context` and `supersedes`). The server does not validate `note_type` against that list — callers SHOULD stick to the five listed types so notes stay queryable. It is also idempotent: storing an identical payload returns the existing path with `"idempotent": true`.
 
-Inputs to both MUST already be sanitized by the caller (see Privacy below). Both acquire a short-lived internal write lock; lock contention surfaces as an error dict whose message mentions the write lock, and such errors are retryable. (A structured `"reason": "lock_timeout"` field exists only on `memento_daily_snapshot`.)
+Inputs to both MUST already be sanitized by the caller (see Privacy below). Both acquire a short-lived internal write lock; lock contention surfaces as an error dict whose message mentions the write lock, and such errors are retryable. (A structured `"reason": "lock_timeout"` field exists only on `almanac_daily_snapshot`.)
 
 ### Batch synthesis from sanitized summaries
 
-Runners that already have a batch of sanitized post-run summaries MAY call `memento_synthesize_failures` to produce an immediate dry-run learning report:
+Runners that already have a batch of sanitized post-run summaries MAY call `almanac_synthesize_failures` to produce an immediate dry-run learning report:
 
 ```json
-memento_synthesize_failures({
+almanac_synthesize_failures({
   "run_summaries": [
     {
       "run_id": "rondo-2026-06-30-1",
@@ -187,16 +187,16 @@ memento_synthesize_failures({
 
 The input schema is summary-shaped by design. It rejects raw run stores, ledgers, event streams, transcripts, proof/evidence dumps, stdout/stderr, log fields, and oversized multiline strings. Accepted summaries are grouped into memory, process, agent, harness, environment, and requirement failures, including repeated gate failures, memory-not-retrieved failures, missing process/gates, ambiguous requirements, harness/environment failures, and proof gaps.
 
-By default the tool is dry-run only: it returns grouped failures plus concrete candidate lessons and advisory note/issue/gate/docs actions, and performs no writes. Passing `approve_writes: true` is the explicit approval boundary for storing candidate lesson notes via the typed note-write path (`origin: mcp_batch_failure_synthesis`, `note_type` discovery/pattern, certainty, tags, project/branch/session metadata). Advisory issue/gate/docs actions are never executed by Memento; the owning runner or project must handle them outside the vault.
+By default the tool is dry-run only: it returns grouped failures plus concrete candidate lessons and advisory note/issue/gate/docs actions, and performs no writes. Passing `approve_writes: true` is the explicit approval boundary for storing candidate lesson notes via the typed note-write path (`origin: mcp_batch_failure_synthesis`, `note_type` discovery/pattern, certainty, tags, project/branch/session metadata). Advisory issue/gate/docs actions are never executed by Almanac; the owning runner or project must handle them outside the vault.
 
-Per-run `memento_capture` plus asynchronous Inception consolidation remains supported for background learning. `memento_synthesize_failures` is for sanitized batches where the runner wants an immediate report or approved lesson-note capture without storing aggregate run evidence.
+Per-run `almanac_capture` plus asynchronous Inception consolidation remains supported for background learning. `almanac_synthesize_failures` is for sanitized batches where the runner wants an immediate report or approved lesson-note capture without storing aggregate run evidence.
 
 ## Failure behavior
 
 **Fail-open is the default.** Memory is an optional input to a run:
 
 - Degraded or missing memory MUST be visible to the caller (miss envelope, `should_inject: false`, empty packet, status flags) — and MUST NOT fail the run by default.
-- A runner whose work genuinely requires memory MAY treat specific signals (for example `backend_unavailable`, or a stale `memento_status`) as fail-closed — but that is the caller's explicit decision, declared in its own work contract, not Memento's default.
+- A runner whose work genuinely requires memory MAY treat specific signals (for example `backend_unavailable`, or a stale `almanac_status`) as fail-closed — but that is the caller's explicit decision, declared in its own work contract, not Almanac's default.
 - Silent failure is never acceptable: read operations return structured miss/status data rather than raising, and write failures return an error dict the runner MUST surface in its own run evidence.
 
 ## Privacy and redaction
@@ -214,7 +214,7 @@ That server-side pass is **defense-in-depth, not permission**:
 Automation consumers MUST NOT:
 
 - **Store run evidence, proofs, or gate transcripts in the vault.** That is run-ledger material; it belongs in Rondo's run evidence store.
-- **Use vault notes as locks, queues, or any active coordination state.** Coordination belongs to the runner's own infrastructure. (Memento's internal write lock is an implementation detail of safe file writes, not a coordination primitive offered to callers.)
+- **Use vault notes as locks, queues, or any active coordination state.** Coordination belongs to the runner's own infrastructure. (Almanac's internal write lock is an implementation detail of safe file writes, not a coordination primitive offered to callers.)
 - **Store patches or diffs as notes.** Patches belong in git branches and PRs; a note may *reference* a commit or PR.
 - **Write full transcripts by default.** Capture sanitized summaries. Transcript-based triage exists for local interactive hosts, not as an automation default.
 - **Create Rondo-specific queues (or any runner-specific work queues) in the vault.** No pending-work notes, no claim/ack markers, no scheduling state.
@@ -235,7 +235,7 @@ Each prohibited item has a home; it just isn't here:
 Before the run — fetch the context packet:
 
 ```json
-memento_session_context({
+almanac_session_context({
   "cwd": "/repo", "prompt": "fix flaky retrieval test",
   "session_id": "run-7f3a", "token_budget": 2000
 })
@@ -244,14 +244,14 @@ memento_session_context({
 During the run — explicit recall when the runner hits something that smells familiar:
 
 ```json
-memento_search({"query": "flaky test_deep_recall timeout fix", "cwd": "/repo"})
-memento_get({"path": "notes/qmd-timeout-tuning.md"})
+almanac_search({"query": "flaky test_deep_recall timeout fix", "cwd": "/repo"})
+almanac_get({"path": "notes/qmd-timeout-tuning.md"})
 ```
 
 After the run — capture the lesson, sanitized:
 
 ```json
-memento_capture({
+almanac_capture({
   "session_summary": "Retrieval test flakiness was QMD cold-start, not the test. Warmed index in fixture; gate stable across 5 runs.",
   "cwd": "/repo", "branch": "fix/flaky-retrieval",
   "session_id": "run-7f3a", "agent": "rondo"
@@ -261,7 +261,7 @@ memento_capture({
 ❌ **Prohibited** — this is a run-ledger entry wearing a note costume:
 
 ```json
-memento_store({
+almanac_store({
   "title": "run-7f3a: gate results",
   "body": "ruff: pass, pytest: pass (412 tests), release-smoke: pass, proof hash 9c1f…"
 })
@@ -271,21 +271,21 @@ Gate results and proof hashes go in the runner's ledger. The vault gets the *les
 
 ## Health and status signals
 
-Available today, via `memento_status` (read-only, secret-free, cheap):
+Available today, via `almanac_status` (read-only, secret-free, cheap):
 
 - `vault_exists`, `vault_path`, `vault_id` — is there a vault at all
 - `qmd_available` — is the search backend present (when false, expect `backend_unavailable` misses; reads degrade, they don't break)
 - `note_count`, `project_count`, `fleeting_count` — rough corpus size
 - `config` — non-secret config summary (collection, backends, feature flags)
 
-`almanac health` (CLI) runs deeper read-only checks — config parse, vault structure, backend availability, recent triage health from the 24-hour triage-health log, retrieval log health, lock files — with `--json` for structured output and `--strict` to exit non-zero on warnings. Its JSON includes an `automation_memory` readiness object for orchestration probes. `memento_status` exposes the same readiness object, and `memento_session_context` includes a compact probe summary in `sections.status.automation_memory`. Lifecycle packets also surface a triage-health warning inline when recent capture failure rates are high.
+`almanac health` (CLI) runs deeper read-only checks — config parse, vault structure, backend availability, recent triage health from the 24-hour triage-health log, retrieval log health, lock files — with `--json` for structured output and `--strict` to exit non-zero on warnings. Its JSON includes an `automation_memory` readiness object for orchestration probes. `almanac_status` exposes the same readiness object, and `almanac_session_context` includes a compact probe summary in `sections.status.automation_memory`. Lifecycle packets also surface a triage-health warning inline when recent capture failure rates are high.
 
 Automation memory readiness reports:
 
 - search backend availability as explicit readiness metadata
 - recent recall/search failure rate over a 24-hour window
 - embedded-index staleness warnings when a local index exists
-- local/remote divergence via the local sync ledger when `MEMENTO_VAULT_URL` is configured (no network probe by default)
+- local/remote divergence via the local sync ledger when `ALMANAC_VAULT_URL` is configured (no network probe by default)
 - timestamp/shape of the last successful automation memory packet
 - common failure reasons, structured from local health/retrieval/sync logs
 
@@ -293,11 +293,11 @@ All health surfaces are read-only, cheap by default, fail-open unless the caller
 
 ### Transport notes
 
-The contract is transport-neutral: the same tools are exposed over stdio (local) and HTTP (remote). Remote callers should note two caveats: `memento_capture`'s `transcript_path` mode is rejected over HTTP (send `session_summary`), and write idempotency via `session_id` exists precisely so HTTP retries after timeouts are safe.
+The contract is transport-neutral: the same tools are exposed over stdio (local) and HTTP (remote). Remote callers should note two caveats: `almanac_capture`'s `transcript_path` mode is rejected over HTTP (send `session_summary`), and write idempotency via `session_id` exists precisely so HTTP retries after timeouts are safe.
 
 ## Non-goals
 
-To remove any doubt about scope, Memento as an automation MemoryProvider is **not**:
+To remove any doubt about scope, Almanac as an automation MemoryProvider is **not**:
 
 - a run ledger or execution history store
 - a proof or evidence store

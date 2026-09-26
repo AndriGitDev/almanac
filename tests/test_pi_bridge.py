@@ -334,7 +334,7 @@ def test_pi_bridge_search_can_include_content_and_budget(capsys, tmp_path):
 
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["results"][0]["content"].endswith("use memento_get for full note")
+    assert payload["results"][0]["content"].endswith("use almanac_get for full note")
     assert payload["metadata"]["truncated"] is True
     assert payload["metadata"]["expandable_paths"] == ["notes/env.md"]
 
@@ -644,7 +644,7 @@ def test_pi_bridge_triage_spawns_sessionend_hook_for_pi_transcript(capsys, tmp_p
         "source_event": "session_shutdown",
         "reason": "session_shutdown:quit",
     }
-    assert "memento-triage.py" in popen_calls[0]["args"][-1]
+    assert "almanac-triage.py" in popen_calls[0]["args"][-1]
     assert not (state_home / "queue" / "pi-captures.jsonl").exists()
 
     audit_entries = [
@@ -1412,12 +1412,12 @@ def test_pi_bridge_queue_path_resolution_characterization(tmp_path, monkeypatch)
     assert pi_bridge._legacy_queue_file(vault) == vault / "queue" / "pi-captures.jsonl"
 
     monkeypatch.delenv("MEMENTO_PI_STATE_HOME")
-    assert pi_bridge._state_root() == tmp_path / "ignored-xdg" / "memento" / "pi"
-    assert pi_bridge._queue_file(vault) == tmp_path / "ignored-xdg" / "memento" / "pi" / "queue" / "pi-captures.jsonl"
+    assert pi_bridge._state_root() == tmp_path / "ignored-xdg" / "almanac" / "pi"
+    assert pi_bridge._queue_file(vault) == tmp_path / "ignored-xdg" / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
 
     monkeypatch.delenv("XDG_STATE_HOME")
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    default_root = tmp_path / "home" / ".local" / "state" / "memento" / "pi"
+    default_root = tmp_path / "home" / ".local" / "state" / "almanac" / "pi"
     assert pi_bridge._state_root() == default_root
     assert pi_bridge._queue_file(vault) == default_root / "queue" / "pi-captures.jsonl"
 
@@ -2069,7 +2069,7 @@ def test_pi_bridge_capture_marks_processor_session_queue_metadata(capsys, tmp_pa
     assert payload["queued"] is True
     queue_file = tmp_path / "state" / "queue" / "pi-captures.jsonl"
     queued = [json.loads(line) for line in queue_file.read_text().splitlines()]
-    assert queued[0]["metadata"]["memento_processor"] is True
+    assert queued[0]["metadata"]["almanac_processor"] is True
 
 
 def test_pi_bridge_process_start_skips_processor_session_queue_captures(capsys, tmp_path, monkeypatch):
@@ -2658,7 +2658,7 @@ def test_pi_bridge_clean_transcript_caps_before_appending_current_block(tmp_path
     )
 
     cleaned = pi_bridge._clean_transcript(session_file, total_cap=40)
-    body, marker = cleaned.split("[transcript truncated by memento processor]")
+    body, marker = cleaned.split("[transcript truncated by almanac processor]")
     assert marker == ""
     assert len(body.rstrip()) <= 40
     assert "x" * 100 not in cleaned

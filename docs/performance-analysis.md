@@ -133,7 +133,7 @@ One concierge call costs the same as **486 hooked sessions**. They're complement
 
 | System | Architecture | Retrieval | Consolidation | LLM cost | Storage |
 |---|---|---|---|---|---|
-| **Memento-vault** | BM25/vector hooks + CE reranker | 472ms adaptive, PRF + RRF + PPR + PageRank + MiniLM-L6 | Inception (batch HDBSCAN, parallel) | Zero at retrieval (CE is local ONNX) | Markdown + SQLite |
+| **Almanac-vault** | BM25/vector hooks + CE reranker | 472ms adaptive, PRF + RRF + PPR + PageRank + MiniLM-L6 | Inception (batch HDBSCAN, parallel) | Zero at retrieval (CE is local ONNX) | Markdown + SQLite |
 | Honcho 3 | Agentic tool-use | 200ms, agent-directed | Dreamer (agentic specialists) | Per-query + per-dream | PostgreSQL + pgvector |
 | Hindsight | 4-network architecture | Not published | Dual consolidation networks | LLM per update (supports Ollama) | Cloud or local |
 | Zep (Graphiti) | Temporal KG | 2.5-3.2s, graph traversal | Real-time streaming | Optional reranker | Neo4j |
@@ -164,7 +164,7 @@ Benchmark replays real Claude Code session transcripts through the retrieval hoo
 ```
 For each session transcript:
     1. Parse JSONL for user prompts and Read tool calls
-    2. Clean caches (/tmp/memento-*.json)
+    2. Clean caches (/tmp/almanac-*.json)
     3. Fire vault-briefing.py with the session's cwd
     4. For each prompt + interleaved file reads:
        - Fire vault-tool-context.py for each Read
@@ -174,7 +174,7 @@ For each session transcript:
 
 Source: `benchmark/replay_benchmark.py`
 
-**Dataset:** 30 sessions, 381 prompts, 382 file reads, 16 projects. Sessions span a work monorepo, memento-vault, personal side projects, dotfiles, and infrastructure. Session sizes 1-146 actions (median: 12).
+**Dataset:** 30 sessions, 381 prompts, 382 file reads, 16 projects. Sessions span a work monorepo, almanac, personal side projects, dotfiles, and infrastructure. Session sizes 1-146 actions (median: 12).
 
 ## How to run
 
@@ -200,11 +200,11 @@ python3 benchmark/longmemeval_adapter.py --dataset data/longmemeval/longmemeval_
 For ongoing monitoring:
 
 ```yaml
-# ~/.config/memento-vault/memento.yml
+# ~/.config/almanac/almanac.yml
 retrieval_log: true
 ```
 
-Logs go to `~/.config/memento-vault/retrieval.jsonl`. Analyze with `memento-vault retrieval-report --since 7` (or `python tools/analyze-retrieval.py --since 7`) to review skip reasons, latency, and behavior recommendations for when purpose-built tools or concrete search would help.
+Logs go to `~/.config/almanac/retrieval.jsonl`. Analyze with `almanac retrieval-report --since 7` (or `python tools/analyze-retrieval.py --since 7`) to review skip reasons, latency, and behavior recommendations for when purpose-built tools or concrete search would help.
 
 ## References
 

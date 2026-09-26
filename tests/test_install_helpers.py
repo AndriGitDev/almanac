@@ -102,7 +102,7 @@ def test_noninteractive_force_requires_explicit_env():
     result = subprocess.run([installer, "--force"], input="", text=True, capture_output=True, env=env, timeout=5)
 
     assert result.returncode == 1
-    assert "Refusing non-interactive --force without MEMENTO_FORCE=1" in result.stdout
+    assert "Refusing non-interactive --force without ALMANAC_FORCE=1" in result.stdout
 
 
 def test_bootstrap_marks_curl_pipe_mode_noninteractive():
@@ -113,7 +113,7 @@ def test_bootstrap_marks_curl_pipe_mode_noninteractive():
     with open(bootstrap) as f:
         contents = f.read()
 
-    assert "MEMENTO_NONINTERACTIVE=1" in contents
+    assert "ALMANAC_NONINTERACTIVE=1" in contents
     assert "GIT_TERMINAL_PROMPT=0" in contents
     assert "[ ! -t 0 ]" in contents
 
@@ -258,13 +258,11 @@ setup_cli >/dev/null
 
     subprocess.run(["bash", "-c", script], check=True, text=True, capture_output=True)
 
-    link = tmp_path / ".local" / "bin" / "memento-vault"
+    link = tmp_path / ".local" / "bin" / "almanac"
     assert link.is_symlink()
-    assert os.readlink(link) == os.path.join(repo, "bin", "memento-vault")
+    assert os.readlink(link) == os.path.join(repo, "bin", "almanac")
 
-    almanac_link = tmp_path / ".local" / "bin" / "almanac"
-    assert almanac_link.is_symlink()
-    assert os.readlink(almanac_link) == os.path.join(repo, "bin", "almanac")
+    assert not (tmp_path / ".local" / "bin" / "memento-vault").exists()
 
     result = subprocess.run([str(link), "version"], check=True, text=True, capture_output=True)
     with open(os.path.join(repo, "VERSION")) as f:
@@ -393,7 +391,7 @@ def test_shell_warmup_snippet_uses_memento_cli_without_shell_job_control():
     assert 'qmd vsearch "warmup" -c memento -n 1 &>/dev/null &' not in re.search(
         r"cat >> \"\$shell_rc\" << WARMUP_EOF\n(?P<body>.*?)\nWARMUP_EOF", contents, re.S
     ).group("body")
-    assert 'local warmup_cli="$SCRIPT_DIR/bin/memento-vault"' in contents
+    assert 'local warmup_cli="$SCRIPT_DIR/bin/almanac"' in contents
     assert "$warmup_cli_quoted warmup >/dev/null 2>&1" in contents
 
 
@@ -431,7 +429,7 @@ setup_shell_warmup >/dev/null
 
     contents = shell_rc.read_text()
     assert 'qmd vsearch "warmup"' not in contents
-    assert "memento-vault warmup" in contents
+    assert "almanac warmup" in contents
     assert contents.count("Warm QMD embedding model") == 1
 
 
@@ -469,7 +467,7 @@ setup_shell_warmup >/dev/null
 
     contents = shell_rc.read_text()
     assert 'qmd vsearch "warmup"' not in contents
-    assert "memento-vault warmup" in contents
+    assert "almanac warmup" in contents
     assert contents.count("Warm QMD embedding model") == 1
 
 
@@ -506,7 +504,7 @@ setup_shell_warmup >/dev/null
 
     contents = shell_rc.read_text()
     assert "python3 -c" not in contents
-    assert "memento-vault warmup" in contents
+    assert "almanac warmup" in contents
     assert contents.count("Warm QMD embedding model") == 1
 
 
@@ -746,7 +744,7 @@ class TestMcpConfig:
         assert rc == 0
 
         config = json.loads((tmp_path / "mcp-servers.json").read_text())
-        entry = config["memento-vault"]
+        entry = config["almanac"]
         assert entry["type"] == "http"
         assert entry["url"] == "https://vault.example.com:8745/mcp"
         assert entry["headers"]["Authorization"] == "Bearer my-key"
@@ -762,7 +760,7 @@ class TestMcpConfig:
         assert rc == 0
 
         config = json.loads((tmp_path / "mcp-servers.json").read_text())
-        assert "headers" not in config["memento-vault"]
+        assert "headers" not in config["almanac"]
 
     def test_local_config_creates_stdio_entry(self, tmp_path):
         rc, _, _ = _run_helper(
@@ -775,10 +773,10 @@ class TestMcpConfig:
         assert rc == 0
 
         config = json.loads((tmp_path / "mcp-servers.json").read_text())
-        entry = config["memento-vault"]
+        entry = config["almanac"]
         assert entry["command"] == "python3"
         assert "-m" in entry["args"]
-        assert "memento" in entry["args"]
+        assert "almanac" in entry["args"]
 
     def test_config_merges_with_existing(self, tmp_path):
         existing = {"other-server": {"command": "node", "args": ["server.js"]}}
@@ -795,7 +793,7 @@ class TestMcpConfig:
 
         config = json.loads((tmp_path / "mcp-servers.json").read_text())
         assert "other-server" in config
-        assert "memento-vault" in config
+        assert "almanac" in config
 
 
 class TestMergeSettings:
@@ -870,7 +868,8 @@ class TestMergeSettings:
         assert result.returncode == 0, result.stderr
         merged = json.loads(settings_path.read_text())
         commands = [hook["command"] for entry in merged["hooks"]["SessionEnd"] for hook in entry.get("hooks", [entry])]
-        assert prefix + f"python3 {claude_dir}/hooks/memento-triage.py" in commands
+        assert prefix + f"python3 {claude_dir}/hooks/almanac-triage.py" in commands
+        assert not any("memento-triage.py" in command for command in commands)
         assert user_hook in commands
 
     def test_uninstall_settings_removes_only_memento_hooks_and_permissions(self, tmp_path):
@@ -909,7 +908,7 @@ class TestMergeSettings:
         rc, stdout, stderr = _run_helper("uninstall-settings", str(settings_path), str(claude_dir), str(vault))
 
         assert rc == 0, stderr
-        assert "Removed 1 memento hook(s) and 4 permission rule(s)" in stdout
+        assert "Removed 1 Almanac hook(s) and 4 permission rule(s)" in stdout
         merged = json.loads(settings_path.read_text())
         assert merged["hooks"]["SessionEnd"][0]["hooks"][0]["command"] == user_hook
         assert merged["permissions"]["allow"] == ["Read(/tmp/user/**)"]
@@ -944,7 +943,7 @@ class TestMergeSettings:
         assert "SessionStart" in hooks
         assert "UserPromptSubmit" in hooks
         assert "PreToolUse" in hooks
-        assert hooks["SessionEnd"][0]["hooks"][0]["command"].endswith("memento-triage.py")
+        assert hooks["SessionEnd"][0]["hooks"][0]["command"].endswith("almanac-triage.py")
         assert hooks["SessionStart"][0]["hooks"][0]["command"].endswith("vault-briefing.py")
         assert hooks["UserPromptSubmit"][0]["hooks"][0]["command"].endswith("vault-recall.py")
         assert hooks["PreToolUse"][0]["hooks"][0]["command"].endswith("vault-tool-context.py")
