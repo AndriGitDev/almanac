@@ -1,5 +1,10 @@
 """Tests for the search backend abstraction layer."""
 
+import os
+import subprocess
+import sys
+import time
+
 import pytest
 
 from memento.search import is_literal_like_query, resolve_concrete_mode
@@ -9,6 +14,7 @@ from memento.search_backend import (
     SearchBackend,
     _clean_snippet,
     _literal_score,
+    _run_qmd,
     get_backend,
     normalize_grep_term_coverage,
     normalize_qmd_score,
@@ -199,6 +205,59 @@ class TestConcreteDetection:
         )
 
         assert exact > substring
+
+
+class TestQMDAvailabilityCache:
+    """is_available() must not re-spawn a `qmd search` preflight on every call:
+    get_backend selection + qmd_search guard + search()/get() guard would
+    otherwise each pay for a fresh Node process."""
+
+    def test_probe_runs_once_within_ttl(self, monkeypatch):
+        backend = QMDBackend()
+        probes = {"n": 0}
+
+        def fake_probe():
+            probes["n"] += 1
+            return True
+
+        monkeypatch.setattr(backend, "_probe_available", fake_probe)
+
+        assert backend.is_available() is True
+        assert backend.is_available() is True
+        assert backend.is_available() is True
+        assert probes["n"] == 1
+
+    def test_cached_value_is_returned(self, monkeypatch):
+        backend = QMDBackend()
+        monkeypatch.setattr(backend, "_probe_available", lambda: False)
+        assert backend.is_available() is False
+        # Even if the underlying probe would now say True, the cached False holds.
+        monkeypatch.setattr(backend, "_probe_available", lambda: True)
+        assert backend.is_available() is False
+
+    def test_cache_expires_after_ttl(self, monkeypatch):
+        backend = QMDBackend()
+        probes = {"n": 0}
+        monkeypatch.setattr(backend, "_probe_available", lambda: probes.__setitem__("n", probes["n"] + 1) or True)
+
+        clock = {"t": 1000.0}
+        monkeypatch.setattr("memento.search_backend.time.monotonic", lambda: clock["t"])
+
+        assert backend.is_available() is True
+        assert backend.is_available() is True
+        assert probes["n"] == 1
+
+        clock["t"] += QMDBackend._AVAILABILITY_TTL_SECONDS + 1
+        assert backend.is_available() is True
+        assert probes["n"] == 2
+
+    def test_each_instance_has_independent_cache(self, monkeypatch):
+        first = QMDBackend()
+        second = QMDBackend()
+        monkeypatch.setattr(first, "_probe_available", lambda: True)
+        monkeypatch.setattr(second, "_probe_available", lambda: False)
+        assert first.is_available() is True
+        assert second.is_available() is False
 
 
 class TestBackendIndexHook:
@@ -506,3 +565,56 @@ class TestArchiveExclusion:
             reset_backend()
 
         assert [r["path"] for r in results] == ["notes/archive-export-design.md"]
+
+
+class TestRunQmd:
+    """_run_qmd must reap the whole qmd process tree instead of leaking a
+    grandchild that keeps the stdout pipe open and hangs the caller."""
+
+    def test_returns_completed_process_on_success(self):
+        result = _run_qmd([sys.executable, "-c", "print('ok')"], timeout=10)
+        assert result.returncode == 0
+        assert "ok" in result.stdout
+
+    def test_nonzero_returncode_is_preserved(self):
+        result = _run_qmd([sys.executable, "-c", "import sys; sys.exit(3)"], timeout=10)
+        assert result.returncode == 3
+
+    def test_timeout_raises(self):
+        with pytest.raises(subprocess.TimeoutExpired):
+            _run_qmd([sys.executable, "-c", "import time; time.sleep(30)"], timeout=1)
+
+    @pytest.mark.skipif(os.name != "posix", reason="process-group kill is POSIX-only")
+    def test_timeout_reaps_grandchild_holding_pipe(self, tmp_path):
+        # Reproduce qmd's launcher -> node grandchild shape: the direct child
+        # spawns a grandchild that inherits the stdout pipe and outlives it,
+        # then both sleep past the timeout. A subprocess.run(timeout=) here
+        # would kill only the direct child and block forever draining the
+        # pipe the grandchild still holds; _run_qmd must kill the whole group.
+        pidfile = tmp_path / "grandchild.pid"
+        inner = f"import os, time; open({str(pidfile)!r}, 'w').write(str(os.getpid())); time.sleep(60)"
+        outer = f"import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', {inner!r}]); time.sleep(60)"
+
+        start = time.monotonic()
+        with pytest.raises(subprocess.TimeoutExpired):
+            _run_qmd([sys.executable, "-c", outer], timeout=1)
+        # Must not hang on the grandchild's inherited pipe.
+        assert time.monotonic() - start < 15
+
+        deadline = time.monotonic() + 5
+        while not pidfile.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert pidfile.exists(), "grandchild never started"
+        grandchild_pid = int(pidfile.read_text())
+
+        # The grandchild must be dead — proof the whole group was killed, not
+        # just the direct child. It was reparented to init, which reaps it.
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            try:
+                os.kill(grandchild_pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.05)
+        with pytest.raises(ProcessLookupError):
+            os.kill(grandchild_pid, 0)
