@@ -186,6 +186,29 @@ class TestNomicLocalProviderUnit:
             with pytest.raises(RuntimeError, match="onnxruntime"):
                 p.embed_query("hello")
 
+    def test_embed_bounds_local_inference_batch_and_preserves_order(self):
+        from memento.embedding import NomicLocalProvider, _MAX_LOCAL_INFERENCE_BATCH
+
+        p = NomicLocalProvider(dimensions=2)
+        texts = [f"note {i}" for i in range(_MAX_LOCAL_INFERENCE_BATCH * 2 + 1)]
+        batches = []
+
+        def fake_inference(batch):
+            batches.append(batch)
+            return np.array([[int(text.rsplit(" ", 1)[1]) + 1, 1.0] for text in batch], dtype=np.float32)
+
+        with patch.object(p, "_ensure_runtime"), patch.object(p, "_run_inference", side_effect=fake_inference):
+            vectors = p.embed(texts)
+
+        assert [len(batch) for batch in batches] == [
+            _MAX_LOCAL_INFERENCE_BATCH,
+            _MAX_LOCAL_INFERENCE_BATCH,
+            1,
+        ]
+        assert [text for batch in batches for text in batch] == [f"search_document: {text}" for text in texts]
+        assert len(vectors) == len(texts)
+        assert [vector[0] / vector[1] for vector in vectors] == pytest.approx(list(range(1, len(texts) + 1)))
+
 
 # ---------------------------------------------------------------------------
 # Matryoshka truncation + L2 normalization (tested in isolation)
