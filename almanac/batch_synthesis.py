@@ -1,6 +1,6 @@
 """Batch failure synthesis for sanitized external run summaries.
 
-Memento is not a run ledger. This module accepts only compact, sanitized
+Almanac is not a run ledger. This module accepts only compact, sanitized
 summary records from external runners and produces deterministic learning/action
 candidates. Raw run stores, transcripts, logs, and proof dumps are rejected at
 schema-validation time.
@@ -221,7 +221,7 @@ def _looks_failure_like(summary: dict[str, Any]) -> bool:
 
 def _classify_category(text: str) -> str:
     lowered = text.lower()
-    if _contains(lowered, "memory", "memento", "recall", "retrieval", "context packet", "note not found"):
+    if _contains(lowered, "memory", "almanac", "memento", "recall", "retrieval", "context packet", "note not found"):
         return "memory"
     if _contains(lowered, "ambiguous", "requirement", "acceptance", "scope", "spec", "unclear"):
         return "requirement"
@@ -238,7 +238,7 @@ def _classify_category(text: str) -> str:
 
 def _classify_type(text: str) -> str:
     lowered = text.lower()
-    if _contains(lowered, "memory", "memento", "recall", "retrieval", "context packet", "note not found"):
+    if _contains(lowered, "memory", "almanac", "memento", "recall", "retrieval", "context packet", "note not found"):
         return "memory_not_retrieved"
     if _contains(lowered, "missing gate", "no gate", "gate not", "not run", "skipped gate", "missing process"):
         return "missing_process_or_gate"
@@ -371,9 +371,9 @@ def _suggested_learning(failure_type: str, category: str) -> str:
         "missing_process_or_gate": "Document the missing process step and consider adding a runner-side gate or checklist item.",
         "proof_gap": "Make expected proof surfaces explicit in the work contract and add a runner-side proof check where possible.",
         "ambiguous_requirements": "Route similar work through specification before implementation and capture clarified acceptance criteria.",
-        "harness_failure": "File or update a harness issue with sanitized reproduction context; keep execution evidence outside Memento.",
+        "harness_failure": "File or update a harness issue with sanitized reproduction context; keep execution evidence outside Almanac.",
         "environment_failure": "Document environment prerequisites or add a preflight in the owning runner/repo.",
-        "gate_failure": "Capture the durable fix pattern if repeated; add or tune tests/gates in the owning repo, not in Memento as run evidence.",
+        "gate_failure": "Capture the durable fix pattern if repeated; add or tune tests/gates in the owning repo, not in Almanac as run evidence.",
         "agent_failure": "Capture an agent guidance pattern or checklist that prevents the repeated mistake.",
     }
     return suggestions.get(failure_type, f"Capture a concise {category} lesson if this pattern remains actionable.")

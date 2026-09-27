@@ -900,7 +900,7 @@ def build_report(
 def render_text_report(report: dict[str, Any]) -> str:
     window = report["window"]
     lines = [
-        "=== Memento retrieval debug report ===",
+        "=== Almanac retrieval debug report ===",
         f"Period: {window['start']} to {window['end']}",
         f"Total log entries: {window['count']}",
         "Privacy: redacted by default; use --include-sensitive to show sanitized query previews.",
@@ -1290,7 +1290,7 @@ def render_html_report(report: dict[str, Any]) -> str:
 <head>
   <meta charset=\"utf-8\" />
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
-  <title>Memento retrieval debug report</title>
+  <title>Almanac retrieval debug report</title>
   <style>
     :root {{ color-scheme: light dark; }}
     body {{ font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; margin: 0; padding: 24px; background: #0b1020; color: #e5e7eb; }}
@@ -1318,7 +1318,7 @@ def render_html_report(report: dict[str, Any]) -> str:
   <div class=\"layout\">
     <div class=\"header\">
       <div>
-        <h1>Memento retrieval debug report</h1>
+        <h1>Almanac retrieval debug report</h1>
         <p class=\"subtitle\">Window {escape(window["start"])} → {escape(window["end"])} · {window["count"]} entries</p>
       </div>
       <div class=\"subtitle\">Privacy: {"sensitive previews enabled" if privacy["include_sensitive"] else "redacted by default"}</div>

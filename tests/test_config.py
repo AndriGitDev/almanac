@@ -1,4 +1,4 @@
-"""Tests for memento.config module."""
+"""Tests for Almanac configuration and compatibility paths."""
 
 import builtins
 import os
@@ -358,3 +358,24 @@ class TestTagAliasesDefault:
         assert all(isinstance(k, str) and isinstance(v, str) for k, v in aliases.items())
         # A stable representative entry from the stock controlled vocabulary.
         assert aliases["k8s"] == "kubernetes"
+
+
+def test_graph_indexes_follow_new_or_existing_config_directory(tmp_path):
+    import json
+    import subprocess
+    import sys
+
+    code = (
+        "import json; from almanac.graph import CONCEPT_INDEX_PATH, load_project_maps; "
+        "print(json.dumps({'concept': CONCEPT_INDEX_PATH, 'maps': load_project_maps()}))"
+    )
+    for legacy in (False, True):
+        config_home = tmp_path / ("legacy" if legacy else "fresh")
+        selected = config_home / ("memento-vault" if legacy else "almanac")
+        selected.mkdir(parents=True)
+        (selected / "project-maps.json").write_text('{"maps": {"demo": []}}')
+        env = {**os.environ, "HOME": str(tmp_path), "XDG_CONFIG_HOME": str(config_home)}
+        result = subprocess.run([sys.executable, "-c", code], env=env, text=True, capture_output=True, check=True)
+        payload = json.loads(result.stdout)
+        assert Path(payload["concept"]) == selected / "concept-index.json"
+        assert payload["maps"] == {"demo": []}

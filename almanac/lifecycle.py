@@ -1,4 +1,4 @@
-"""Shared lifecycle retrieval primitives for memento host adapters."""
+"""Shared lifecycle retrieval primitives for Almanac host adapters."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Typed metadata queries over Memento vault notes.
+"""Typed metadata queries over Almanac vault notes.
 
 This module intentionally scans Markdown/frontmatter directly instead of
 accepting arbitrary query strings. It is a compact metadata surface for agents

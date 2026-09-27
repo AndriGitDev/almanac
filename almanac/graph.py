@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 from almanac import frontmatter
-from almanac.config import RUNTIME_DIR, get_config, get_vault
+from almanac.config import RUNTIME_DIR, get_config, get_config_dir, get_vault
 
 # --- Note metadata ---
 
@@ -307,7 +307,7 @@ def load_or_build_graph(vault_path=None, cache_path=None):
 
     Args:
         vault_path: Override vault path (default: from config).
-        cache_path: Override cache file path (default: /tmp/memento-wikilink-graph.json).
+        cache_path: Override cache file path (default: the Almanac runtime graph cache).
 
     Returns:
         Tuple of (nx.DiGraph, dict) with the graph and pagerank scores.
@@ -701,11 +701,7 @@ def build_related_view(note, direction="both", depth=1, cap=NEIGHBORHOOD_DEFAULT
 
 _CONCEPT_INDEX = None
 
-CONCEPT_INDEX_PATH = os.path.join(
-    os.environ.get("XDG_CONFIG_HOME", os.path.join(str(Path.home()), ".config")),
-    "memento-vault",
-    "concept-index.json",
-)
+CONCEPT_INDEX_PATH = str(get_config_dir() / "concept-index.json")
 
 
 def load_concept_index(config_dir=None):
@@ -792,11 +788,9 @@ def load_project_maps(config_dir=None):
     if _PROJECT_MAPS is not None and config_dir is None:
         return _PROJECT_MAPS
 
-    if config_dir is None:
-        config_dir = os.path.join(
-            os.environ.get("XDG_CONFIG_HOME", os.path.join(str(Path.home()), ".config")),
-            "memento-vault",
-        )
+    use_default = config_dir is None
+    if use_default:
+        config_dir = get_config_dir()
 
     path = Path(config_dir) / "project-maps.json"
     if not path.exists():
@@ -806,7 +800,7 @@ def load_project_maps(config_dir=None):
         with open(path) as f:
             data = json.load(f)
         maps = data.get("maps", {})
-        if config_dir is None:
+        if use_default:
             _PROJECT_MAPS = maps
         return maps
     except (json.JSONDecodeError, OSError):

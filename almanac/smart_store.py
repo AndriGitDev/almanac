@@ -1,4 +1,4 @@
-"""Smart-store candidate analysis for Memento writes."""
+"""Smart-store candidate analysis for Almanac writes."""
 
 from __future__ import annotations
 
