@@ -3,4 +3,4 @@
 The ``memento`` import remains for compatibility with existing installations.
 """
 
-__version__ = "5.1.0"
+__version__ = "5.1.1"
