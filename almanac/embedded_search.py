@@ -365,6 +365,19 @@ class EmbeddedSearchBackend(SearchBackend):
             signature = self._embedding_signature()
             existing_signature = self._read_metadata(conn, _EMBEDDING_SIGNATURE_KEY)
             vec_table_existed = self._table_exists(conn, "notes_vec")
+            if vec_table_existed and existing_signature != signature and existing_signature:
+                try:
+                    legacy_metadata = json.loads(existing_signature)
+                except (TypeError, ValueError):
+                    legacy_metadata = None
+                if isinstance(legacy_metadata, dict):
+                    provider_class = legacy_metadata.get("provider_class")
+                    if isinstance(provider_class, str) and provider_class.startswith("memento.embedding."):
+                        legacy_metadata["provider_class"] = provider_class.replace(
+                            "memento.embedding.", "almanac.embedding.", 1
+                        )
+                        if _metadata_json(legacy_metadata) == signature:
+                            existing_signature = signature
             legacy_or_changed = vec_table_existed and existing_signature != signature
             if legacy_or_changed:
                 logger.info("Embedding provider metadata changed; rebuilding vector index")

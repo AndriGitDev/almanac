@@ -581,6 +581,35 @@ class TestVectorSearch:
         note_count = conn.execute("SELECT COUNT(*) FROM notes").fetchone()[0]
         assert vec_count == note_count == 4
 
+    def test_legacy_module_rename_keeps_compatible_vectors(self, embedded_vault):
+        if not _sqlite_vec_available():
+            pytest.skip("sqlite-vec extension loading is unavailable")
+        from almanac.embedded_search import EmbeddedSearchBackend
+
+        compatible_provider = type("CompatibleProvider", (MockEmbeddingProvider,), {"__module__": "almanac.embedding"})
+        vault, db_path = embedded_vault
+        first = EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=compatible_provider())
+        first.reindex("almanac")
+        conn = first._get_conn()
+        raw = conn.execute("SELECT value FROM index_metadata WHERE key = ?", ("embedding_signature",)).fetchone()[0]
+        legacy = json.loads(raw)
+        legacy["provider_class"] = legacy["provider_class"].replace("almanac.embedding.", "memento.embedding.", 1)
+        conn.execute(
+            "UPDATE index_metadata SET value = ? WHERE key = ?",
+            (json.dumps(legacy, sort_keys=True, separators=(",", ":")), "embedding_signature"),
+        )
+        conn.commit()
+        first.close()
+
+        second = EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=compatible_provider())
+        conn = second._get_conn()
+        assert second._needs_reindex is False
+        assert conn.execute("SELECT COUNT(*) FROM notes_vec").fetchone()[0] == 4
+        assert (
+            conn.execute("SELECT value FROM index_metadata WHERE key = ?", ("embedding_signature",)).fetchone()[0]
+            == raw
+        )
+
     def test_legacy_l2_vector_index_migrates_to_cosine_on_reopen(self, embedded_vault):
         """MEM-127: a vec index built before this change (implicit L2 default,
         no distance_metric in the signature) must be rebuilt automatically on
