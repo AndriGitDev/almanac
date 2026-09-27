@@ -19,7 +19,7 @@ vault_path: ~/almanac
 #   ALMANAC_VAULT_URL   - Remote vault URL (set on clients)
 #   ALMANAC_API_KEY     - Bearer token (set on both server and clients)
 #   ALMANAC_TRANSPORT   - Transport: stdio (default) or streamable-http
-#   ALMANAC_HOST        - Bind address for HTTP (default: 0.0.0.0)
+#   ALMANAC_HOST        - Bind address for HTTP (default: 127.0.0.1)
 #   ALMANAC_PORT        - Port for HTTP (default: 8745)
 #   ALMANAC_VAULT_PATH  - Vault directory (default: ~/almanac)
 

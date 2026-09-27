@@ -20,7 +20,7 @@ if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
 from almanac.archive import fleeting_lifecycle_sweep, sweep_archive_candidates  # noqa: E402
-from almanac.config import get_vault  # noqa: E402
+from almanac.config import ensure_runtime_dir, get_vault  # noqa: E402
 from almanac.contradictions import apply_supersession_backlinks  # noqa: E402
 from almanac.hub import regenerate_stale_hubs  # noqa: E402
 from almanac.store import fold_access_log_into_frontmatter, fold_stale_citations_into_frontmatter  # noqa: E402
@@ -30,9 +30,7 @@ CLAUDE_SESSIONS = Path.home() / ".claude" / "sessions"
 PI_SESSIONS = Path.home() / ".pi" / "agent" / "sessions"
 PI_SUBAGENTS = Path.home() / ".pi" / "agent" / "subagents"
 TRIAGE_SCRIPT = Path(__file__).parent / "almanac-triage.py"
-_RUNTIME = os.environ.get("XDG_RUNTIME_DIR", os.path.join(str(Path.home()), ".cache", "almanac-vault"))
-os.makedirs(_RUNTIME, mode=0o700, exist_ok=True)
-LOCK_FILE = Path(_RUNTIME) / "sweeper.lock"
+LOCK_FILE = Path(ensure_runtime_dir()) / "sweeper.lock"
 MAX_AGE_HOURS = 24
 ORPHAN_GRACE_SECONDS = int(os.environ.get("ALMANAC_SWEEPER_ORPHAN_GRACE_SECONDS", "300"))
 

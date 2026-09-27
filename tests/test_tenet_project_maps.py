@@ -1,10 +1,35 @@
 """Tests for project retrieval maps (build, write, load, lookup)."""
 
 import json
+import importlib.util
+import sys
+from pathlib import Path
 
 
 from memento_inception import build_project_maps, write_project_maps
 from memento.graph import load_project_maps, lookup_project_notes
+
+
+def test_almanac_inception_writes_indexes_to_active_config_directory(tmp_path, monkeypatch):
+    script = Path(__file__).resolve().parents[1] / "hooks" / "almanac-inception.py"
+    spec = importlib.util.spec_from_file_location("almanac_inception_test", script)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+        for legacy in (False, True):
+            config_home = tmp_path / ("legacy" if legacy else "fresh")
+            selected = config_home / ("memento-vault" if legacy else "almanac")
+            if legacy:
+                selected.mkdir(parents=True)
+            monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))
+            module.write_project_maps({"demo": []})
+            module.write_concept_index({"demo": []})
+            assert json.loads((selected / "project-maps.json").read_text())["maps"] == {"demo": []}
+            assert json.loads((selected / "concept-index.json").read_text())["index"] == {"demo": []}
+    finally:
+        sys.modules.pop(spec.name, None)
 
 
 # --- build_project_maps ---

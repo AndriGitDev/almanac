@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Shared utilities for almanac-vault hooks.
+Shared utilities for Almanac hooks.
 
 This module re-exports from the almanac package for backwards compatibility.
 New code should import from almanac.config, almanac.search, etc. directly.
