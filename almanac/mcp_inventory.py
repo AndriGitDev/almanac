@@ -230,7 +230,7 @@ def _markdown_cell(value: str) -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Render or check Memento MCP tool inventory docs.")
+    parser = argparse.ArgumentParser(description="Render or check Almanac MCP tool inventory docs.")
     parser.add_argument("--markdown", action="store_true", help="print the generated Markdown inventory block")
     parser.add_argument("--check", action="store_true", help="fail if inventory names differ from registered MCP tools")
     args = parser.parse_args(argv)

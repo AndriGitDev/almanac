@@ -1,6 +1,6 @@
 """Typed automated-run lesson capture contract.
 
-Memento is not a run ledger. This module accepts one compact, sanitized lesson
+Almanac is not a run ledger. This module accepts one compact, sanitized lesson
 candidate from an external runner and either queues it for human review or,
 when explicitly approved, writes one curated note with provenance references.
 Raw logs, transcripts, ledgers, proof dumps, and patch blobs are rejected before
@@ -322,7 +322,7 @@ def lesson_candidate_from_batch_candidate(
     tags = [str(tag) for tag in candidate.get("tags") or []]
     lesson_type = next((tag for tag in tags if tag in LESSON_TYPES), "process")
     return {
-        "external_system": "memento_synthesize_failures",
+        "external_system": "almanac_synthesize_failures",
         "run_id": session_id or ",".join(str(item) for item in group_ids) or str(candidate.get("id") or "batch"),
         "artifact_refs": [str(item) for item in group_ids],
         "project": project,

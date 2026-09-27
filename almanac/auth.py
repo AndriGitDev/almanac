@@ -1,4 +1,4 @@
-"""Authentication middleware for the memento vault server.
+"""Authentication middleware for the Almanac vault server.
 
 Provides a pluggable auth system that returns an Identity for each request.
 Currently supports bearer token auth and no-auth (local mode).
@@ -71,7 +71,7 @@ class BearerTokenAuth(AuthProvider):
         return None
 
 
-class MementoTokenVerifier:
+class AlmanacTokenVerifier:
     """MCP-compatible TokenVerifier that wraps our AuthProvider.
 
     Implements the TokenVerifier protocol expected by FastMCP's
@@ -95,10 +95,13 @@ class MementoTokenVerifier:
         )
 
 
+MementoTokenVerifier = AlmanacTokenVerifier
+
+
 def create_auth_provider(config: dict | None = None) -> AuthProvider:
     """Create an auth provider based on configuration.
 
-    If MEMENTO_API_KEY env var or config['api_key'] is set, uses BearerTokenAuth.
+    If ALMANAC_API_KEY (or legacy MEMENTO_API_KEY) env var or config['api_key'] is set, uses BearerTokenAuth.
     Otherwise, falls back to NoAuth (local mode).
     """
     if config is None:

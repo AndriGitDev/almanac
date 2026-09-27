@@ -40,7 +40,7 @@ MAX_MALFORMED_RETRIES = 1
 # cheap routed model to think, but never allowed to blow the loop budget.
 PER_CALL_TIMEOUT_SECONDS = 30
 
-SYSTEM_PROMPT = """You are a bounded retrieval agent for the Memento vault, a persistent knowledge store of markdown notes.
+SYSTEM_PROMPT = """You are a bounded retrieval agent for the Almanac vault, a persistent knowledge store of markdown notes.
 
 Given a query, find the vault note paths most relevant to it by calling tools, then stop. Prefer fewer, precise calls over broad exploration.
 

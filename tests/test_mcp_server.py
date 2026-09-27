@@ -1560,7 +1560,7 @@ class TestMementoSynthesizeFailures:
         note_path = tmp_vault / result["write_results"][0]["path"]
         content = note_path.read_text()
         assert "type: discovery" in content
-        assert "origin: automated_run_lesson:memento_synthesize_failures" in content
+        assert "origin: automated_run_lesson:almanac_synthesize_failures" in content
         assert 'tags: ["automation", "automated-run", "memory", "failure"]' in content
         assert "session_id: batch-1" in content
         assert "## Automated run provenance" in content

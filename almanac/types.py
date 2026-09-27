@@ -1,4 +1,4 @@
-"""Shared type definitions for memento vault.
+"""Shared type definitions for Almanac vault.
 
 Stubs for PR3 — will be used as return type annotations on MCP tools
 and as parameter types in store/search once the full typing pass lands.

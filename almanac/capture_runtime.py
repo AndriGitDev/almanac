@@ -1,4 +1,4 @@
-"""Host-neutral runtime for queued Memento capture processing.
+"""Host-neutral runtime for queued Almanac capture processing.
 
 The Pi bridge owns CLI/extension adaptation, but this module owns the queued
 capture processing state machine: selection, grouping, run setup, result
@@ -337,7 +337,9 @@ def select_captures(
             continue
         if session_id and metadata.get("session_id") != session_id:
             continue
-        if skip_processor_captures and metadata.get("memento_processor") is True:
+        if skip_processor_captures and (
+            metadata.get("almanac_processor") is True or metadata.get("memento_processor") is True
+        ):
             continue
         selected.append(capture)
     selected.sort(key=capture_created_at, reverse=newest)

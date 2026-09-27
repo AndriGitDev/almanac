@@ -452,5 +452,5 @@ def test_main_writes_html_dashboard(tmp_path, capsys, monkeypatch):
     assert captured.out.strip() == str(output)
     assert output.exists()
     rendered = output.read_text(encoding="utf-8")
-    assert "Memento retrieval debug report" in rendered
+    assert "Almanac retrieval debug report" in rendered
     assert "debug-surface.md" in rendered
