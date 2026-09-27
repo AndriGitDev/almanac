@@ -20,7 +20,7 @@ Use MCP tools when they are available:
 
 If MCP tools are not available, use the configured local vault:
 
-1. Read `~/.config/almanac-vault/almanac.yml` or `~/almanac/almanac.yml` to find `vault_path`.
+1. Read `~/.config/almanac/almanac.yml` or `~/almanac/almanac.yml` to find `vault_path`.
 2. Default to `~/almanac` if no config exists.
 3. Search `notes/` and `projects/` before writing.
 4. Write new notes under `notes/`.

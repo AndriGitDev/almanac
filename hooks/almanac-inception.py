@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Inception — background consolidation agent for almanac-vault.
+Inception — background consolidation agent for Almanac.
 Clusters vault notes by embedding similarity and produces pattern notes.
 """
 
@@ -24,7 +24,7 @@ import numpy as np
 _repo_root = Path(__file__).parent.parent
 sys.path.insert(0, str(_repo_root))
 sys.path.insert(0, str(Path(__file__).parent))
-from almanac.config import RUNTIME_DIR, get_config, slugify  # noqa: E402
+from almanac.config import RUNTIME_DIR, get_config, get_config_dir, slugify  # noqa: E402
 from almanac.contradictions import _normalize_note_ref, apply_invalidation  # noqa: E402
 from almanac.embedded_search import EmbeddedSearchBackend  # noqa: E402
 from almanac.llm import llm_complete  # noqa: E402
@@ -1316,7 +1316,7 @@ def check_dependencies():
 def parse_args(argv=None):
     """Parse CLI arguments."""
     parser = argparse.ArgumentParser(
-        description="Inception — background consolidation agent for almanac-vault",
+        description="Inception — background consolidation agent for Almanac",
     )
     parser.add_argument("--dry-run", action="store_true", help="Log clusters and proposed notes, write nothing")
     parser.add_argument("--full", action="store_true", help="Process all notes, ignoring threshold and processed list")
@@ -1795,10 +1795,7 @@ def write_project_maps(maps, config_dir=None):
     JSON format: {"version": 1, "built_at": ISO, "maps": {slug: [...]}}
     """
     if config_dir is None:
-        config_dir = os.path.join(
-            os.environ.get("XDG_CONFIG_HOME", os.path.join(str(Path.home()), ".config")),
-            "almanac-vault",
-        )
+        config_dir = get_config_dir()
     config_dir = Path(config_dir)
     config_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1984,10 +1981,7 @@ def write_concept_index(index, config_dir=None):
     JSON format: {"version": 1, "built_at": ISO, "index": {keyword: [{stem, title, score}]}}
     """
     if config_dir is None:
-        config_dir = os.path.join(
-            os.environ.get("XDG_CONFIG_HOME", os.path.join(str(Path.home()), ".config")),
-            "almanac-vault",
-        )
+        config_dir = get_config_dir()
     config_dir = Path(config_dir)
     config_dir.mkdir(parents=True, exist_ok=True)
 

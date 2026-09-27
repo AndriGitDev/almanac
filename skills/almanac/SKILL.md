@@ -7,7 +7,7 @@ description: Capture the current session to the almanac vault. Use when you want
 
 Capture the current session as atomic Zettelkasten notes in the almanac vault.
 
-The vault location is configured in `almanac.yml` (default: `~/almanac`). Check `~/.config/almanac-vault/almanac.yml` or `~/almanac/almanac.yml` for the active config. If neither exists, use `~/almanac`.
+The vault location is configured in `almanac.yml` (default: `~/almanac`). Check `~/.config/almanac/almanac.yml` or `~/almanac/almanac.yml` for the active config. If neither exists, use `~/almanac`.
 
 ## When to use
 

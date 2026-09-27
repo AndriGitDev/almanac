@@ -7,7 +7,7 @@ description: Archive stale almanac notes. Moves low-certainty, unaccessed notes 
 
 Move stale notes to the vault's `archive/` directory to keep the active vault focused. No merging, no deletion. Git history preserves everything.
 
-The vault location is configured in `almanac.yml` (default: `~/almanac`). Check `~/.config/almanac-vault/almanac.yml` or `~/almanac/almanac.yml` for the active config.
+The vault location is configured in `almanac.yml` (default: `~/almanac`). Check `~/.config/almanac/almanac.yml` or `~/almanac/almanac.yml` for the active config.
 
 ## When to use
 
