@@ -2,7 +2,7 @@ class Almanac < Formula
   desc "Persistent memory layer for AI coding agents"
   homepage "https://github.com/AndriGitDev/almanac"
   url "https://github.com/AndriGitDev/almanac/archive/refs/tags/v5.1.1.tar.gz"
-  # sha256 "UPDATE_WITH_ACTUAL_SHA256_AFTER_RELEASE"
+  sha256 "2e0216c242019fc3b56e667f6e08c1f7e127605acae31a773f8e9834b52f0b87"
   license "MIT"
   head "https://github.com/AndriGitDev/almanac.git", branch: "main"
 
