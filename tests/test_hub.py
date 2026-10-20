@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-import memento.graph as graph
-from memento.hub import HUB_SECTION_HEADINGS, regenerate_project_hub, regenerate_stale_hubs, vault_map
+import almanac.graph as graph
+from almanac.hub import HUB_SECTION_HEADINGS, regenerate_project_hub, regenerate_stale_hubs, vault_map
 
 FIXED_NOW = datetime(2026, 7, 6, tzinfo=timezone.utc)
 
@@ -38,10 +38,10 @@ def _write_note(
 def isolate_graph_cache(tmp_path, monkeypatch):
     """Reset the module-level wikilink-graph cache and point its disk cache at tmp_path.
 
-    memento.graph.load_or_build_graph caches in-process (a mutable module
+    almanac.graph.load_or_build_graph caches in-process (a mutable module
     global) and on disk (RUNTIME_DIR by default); both must be isolated per
     test so hub tests never read a graph built for another test's vault, and
-    never touch the real ~/.cache/memento-vault shared with sibling agent
+    never touch the real ~/.cache/almanac shared with sibling agent
     worktrees running in parallel.
     """
     monkeypatch.setattr(graph, "_GRAPH_CACHE", [None])
@@ -102,12 +102,12 @@ class TestRegenerateProjectHub:
         assert "## Top notes" in text
 
     def test_corrupted_legacy_hub_is_overwritten_cleanly(self, tmp_vault):
-        """Modeled on the real 316-line corrupted memento-vault.md hub (MEM-160)."""
+        """Modeled on the real 316-line corrupted almanac.md hub (MEM-160)."""
         corrupted_block = "\n".join(
             [
                 "---",
-                "title: memento-vault",
-                "project: memento-vault",
+                "title: almanac",
+                "project: almanac",
                 "---",
                 "",
                 "## Notes",
@@ -128,12 +128,12 @@ class TestRegenerateProjectHub:
                 "",
             ]
         )
-        (tmp_vault / "projects" / "memento-vault.md").write_text(corrupted_block * 5)
-        _write_note(tmp_vault, "some-note", title="Some note", project="memento-vault", date="2026-06-01T10:00")
+        (tmp_vault / "projects" / "almanac.md").write_text(corrupted_block * 5)
+        _write_note(tmp_vault, "some-note", title="Some note", project="almanac", date="2026-06-01T10:00")
 
-        report = regenerate_project_hub(tmp_vault, "memento-vault", now=FIXED_NOW)
+        report = regenerate_project_hub(tmp_vault, "almanac", now=FIXED_NOW)
 
-        text = (tmp_vault / "projects" / "memento-vault.md").read_text()
+        text = (tmp_vault / "projects" / "almanac.md").read_text()
         assert text.count("## Sessions") == 0
         assert text.count("## Activity log") == 0
         assert "stray fragment" not in text
@@ -163,7 +163,7 @@ class TestRegenerateProjectHub:
         assert "not shown" in text
 
     def test_default_cap_is_25kb(self, tmp_vault):
-        from memento.hub import HUB_MAX_BYTES_DEFAULT
+        from almanac.hub import HUB_MAX_BYTES_DEFAULT
 
         assert HUB_MAX_BYTES_DEFAULT == 25_000
 
@@ -210,7 +210,7 @@ class TestRegenerateProjectHub:
             replace_calls.append((src, dst))
             return real_replace(src, dst)
 
-        monkeypatch.setattr("memento.store.os.replace", recording_replace)
+        monkeypatch.setattr("almanac.store.os.replace", recording_replace)
 
         regenerate_project_hub(tmp_vault, "demo", now=FIXED_NOW)
 
@@ -258,7 +258,7 @@ class TestVaultMap:
         assert len(text.encode("utf-8")) <= 1200
 
     def test_default_cap_is_25kb(self):
-        from memento.hub import VAULT_MAP_MAX_BYTES_DEFAULT
+        from almanac.hub import VAULT_MAP_MAX_BYTES_DEFAULT
 
         assert VAULT_MAP_MAX_BYTES_DEFAULT == 25_000
 

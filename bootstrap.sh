@@ -7,7 +7,7 @@
 set -euo pipefail
 
 REPO="https://github.com/AndriGitDev/almanac.git"
-INSTALL_DIR="${ALMANAC_INSTALL_DIR:-${MEMENTO_INSTALL_DIR:-$HOME/.local/share/almanac}}"
+INSTALL_DIR="${ALMANAC_INSTALL_DIR:-$HOME/.local/share/almanac}"
 
 # curl|bash leaves stdin attached to the script stream/EOF, so downstream
 # prompts cannot be answered safely. Make that mode explicit and disable git's

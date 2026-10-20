@@ -1,7 +1,7 @@
 # MCP server
 
 The MCP server exposes read, lifecycle, write, and maintenance tools over stdio (local) or HTTP (remote).
-Any MCP-compatible agent can use them: Cursor, Windsurf, Codex, OpenCode, or Claude Code without native hooks. New clients register `almanac` and see `almanac_*` tools. Existing `python -m memento` clients retain the `memento_*` aliases during migration.
+Any MCP-compatible agent can use them: Cursor, Windsurf, Codex, OpenCode, or Claude Code without native hooks. New clients register `almanac` and see `almanac_*` tools. Existing `python -m almanac` clients retain the `almanac_*` aliases during migration.
 
 ## Tool inventory
 
@@ -26,8 +26,8 @@ The MCP server currently registers **20 tools**. This table is generated from `a
 | `almanac_store_smart` | Write | Search for close matches before writing, and return duplicate/update/supersede suggestions. | Use when you want a write decision with candidate paths/reasons before creating a note; it avoids obvious duplicates by default. |
 | `almanac_daily_snapshot` | Write | Write a deterministic `notes/daily-<date>-<repo-slug>.md` snapshot with an append-only supersede chain. | Low-level structured daily-snapshot primitive for path-controlled integrations; do not use for ordinary notes, interactive memory capture, or session triage. |
 | `almanac_capture` | Write | End-of-session triage from a transcript path or structured summary; writes fleeting session state and optionally an atomic note. | Low-level SessionEnd equivalent for agents without hook support; not a replacement for interactive `/almanac` workflows. |
-| `almanac_capture_run_lesson` | Write | Queue or explicitly write one typed automated-run lesson candidate with provenance refs. | Use for Rondo/Beislið-style post-run learning; queues by default and rejects raw logs, transcripts, run ledgers, proofs, and patch blobs. |
-| `almanac_synthesize_failures` | Write | Dry-run batch synthesis from sanitized external run summaries, with optional approved lesson-note writes. | Use for Rondo/Beislið-style batch failure learning; rejects raw logs/run stores and never executes advisory issue/gate/docs actions. |
+| `almanac_capture_run_lesson` | Write | Queue or explicitly write one typed automated-run lesson candidate with provenance refs. | Use for learning after automated runs; queues by default and rejects raw logs, transcripts, run ledgers, proofs, and patch blobs. |
+| `almanac_synthesize_failures` | Write | Dry-run batch synthesis from sanitized external run summaries, with optional approved lesson-note writes. | Use for batch failure learning from automated runs; rejects raw logs/run stores and never executes advisory issue/gate/docs actions. |
 | `almanac_preserve` | Write | Archive a file or directory bundle under `archive/<slug>/` with a manifest, a lightweight index note, and optional project-linking. | Use for evidence packets, screenshots, handoff bundles, or other artifacts that should stay intact; copy by default, move only when explicitly requested. Do not use it for ordinary knowledge capture or atomic notes. |
 | `almanac_reindex` | Maintenance | Rebuild the search index from all markdown files after out-of-band changes. | Use after bulk adds, git pull, Obsidian sync, or stale-index evidence; not as the default response to a broad/empty search miss. |
 <!-- almanac-mcp-tools:end -->
@@ -78,7 +78,7 @@ python -m almanac
 `almanac_capture` is the MCP equivalent of the SessionEnd hook.
 Agents without hook support can call it at the end of a session with either a transcript path (local/stdio only) or a structured summary.
 
-Consuming Almanac from automated runners (Rondo, Beislið, or any orchestrator)?
+Consuming Almanac from automated runners (Rondo or any orchestrator)?
 The [automation MemoryProvider contract](automation-memory-provider.md) defines the allowed operations, fail-open behavior, privacy expectations, and explicit prohibitions -- in short: the vault is curated memory, never a run ledger.
 
 ## Connecting: local (stdio)

@@ -42,7 +42,7 @@ DEFAULT_CONFIG = {
     # -backend hits (FTS5's bounded score/(score+k) transform and vec's
     # cosine-based (cos+1)/2 both commonly land well under 0.6 for a genuine
     # match - see normalize_fts5_score()/normalize_vec_cosine_distance() in
-    # memento.embedded_search). 0.25 stays inside the range
+    # almanac.embedded_search). 0.25 stays inside the range
     # benchmark/optuna_sweep.py already sweeps (0.0-0.3, best-found ~0.14-
     # 0.16 against LongMemEval's own BM25 adapter) while remaining a
     # meaningful noise floor: QMD's own measured "barely related" junk still
@@ -85,19 +85,19 @@ DEFAULT_CONFIG = {
     # Deprecated (MEM-150): no longer confers decay immunity. Kept parseable
     # for config-file backwards compatibility, but apply_temporal_decay() now
     # derives immunity from the durability tier (see durability_hot_window_days
-    # below and memento.store.durability_tier) instead of certainty.
+    # below and almanac.store.durability_tier) instead of certainty.
     "temporal_decay_certainty_floor": 4,
     "temporal_decay_undated_factor": 0.5,
     # Durability tiers (MEM-150): "hot" is last_resurfaced within this many
     # days; "pinned" (manual `pinned: true` frontmatter) and "hot" are the
-    # only decay-immune tiers. See memento.store.durability_tier.
+    # only decay-immune tiers. See almanac.store.durability_tier.
     "durability_hot_window_days": 30,
     # Auto-archive sweep (MEM-152): reversibly archives notes/*.md that are
     # durability_tier "cold" AND older than archive_sweep_age_days AND
     # certainty < 4, using the existing tombstone machinery in
-    # memento.archive (never a hard delete). Disabled by default -- flip
+    # almanac.archive (never a hard delete). Disabled by default -- flip
     # archive_sweep_enabled once you've reviewed a dry-run report. See
-    # memento.archive.sweep_archive_candidates.
+    # almanac.archive.sweep_archive_candidates.
     "archive_sweep_enabled": False,
     "archive_sweep_age_days": 90,
     "archive_sweep_max_per_run": 50,
@@ -106,7 +106,7 @@ DEFAULT_CONFIG = {
     # they're cited by a session-summary note, and reversibly expires
     # (archives) whatever's left once older than fleeting_expire_days.
     # Disabled by default -- flip fleeting_lifecycle_enabled once you've
-    # reviewed a dry-run report. See memento.archive.fleeting_lifecycle_sweep.
+    # reviewed a dry-run report. See almanac.archive.fleeting_lifecycle_sweep.
     "fleeting_lifecycle_enabled": False,
     "fleeting_promote_min_resurfaced": 2,
     "fleeting_expire_days": 14,
@@ -115,12 +115,12 @@ DEFAULT_CONFIG = {
     # replaces the old free-text ## Sessions/## Activity log append that
     # corrupted real hubs into multi-hundred-line files with duplicate
     # headers and truncated entries. hub_regeneration_enabled gates the
-    # periodic sweep (memento.hub.regenerate_stale_hubs, run from
-    # hooks/memento-sweeper.py); disabled by default -- flip it once you've
+    # periodic sweep (almanac.hub.regenerate_stale_hubs, run from
+    # hooks/almanac-sweeper.py); disabled by default -- flip it once you've
     # reviewed a regenerated hub. hub_max_bytes/vault_map_max_bytes cap the
-    # regenerated hub and the two-tier vault map (memento.hub.vault_map)
+    # regenerated hub and the two-tier vault map (almanac.hub.vault_map)
     # respectively. vault_map_in_briefing wires vault_map() into
-    # memento.lifecycle.build_briefing; off by default -- flip it once
+    # almanac.lifecycle.build_briefing; off by default -- flip it once
     # you've inspected the injected output.
     "hub_regeneration_enabled": False,
     "hub_max_bytes": 25_000,
@@ -133,7 +133,7 @@ DEFAULT_CONFIG = {
     # the top-k notes actually being injected -- never a full-vault scan.
     # Enabled by default, unlike the sweeps above: it's additive (an
     # unverifiable citation is injected unmarked, never blocked) and cheap.
-    # See memento.retrieval_policy.evaluate_citation_verification.
+    # See almanac.retrieval_policy.evaluate_citation_verification.
     "citation_verification_enabled": True,
     "citation_max_verify_bytes": 262_144,
     "wikilink_expansion": True,
@@ -165,7 +165,7 @@ DEFAULT_CONFIG = {
     # Inception run aims to consolidate, in notes rather than clusters, so
     # the backlog doesn't grow unbounded when capture volume spikes. Actual
     # budget = max(inception_budget_floor, notes ingested since the last
-    # run), capped at inception_budget_cap. See hooks/memento-inception.py's
+    # run), capped at inception_budget_cap. See hooks/almanac-inception.py's
     # compute_inception_budget().
     "inception_budget_floor": 20,
     "inception_budget_cap": 200,
@@ -215,7 +215,7 @@ DEFAULT_CONFIG = {
     # Agentic retrieval tier — bounded tool-using retrieval agent that upgrades
     # the SessionStart deferred-briefing worker's internals from one-shot
     # top-k search to a ReAct-style loop over search/query/related/get
-    # (memento/retrieval_agent.py, wired in memento.lifecycle's
+    # (almanac/retrieval_agent.py, wired in almanac.lifecycle's
     # run_deferred_briefing_search). Disabled by default; any protocol or
     # provider failure falls back to the existing one-shot pipeline
     # byte-identically. provider/model default to llm_backend/llm_model when
@@ -225,7 +225,7 @@ DEFAULT_CONFIG = {
     "retrieval_agent_provider": None,
     "retrieval_agent_model": None,
     # Tag normalization: controlled-vocabulary merge map applied at write time
-    # (memento/store.py), by the post-write hook fixer (memento/utils.py), and
+    # (almanac/store.py), by the post-write hook fixer (almanac/utils.py), and
     # by scripts/backfill_project_slugs.py (MEM-164). Merging the long tail of
     # near-duplicate tags is a config change here, never a code change.
     "tag_aliases": {
@@ -251,7 +251,7 @@ DEFAULT_CONFIG = {
     # normalization (MEM-127): score / (score + fts5_score_k), replacing the
     # old batch-relative `score / max_score_in_this_batch` (which always
     # forced the top hit in any result batch to exactly 1.0 - see
-    # normalize_fts5_score() in memento.embedded_search). Default chosen
+    # normalize_fts5_score() in almanac.embedded_search). Default chosen
     # empirically against a small fixture vault: a single rare, discriminating
     # term match raw-scores ~1.0-1.7 (mapping to ~0.4-0.6 with k=2.0), while
     # common-term-only matches (near-zero raw BM25, since IDF collapses when
@@ -281,7 +281,7 @@ DEFAULT_CONFIG = {
     # Bitemporal supersession (MEM-163): `valid_from`/`invalidated_by`
     # frontmatter give deterministic validity intervals instead of the sparse
     # `supersedes` field alone. Background candidate pass + LLM adjudication
-    # ride the Inception hook's cadence (hooks/memento-inception.py's
+    # ride the Inception hook's cadence (hooks/almanac-inception.py's
     # run_contradiction_detection) and auto-set `invalidated_by` only when a
     # contradicting pair's newer note wins with high confidence and both
     # share a project; everything else queues for human review. Disabled by
@@ -292,7 +292,7 @@ DEFAULT_CONFIG = {
     "contradiction_max_pairs_per_run": 20,
     "contradiction_confidence_threshold": 0.75,
     # Keep the pre-MEM-163 lexical polarity-matching contradiction report
-    # (memento.contradictions.inspect_contradictions) available as an
+    # (almanac.contradictions.inspect_contradictions) available as an
     # explicit fallback rather than deleting it outright; default false uses
     # the new validity-chain report (note -> invalidated_by -> ... with
     # dates).
@@ -307,27 +307,15 @@ def load_config():
     config = dict(DEFAULT_CONFIG)
 
     home = Path.home()
-    new_vault = home / "almanac"
-    old_vault = home / "memento"
-    legacy_candidates = [
-        home / ".config" / "almanac" / "memento.yml",  # existing Compose config volume at its new mount
-        old_vault / "memento.yml",
-        home / ".config" / "memento-vault" / "memento.yml",
-        home / ".memento-vault.yml",
-    ]
     candidates = [
         Path(config["vault_path"]) / "almanac.yml",
-        Path(config["vault_path"]) / "memento.yml",
-        new_vault / "almanac.yml",
+        home / "almanac" / "almanac.yml",
         home / ".config" / "almanac" / "almanac.yml",
         home / ".almanac.yml",
-        *legacy_candidates,
     ]
 
-    found_config = False
     for path in candidates:
         if path.exists():
-            found_config = True
             try:
                 try:
                     import yaml
@@ -338,24 +326,17 @@ def load_config():
                     user_config = _parse_simple_yaml(path)
 
                 config.update({k: v for k, v in user_config.items() if v is not None})
-                if "vault_path" not in user_config and path in legacy_candidates:
-                    config["vault_path"] = str(old_vault)
-                    config["qmd_collection"] = "memento"
             except Exception as exc:
                 import sys as _sys
 
                 print(f"[almanac] warning: failed to parse config {path}: {exc}", file=_sys.stderr)
             break
 
-    if not found_config and old_vault.exists() and not new_vault.exists():
-        config["vault_path"] = str(old_vault)
-        config["qmd_collection"] = "memento"
-
     # Environment overrides
-    env_vault = os.environ.get("ALMANAC_VAULT_PATH") or os.environ.get("MEMENTO_VAULT_PATH")
+    env_vault = os.environ.get("ALMANAC_VAULT_PATH")
     if env_vault:
         config["vault_path"] = env_vault
-    env_backend = os.environ.get("ALMANAC_SEARCH_BACKEND") or os.environ.get("MEMENTO_SEARCH_BACKEND")
+    env_backend = os.environ.get("ALMANAC_SEARCH_BACKEND")
     if env_backend:
         config["search_backend"] = env_backend
     config["vault_path"] = str(Path(config["vault_path"]).expanduser())
@@ -419,25 +400,18 @@ def get_vault():
 
 
 def get_vault_metadata_dir(vault: Path | None = None) -> Path:
-    """Select new vault metadata storage, retaining an existing legacy tree."""
+    """Return the Almanac metadata directory for a vault."""
     root = Path(vault) if vault is not None else get_vault()
-    current = root / ".almanac"
-    legacy = root / ".memento"
-    if not current.exists() and (legacy.exists() or root == Path.home() / "memento"):
-        return legacy
-    return current
+    return root / ".almanac"
 
 
 def get_config_dir() -> Path:
-    """Use the Almanac state directory, or an existing Memento directory."""
-    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-    current = base / "almanac"
-    legacy = base / "memento-vault"
-    return legacy if legacy.exists() and not current.exists() else current
+    """Return the Almanac configuration directory."""
+    return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "almanac"
 
 
 def _runtime_name() -> str:
-    return "memento-vault" if get_config_dir().name == "memento-vault" else "almanac"
+    return "almanac"
 
 
 # --- Vault identity ---
@@ -456,20 +430,12 @@ def _vault_identity_path():
     return vault / _VAULT_IDENTITY_FILENAME
 
 
-def _legacy_vault_identity_path():
-    """Old location for vault identity (pre-migration)."""
-    config_dir = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "memento-vault"
-    return config_dir / _VAULT_IDENTITY_FILENAME
-
-
 def get_vault_id() -> str | None:
     """Get the unique vault ID, creating one on first call.
 
     The vault ID is a stable UUID that uniquely identifies this vault instance.
     It's generated once and persisted inside the vault directory. Used for
     cross-vault interoperability and note provenance tracking.
-
-    Migrates from the old global config location on first access.
     """
     path = _vault_identity_path()
 
@@ -479,31 +445,6 @@ def get_vault_id() -> str | None:
             data = json.loads(path.read_text())
             vault_id = data.get("vault_id")
             if vault_id:
-                return vault_id
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    # Migrate from legacy global location if it exists
-    legacy = _legacy_vault_identity_path()
-    if legacy.exists():
-        try:
-            data = json.loads(legacy.read_text())
-            vault_id = data.get("vault_id")
-            if vault_id:
-                # Copy to new location
-                path.parent.mkdir(parents=True, exist_ok=True)
-                tmp = path.with_suffix(".tmp")
-                tmp.write_text(
-                    json.dumps(
-                        {
-                            "vault_id": vault_id,
-                            "created": data.get("created", _iso_now()),
-                            "migrated_from": str(legacy),
-                        },
-                        indent=2,
-                    )
-                )
-                os.replace(tmp, path)
                 return vault_id
         except (json.JSONDecodeError, OSError):
             pass
@@ -605,9 +546,9 @@ def get_runtime_dir(*, strict: bool = False) -> str:
     returns the first writable one. Raises ``OSError`` if none is writable.
 
     Candidates, in order of preference:
-      1. ``$XDG_RUNTIME_DIR/memento-vault``
-      2. ``~/.cache/memento-vault``
-      3. ``tempfile.gettempdir()/memento-vault-<uid>``
+      1. ``$XDG_RUNTIME_DIR/almanac``
+      2. ``~/.cache/almanac``
+      3. ``tempfile.gettempdir()/almanac-<uid>``
 
     Cf. ``ensure_runtime_dir()`` when you want to guarantee existence.
     """

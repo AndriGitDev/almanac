@@ -21,7 +21,7 @@ export const defaultConfig = {
 };
 
 function envValue(name) {
-    return process.env[name] ?? process.env[name.replace(/^ALMANAC_/, "MEMENTO_")];
+    return process.env[name];
 }
 
 function envBool(name) {
@@ -45,8 +45,7 @@ function readJson(path) {
 function bridgeConfigFrom(raw) {
 	const root = raw && typeof raw === "object" ? raw : undefined;
 	const almanac = root?.almanac && typeof root.almanac === "object" ? root.almanac : undefined;
-	const memento = root?.memento && typeof root.memento === "object" ? root.memento : undefined;
-	const candidate = (almanac?.piBridge ?? memento?.piBridge ?? root?.piBridge ?? root) || undefined;
+	const candidate = (almanac?.piBridge ?? root?.piBridge ?? root) || undefined;
 	const partial = {};
 	if (!candidate || typeof candidate !== "object") return partial;
 
@@ -83,7 +82,6 @@ export function loadConfig(cwd = process.cwd()) {
 	let config = { ...defaultConfig };
 	const sources = ["defaults"];
 	const candidates = [
-		join(homedir(), ".config", "memento-vault", "pi-bridge.json"),
 		join(homedir(), ".config", "almanac", "pi-bridge.json"),
 		resolve(cwd, ".pi", "settings.json"),
 		resolve(cwd, "package.json"),

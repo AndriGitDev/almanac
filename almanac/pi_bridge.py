@@ -98,8 +98,6 @@ def _env_bool(name: str) -> bool | None:
 
 def _pi_capture_queue_enabled() -> bool:
     env_value = _env_bool("ALMANAC_PI_CAPTURE_QUEUE")
-    if env_value is None:
-        env_value = _env_bool("MEMENTO_PI_CAPTURE_QUEUE")
     return env_value if env_value is not None else False
 
 
@@ -233,8 +231,6 @@ def _triage_hook_script() -> Path:
     candidates = (
         root / "hooks" / "almanac-triage.py",
         root / "almanac-triage.py",
-        root / "hooks" / "memento-triage.py",
-        root / "memento-triage.py",
     )
     return next((path for path in candidates if path.exists()), candidates[0])
 
@@ -1299,7 +1295,7 @@ def _triage(
 
     The TypeScript extension calls this command at session boundaries. The
     bridge validates that the path is a local Pi transcript, then invokes the
-    existing Claude SessionEnd triage hook with ``MEMENTO_AGENT=pi`` so both
+    existing Claude SessionEnd triage hook with ``ALMANAC_AGENT=pi`` so both
     agents share substantiality scoring, fleeting/project writes, structured
     note extraction, health logging, auto-commit, reindex, and Inception hooks.
     """
@@ -1417,8 +1413,6 @@ def _triage(
     env = os.environ.copy()
     env["ALMANAC_AGENT"] = "pi"
     env.setdefault("ALMANAC_PI_TRANSCRIPT_ROOTS", get_env("PI_TRANSCRIPT_ROOTS", ""))
-    env.setdefault("MEMENTO_AGENT", "pi")
-    env.setdefault("MEMENTO_PI_TRANSCRIPT_ROOTS", env["ALMANAC_PI_TRANSCRIPT_ROOTS"])
 
     try:
         if detached:
@@ -2132,7 +2126,7 @@ def _selected_captures(
             continue
         if session_id and metadata.get("session_id") != session_id:
             continue
-        if metadata.get("almanac_processor") is True or metadata.get("memento_processor") is True:
+        if metadata.get("almanac_processor") is True:
             continue
         selected.append(capture)
     selected.sort(key=_capture_created_at, reverse=newest)

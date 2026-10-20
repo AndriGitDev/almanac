@@ -1,4 +1,4 @@
-from memento.batch_synthesis import synthesize_failure_batch
+from almanac.batch_synthesis import synthesize_failure_batch
 
 
 def test_rejects_raw_run_store_or_log_dump_fields():
@@ -42,7 +42,7 @@ def test_groups_required_failure_categories_and_candidate_actions():
                 "run_id": "r1",
                 "summary": "recall missed a prior note and pytest gate failed",
                 "failures": [
-                    {"signal": "Memento recall did not retrieve the relevant note"},
+                    {"signal": "Almanac recall did not retrieve the relevant note"},
                     {"signal": "pytest gate failed", "command": "pytest tests/test_store.py"},
                 ],
             },

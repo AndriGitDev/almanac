@@ -23,7 +23,7 @@ def read_note_metadata(note_name):
         (list of str), and links (list of wikilink target names). Returns
         None if the note file doesn't exist.
 
-    MEM-166: parses frontmatter via :mod:`memento.frontmatter` instead of a
+    MEM-166: parses frontmatter via :mod:`almanac.frontmatter` instead of a
     private line-prefix scanner. The one behavior change from the prior
     implementation: ``tags`` written in block style (``tags:\n  - a\n  -
     b``) are now visible here, same as the inline ``tags: [a, b]`` form --

@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from memento.capture_runtime import (
+from almanac.capture_runtime import (
     CaptureProcessRequest,
     CaptureRuntime,
     MemoryQueueStore,
@@ -94,7 +94,7 @@ def test_select_captures_oldest_first_and_skips_processor_captures():
     captures = [
         {"id": "q2", "created_at": "2026-01-01T00:02:00Z", "metadata": {"project": "repo"}},
         {"id": "q1", "created_at": "2026-01-01T00:01:00Z", "metadata": {"project": "repo"}},
-        {"id": "qp", "created_at": "2026-01-01T00:00:00Z", "metadata": {"project": "repo", "memento_processor": True}},
+        {"id": "qp", "created_at": "2026-01-01T00:00:00Z", "metadata": {"project": "repo", "almanac_processor": True}},
         {"id": "other", "created_at": "2026-01-01T00:03:00Z", "metadata": {"project": "other"}},
     ]
 

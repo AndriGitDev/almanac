@@ -7,10 +7,10 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-from memento.config import DEFAULT_CONFIG
-from memento.graph import extract_wikilinks
-from memento.search import expand_result_links, multi_hop_search, qmd_get, rrf_fuse
-from memento.search_backend import reset_backend
+from almanac.config import DEFAULT_CONFIG
+from almanac.graph import extract_wikilinks
+from almanac.search import expand_result_links, multi_hop_search, qmd_get, rrf_fuse
+from almanac.search_backend import reset_backend
 
 RECALL_MIN_SCORE = DEFAULT_CONFIG["recall_min_score"]
 RECALL_HIGH_CONFIDENCE = DEFAULT_CONFIG["recall_high_confidence"]
@@ -73,8 +73,8 @@ class TestQmdGet:
     def test_returns_note_dict(self):
         mock_output = '{"file": "notes/foo.md", "title": "Foo", "content": "Some content with [[bar]]."}'
         with (
-            patch("memento.search_backend.shutil.which", return_value="/usr/bin/qmd"),
-            patch("memento.search_backend._run_qmd") as mock_run,
+            patch("almanac.search_backend.shutil.which", return_value="/usr/bin/qmd"),
+            patch("almanac.search_backend._run_qmd") as mock_run,
         ):
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = mock_output
@@ -86,8 +86,8 @@ class TestQmdGet:
 
     def test_returns_none_on_failure(self):
         with (
-            patch("memento.search_backend.shutil.which", return_value="/usr/bin/qmd"),
-            patch("memento.search_backend._run_qmd") as mock_run,
+            patch("almanac.search_backend.shutil.which", return_value="/usr/bin/qmd"),
+            patch("almanac.search_backend._run_qmd") as mock_run,
         ):
             mock_run.return_value.returncode = 1
             mock_run.return_value.stdout = ""
@@ -99,8 +99,8 @@ class TestQmdGet:
         import subprocess
 
         with (
-            patch("memento.search_backend.shutil.which", return_value="/usr/bin/qmd"),
-            patch("memento.search_backend._run_qmd", side_effect=subprocess.TimeoutExpired("qmd", 5)),
+            patch("almanac.search_backend.shutil.which", return_value="/usr/bin/qmd"),
+            patch("almanac.search_backend._run_qmd", side_effect=subprocess.TimeoutExpired("qmd", 5)),
         ):
             result = qmd_get("notes/slow.md")
 
@@ -108,19 +108,19 @@ class TestQmdGet:
 
     def test_calls_qmd_with_correct_args(self):
         with (
-            patch("memento.search_backend.shutil.which", return_value="/usr/bin/qmd"),
-            patch("memento.search_backend._run_qmd") as mock_run,
+            patch("almanac.search_backend.shutil.which", return_value="/usr/bin/qmd"),
+            patch("almanac.search_backend._run_qmd") as mock_run,
         ):
             mock_run.return_value.returncode = 0
             mock_run.return_value.stdout = '{"file": "notes/foo.md", "content": "text"}'
-            qmd_get("notes/foo.md", collection="memento")
+            qmd_get("notes/foo.md", collection="almanac")
 
         cmd = mock_run.call_args[0][0]
         assert cmd[0] == "qmd"
         assert cmd[1] == "get"
         assert "notes/foo.md" in cmd
         assert "-c" in cmd
-        assert "memento" in cmd
+        assert "almanac" in cmd
 
 
 class TestMultiHopSearch:
@@ -147,7 +147,7 @@ class TestMultiHopSearch:
                 return note_c
             return None
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             results = multi_hop_search("test query", initial, config={"multi_hop_max": 2})
 
         paths = [r["path"] for r in results]
@@ -167,7 +167,7 @@ class TestMultiHopSearch:
                 return {"path": "notes/a.md", "content": note_a_content}
             return {"path": path, "title": Path(path).stem, "content": "content", "score": 0.0}
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             results = multi_hop_search("test", initial, config={"multi_hop_max": 2})
 
         # initial (1) + max 2 linked = 3
@@ -188,7 +188,7 @@ class TestMultiHopSearch:
                 return {"path": "notes/note-c.md", "title": "Note C", "content": "C", "score": 0.0}
             return None
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             results = multi_hop_search("test", initial, config={"multi_hop_max": 5})
 
         # note-b already present, so only note-c added
@@ -210,7 +210,7 @@ class TestMultiHopSearch:
                 return {"path": "notes/note-b.md", "title": "Note B", "content": "B", "score": 0.0}
             return None  # nonexistent
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             results = multi_hop_search("test", initial, config={"multi_hop_max": 5})
 
         assert len(results) == 2
@@ -229,7 +229,7 @@ class TestMultiHopSearch:
         def mock_get(path, **kwargs):
             return {"path": path, "content": "Plain text with no links."}
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             results = multi_hop_search("test", initial, config={"multi_hop_max": 2})
 
         assert len(results) == 1
@@ -246,7 +246,7 @@ class TestMultiHopSearch:
                 return {"path": "notes/a.md", "content": note_a_content}
             return {"path": path, "title": "High", "content": "B", "score": 0.0}
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             results = multi_hop_search("test", initial, config={"multi_hop_max": 1})
 
         # Original result (0.3) should be first, linked note (0.0) second
@@ -262,7 +262,7 @@ class TestMultiHopSearch:
             get_calls.append(path)
             return {"path": path, "content": "No links here."}
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             multi_hop_search("test", initial, config={"multi_hop_max": 2})
 
         # Should only fetch content for top 3, not all 10
@@ -270,7 +270,7 @@ class TestMultiHopSearch:
 
 
 class TestExpandResultLinks:
-    """expand_result_links (MEM-159): thin shim for memento_search's
+    """expand_result_links (MEM-159): thin shim for almanac_search's
     expand_links opt-in. Unlike multi_hop_search, entries are returned
     separately -- never merged/re-sorted with the direct hits."""
 
@@ -287,7 +287,7 @@ class TestExpandResultLinks:
                 return {"path": "notes/note-b.md", "title": "Note B", "content": "B content."}
             return None
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             expanded = expand_result_links(shaped, config={"multi_hop_max": 2})
 
         assert len(expanded) == 1
@@ -309,7 +309,7 @@ class TestExpandResultLinks:
                 return {"path": "notes/linked.md", "title": "Linked", "content": "text"}
             return None
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             expand_result_links(shaped, config={"multi_hop_max": 2})
 
         # Direct hits list must be untouched: same dicts, same order.
@@ -328,7 +328,7 @@ class TestExpandResultLinks:
                 return {"path": "notes/note-c.md", "title": "Note C", "content": "C"}
             return None
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             expanded = expand_result_links(shaped, config={"multi_hop_max": 5})
 
         paths = [e["path"] for e in expanded]
@@ -343,7 +343,7 @@ class TestExpandResultLinks:
                 return {"path": "notes/a.md", "content": "See [[b]], [[c]], [[d]]."}
             return {"path": path, "title": Path(path).stem, "content": "text"}
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             expanded = expand_result_links(shaped, config={"multi_hop_max": 1})
 
         assert len(expanded) == 1
@@ -357,7 +357,7 @@ class TestExpandResultLinks:
             get_calls.append(path)
             return {"path": path, "content": "No links here."}
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             expand_result_links(shaped, config={"multi_hop_max": 5}, top_n=3)
 
         assert len(get_calls) <= 3
@@ -371,7 +371,7 @@ class TestExpandResultLinks:
         def mock_get(path, **kwargs):
             return {"path": path, "content": "Plain text with no links."}
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             expanded = expand_result_links(shaped, config={"multi_hop_max": 2})
 
         assert expanded == []
@@ -401,7 +401,7 @@ class TestMultiHopGateWithFixedFusionMEM143:
                 return {"path": "notes/weak-linked.md", "title": "Weak linked", "content": "text", "score": 0.0}
             return None
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             results = multi_hop_search("irrelevant query", fused, config={"multi_hop_max": 2})
 
         by_path = {r["path"]: r for r in results}
@@ -429,7 +429,7 @@ class TestMultiHopGateWithFixedFusionMEM143:
                 }
             return None
 
-        with patch("memento.search.qmd_get", side_effect=mock_get):
+        with patch("almanac.search.qmd_get", side_effect=mock_get):
             results = multi_hop_search("irrelevant query", fused, config={"multi_hop_max": 2})
 
         assert results[0]["path"] == "notes/strong-seed.md"

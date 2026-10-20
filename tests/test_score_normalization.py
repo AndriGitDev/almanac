@@ -9,7 +9,7 @@ backend" cross-backend threshold test called for in the MEM-127 design: the
 same query's strong match and weak/unrelated match must land on the correct
 side of ``recall_min_score`` consistently, now that every backend normalizes
 its own score to [0, 1] at the search() boundary (see
-memento.search_backend and memento.embedded_search normalize_* functions).
+almanac.search_backend and almanac.embedded_search normalize_* functions).
 
 QMD itself is an external binary that cannot be indexed or queried live in
 CI, so its half of the cross-backend check exercises the pure
@@ -20,8 +20,8 @@ score ranges from docs/quality-analysis-2026-07-02.md instead of a live
 
 import pytest
 
-from memento.config import DEFAULT_CONFIG
-from memento.search_backend import GrepBackend, normalize_qmd_score
+from almanac.config import DEFAULT_CONFIG
+from almanac.search_backend import GrepBackend, normalize_qmd_score
 
 RECALL_MIN_SCORE = DEFAULT_CONFIG["recall_min_score"]
 RECALL_HIGH_CONFIDENCE = DEFAULT_CONFIG["recall_high_confidence"]
@@ -56,9 +56,9 @@ class TestCrossBackendThresholdConsistency:
     """Same query, same recall_min_score, consistent pass/fail per backend."""
 
     def test_grep_backend_strong_vs_weak_match(self, fixture_vault, monkeypatch):
-        monkeypatch.setattr("memento.config.get_vault", lambda: fixture_vault)
+        monkeypatch.setattr("almanac.config.get_vault", lambda: fixture_vault)
         backend = GrepBackend()
-        results = backend.search(QUERY, "memento", limit=10, min_score=0.0)
+        results = backend.search(QUERY, "almanac", limit=10, min_score=0.0)
         by_path = {r["path"]: r for r in results}
 
         strong = by_path.get("notes/strong-match.md")
@@ -72,12 +72,12 @@ class TestCrossBackendThresholdConsistency:
         assert weak is None or weak["score"] < RECALL_MIN_SCORE
 
     def test_embedded_fts_backend_strong_vs_weak_match(self, fixture_vault, tmp_path):
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         db_path = tmp_path / "search.db"
         backend = EmbeddedSearchBackend(vault_path=fixture_vault, db_path=db_path)
-        backend.reindex("memento")
-        results = backend.search(QUERY, "memento", limit=10, min_score=0.0)
+        backend.reindex("almanac")
+        results = backend.search(QUERY, "almanac", limit=10, min_score=0.0)
         by_path = {r["path"]: r for r in results}
 
         strong = by_path.get("notes/strong-match.md")
@@ -107,17 +107,17 @@ class TestCrossBackendThresholdConsistency:
         """A decisive, multi-distinguishing-term match should read as
         confident (clear recall_high_confidence) on both indexable backends,
         not just clear the coarser recall_min_score noise floor."""
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         db_path = tmp_path / "search.db"
         embedded = EmbeddedSearchBackend(vault_path=fixture_vault, db_path=db_path)
-        embedded.reindex("memento")
-        embedded_results = embedded.search(QUERY, "memento", limit=10, min_score=0.0)
+        embedded.reindex("almanac")
+        embedded_results = embedded.search(QUERY, "almanac", limit=10, min_score=0.0)
         assert embedded_results[0]["path"] == "notes/strong-match.md"
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.config.get_vault", lambda: fixture_vault)
-            grep_results = GrepBackend().search(QUERY, "memento", limit=10, min_score=0.0)
+            mp.setattr("almanac.config.get_vault", lambda: fixture_vault)
+            grep_results = GrepBackend().search(QUERY, "almanac", limit=10, min_score=0.0)
         assert grep_results[0]["path"] == "notes/strong-match.md"
         assert grep_results[0]["score"] >= RECALL_HIGH_CONFIDENCE
 
@@ -134,7 +134,7 @@ class TestRRFInflationInteractionMEM143:
     underlying backends actually measured."""
 
     def test_weak_match_score_survives_rrf_fusion_below_recall_min_score(self):
-        from memento.search import rrf_fuse
+        from almanac.search import rrf_fuse
 
         weak_result = {"path": "notes/weak.md", "title": "Weak", "score": 0.05, "snippet": ""}
         fused = rrf_fuse([[dict(weak_result)], [dict(weak_result)]], k=60)

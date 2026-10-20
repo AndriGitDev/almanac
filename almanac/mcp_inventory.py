@@ -130,13 +130,13 @@ MCP_TOOL_INVENTORY: tuple[McpToolInventoryItem, ...] = (
         "almanac_capture_run_lesson",
         "Write",
         "Queue or explicitly write one typed automated-run lesson candidate with provenance refs.",
-        "Use for Rondo/Beislið-style post-run learning; queues by default and rejects raw logs, transcripts, run ledgers, proofs, and patch blobs.",
+        "Use for learning after automated runs; queues by default and rejects raw logs, transcripts, run ledgers, proofs, and patch blobs.",
     ),
     McpToolInventoryItem(
         "almanac_synthesize_failures",
         "Write",
         "Dry-run batch synthesis from sanitized external run summaries, with optional approved lesson-note writes.",
-        "Use for Rondo/Beislið-style batch failure learning; rejects raw logs/run stores and never executes advisory issue/gate/docs actions.",
+        "Use for batch failure learning from automated runs; rejects raw logs/run stores and never executes advisory issue/gate/docs actions.",
     ),
     McpToolInventoryItem(
         "almanac_preserve",

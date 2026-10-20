@@ -1,14 +1,14 @@
-"""Retrieval probe: runs REAL memento retrieval code against either a
+"""Retrieval probe: runs REAL almanac retrieval code against either a
 hermetic fixture vault (--mode fixture) or the live vault (--mode live).
 
 Run as a subprocess by evals/suites/retrieval_accuracy.py so that
-MEMENTO_VAULT_PATH / MEMENTO_SEARCH_BACKEND overrides never leak into the
+ALMANAC_VAULT_PATH / ALMANAC_SEARCH_BACKEND overrides never leak into the
 parent process. Prints one JSON document to stdout.
 
 Fixture mode is fully deterministic: it renders the template vault in
 evals/golden/fixtures/vault into a temp dir (substituting date
 placeholders), forces the grep backend, and asserts ranking-policy
-behavior with the actual functions from memento.search.
+behavior with the actual functions from almanac.search.
 
 Checks marked known_gap=true encode DESIRED behavior the system does not
 implement yet. They are reported separately so they inform instead of
@@ -22,9 +22,9 @@ scores in the right direction, but it never proves a real query's top-5
 silently reorder real results without failing any pairwise assertion.
 
 `ranked_order_checks()` closes that gap: for a fixed set of queries it runs
-the real FTS5/BM25 (`memento.embedded_search.EmbeddedSearchBackend`, no
+the real FTS5/BM25 (`almanac.embedded_search.EmbeddedSearchBackend`, no
 embedding provider so no vector index and no ONNX/network dependency) +
-PRF query expansion + RRF fusion + policy (`memento.search.enhance_results`)
+PRF query expansion + RRF fusion + policy (`almanac.search.enhance_results`)
 path against the deterministic fixture vault, with every tunable parameter
 (RRF k, PRF term/doc counts, temporal decay half-life/floor, quality-signal
 factors) pinned explicitly in-process rather than read from the ambient
@@ -48,14 +48,14 @@ Deliberately excluded from this v0 blocking path, and why:
     contained.
 
 Golden regeneration is deliberate, not automatic drift-following: set
-`MEMENTO_REGEN_GOLDEN=1` to rewrite `evals/golden/ranked_order.json` with
+`ALMANAC_REGEN_GOLDEN=1` to rewrite `evals/golden/ranked_order.json` with
 whatever the current pipeline produces. A regenerated golden is a diff to
 be read and understood before it is committed -- if you cannot explain
 every path that moved, do not accept it. See evals/README.md.
 
 A ranked order pinned here is not a claim that the order is *correct* --
 only that it is *current*. Where MEM-135 already found real bugs in the
-deep-pipeline gating (`memento/retrieval_policy.py`: vector search never
+deep-pipeline gating (`almanac/retrieval_policy.py`: vector search never
 fuses when BM25 is empty; confidence gating uses an absolute score), the
 affected golden entries are pinned to today's (arguably wrong) output on
 purpose, fix-forward: when MEM-135 lands a fix, regenerate and review.
@@ -123,7 +123,7 @@ def _stable_order(hits: list[dict]) -> list[dict]:
 
     fixture_checks() runs its "end-to-end fixture retrieval" queries and its
     archive-exclusion query against the real search backend (GrepBackend in
-    --mode fixture: MEMENTO_SEARCH_BACKEND is forced to "grep"). GrepBackend
+    --mode fixture: ALMANAC_SEARCH_BACKEND is forced to "grep"). GrepBackend
     sorts primarily by mtime and only then by score, but a stable sort never
     disturbs *ties* -- when two fixture notes tie on score, the surviving
     order falls back to whatever order the filesystem enumerated them in
@@ -146,8 +146,8 @@ def _stable_order(hits: list[dict]) -> list[dict]:
 
 
 def fixture_checks(root: Path) -> list[dict]:
-    from memento import search
-    from memento.config import get_config
+    from almanac import search
+    from almanac.config import get_config
 
     config = get_config()
     checks = []
@@ -342,8 +342,8 @@ def _pinned_ranked_order_config(base_config: dict) -> dict:
     A copy of the ambient config, not a mutation of it, so this check can
     never perturb (or be perturbed by) fixture_checks() running in the same
     process. Values matching current DEFAULT_CONFIG are still restated here
-    on purpose: an accidental default change in memento/config.py must not
-    silently move these goldens, only a deliberate MEMENTO_REGEN_GOLDEN=1
+    on purpose: an accidental default change in almanac/config.py must not
+    silently move these goldens, only a deliberate ALMANAC_REGEN_GOLDEN=1
     run should.
     """
     config = dict(base_config)
@@ -375,7 +375,7 @@ def _pinned_ranked_order_config(base_config: dict) -> dict:
 def _make_fts5_backend(vault: Path, db_path: Path):
     """A pure FTS5/BM25 EmbeddedSearchBackend: no embedding provider, so no
     vector table and no onnxruntime/sqlite-vec dependency at all."""
-    from memento.embedded_search import EmbeddedSearchBackend
+    from almanac.embedded_search import EmbeddedSearchBackend
 
     return EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=None)
 
@@ -383,12 +383,12 @@ def _make_fts5_backend(vault: Path, db_path: Path):
 def _ranked_order_top5(search_module, query: str, config: dict, limit: int = 5) -> list[str]:
     """Run one query through the real BM25 + PRF + RRF-fusion + policy path.
 
-    Mirrors the production stages in memento.search / memento.retrieval_policy
+    Mirrors the production stages in almanac.search / almanac.retrieval_policy
     at the function level (this repo's fixture checks test at that same
     granularity): an initial BM25 pass, a PRF-expanded second pass, RRF
-    fusion of the two (real memento.search.rrf_fuse, the same function the
+    fusion of the two (real almanac.search.rrf_fuse, the same function the
     live pipeline uses to fuse text + vector), then temporal decay and
-    quality signals (memento.search.apply_temporal_decay /
+    quality signals (almanac.search.apply_temporal_decay /
     apply_quality_signals) with the parameters above pinned.
 
     Deliberately calls those two policy functions directly rather than the
@@ -419,10 +419,10 @@ def ranked_order_checks(root: Path) -> list[dict]:
     """Golden ranked-order regression: pins the exact top-5 order for a
     fixed query set through the real FTS5/BM25 + fusion + policy path.
     See the module docstring for scope, exclusions, and the regeneration
-    contract (MEMENTO_REGEN_GOLDEN=1).
+    contract (ALMANAC_REGEN_GOLDEN=1).
     """
-    from memento import search, search_backend
-    from memento.config import get_config
+    from almanac import search, search_backend
+    from almanac.config import get_config
 
     vault = root / "vault"
     config = _pinned_ranked_order_config(get_config())
@@ -435,7 +435,7 @@ def ranked_order_checks(root: Path) -> list[dict]:
     finally:
         search_backend.set_backend(previous_backend)
 
-    regen = bool(os.environ.get("MEMENTO_REGEN_GOLDEN"))
+    regen = bool(os.environ.get("ALMANAC_REGEN_GOLDEN"))
     golden = {}
     if RANKED_ORDER_GOLDEN.exists():
         golden = json.loads(RANKED_ORDER_GOLDEN.read_text())
@@ -468,7 +468,7 @@ def vector_ordering_advisory_checks(root: Path) -> list[dict]:
     RRF-fused inside EmbeddedSearchBackend._hybrid_search) and report the
     resulting order for information only.
 
-    Opt-in only: requires MEMENTO_EVAL_VECTOR_ADVISORY=1. Discovered while
+    Opt-in only: requires ALMANAC_EVAL_VECTOR_ADVISORY=1. Discovered while
     validating this check: ONNX CPU inference is not bit-reproducible
     across runs (near-tied cosine similarities occasionally swap rank), so
     this can never be part of the default `--mode fixture` output without
@@ -482,7 +482,7 @@ def vector_ordering_advisory_checks(root: Path) -> list[dict]:
     is the local ONNX provider (API providers call out over the network on
     every embed() call -- never "local-only"), and that provider's model
     files are already cached on disk. That last check is deliberate and NOT
-    the same gate memento.search_backend._make_embedded uses
+    the same gate almanac.search_backend._make_embedded uses
     (`provider.is_available()` there only checks that onnxruntime imports;
     it does not check the model is cached, because in production triggering
     a first-time download is the intended behavior). An eval/gate script
@@ -498,7 +498,7 @@ def vector_ordering_advisory_checks(root: Path) -> list[dict]:
     extra, so the first import already fails closed; the opt-in flag is
     belt-and-suspenders).
     """
-    if not os.environ.get("MEMENTO_EVAL_VECTOR_ADVISORY"):
+    if not os.environ.get("ALMANAC_EVAL_VECTOR_ADVISORY"):
         return []
 
     try:
@@ -508,20 +508,20 @@ def vector_ordering_advisory_checks(root: Path) -> list[dict]:
     except ImportError:
         return []
 
-    from memento import search, search_backend
-    from memento.config import get_config
-    from memento.embedded_search import EmbeddedSearchBackend
+    from almanac import search, search_backend
+    from almanac.config import get_config
+    from almanac.embedded_search import EmbeddedSearchBackend
 
     config = _pinned_ranked_order_config(get_config())
     if config.get("embedding_provider", "local") != "local":
         return []  # API-backed providers call out over the network per query
 
-    cache_dir = Path(os.environ.get("MEMENTO_MODEL_CACHE_DIR") or (Path.home() / ".cache" / "memento-vault" / "models"))
+    cache_dir = Path(os.environ.get("ALMANAC_MODEL_CACHE_DIR") or (Path.home() / ".cache" / "almanac" / "models"))
     model_dir = cache_dir / str(config.get("embedding_model", "nomic-embed-text-v1.5"))
     if not (model_dir / "model_quantized.onnx").exists() or not (model_dir / "tokenizer.json").exists():
         return []  # model not cached locally; never trigger a download from here
 
-    from memento.embedding import get_embedding_provider
+    from almanac.embedding import get_embedding_provider
 
     try:
         provider = get_embedding_provider(config)
@@ -560,11 +560,11 @@ def vector_ordering_advisory_checks(root: Path) -> list[dict]:
 
 def _production_hits(query_id: str, query: str) -> list[dict]:
     """Run one golden query through the SAME entry point prompt-time recall
-    uses in production: memento.lifecycle.build_recall(), which wraps
-    PromptRecallRuntime.run() (memento/retrieval_policy.py) with the real
+    uses in production: almanac.lifecycle.build_recall(), which wraps
+    PromptRecallRuntime.run() (almanac/retrieval_policy.py) with the real
     qmd_search/enhance_results/PRF/RRF/deep-recall-gating wiring (MEM-140).
 
-    Before this, live_checks() called memento.search.qmd_search() directly:
+    Before this, live_checks() called almanac.search.qmd_search() directly:
     a raw single-pass BM25/vector call with none of that gating, so the
     golden recall@5/MRR metric measured a code path no user ever hits. See
     the MEM-140 ticket for the full history.
@@ -575,7 +575,7 @@ def _production_hits(query_id: str, query: str) -> list[dict]:
     probe, and record=False means the call never writes to the recall-dedup
     or access-log state on disk. Read-only against the live vault.
     """
-    from memento.lifecycle import build_recall
+    from almanac.lifecycle import build_recall
 
     session_id = f"mem140-eval-{query_id}-{uuid.uuid4().hex}"
     decision = build_recall(query, cwd="", session_id=session_id, record=False)
@@ -583,8 +583,8 @@ def _production_hits(query_id: str, query: str) -> list[dict]:
 
 
 def live_checks(queries_path: Path) -> dict:
-    from memento import search
-    from memento.search_backend import get_backend
+    from almanac import search
+    from almanac.search_backend import get_backend
 
     backend = get_backend()
     payload = {
@@ -647,7 +647,7 @@ def main():
     )
     parser.add_argument(
         "--now",
-        help="ISO-8601 UTC timestamp to freeze the eval clock for reproducible runs (env fallback: MEMENTO_EVAL_NOW)",
+        help="ISO-8601 UTC timestamp to freeze the eval clock for reproducible runs (env fallback: ALMANAC_EVAL_NOW)",
     )
     args = parser.parse_args()
 
@@ -659,13 +659,13 @@ def main():
     effective_now = eval_now().isoformat()
 
     if args.mode == "fixture":
-        tmp = tempfile.mkdtemp(prefix="memento-eval-vault-")
+        tmp = tempfile.mkdtemp(prefix="almanac-eval-vault-")
         try:
             vault = render_fixture_vault(Path(tmp), eval_now())
-            os.environ["MEMENTO_VAULT_PATH"] = str(vault)
-            os.environ["MEMENTO_SEARCH_BACKEND"] = "grep"
-            os.environ.pop("MEMENTO_DEBUG", None)
-            from memento.config import reset_config
+            os.environ["ALMANAC_VAULT_PATH"] = str(vault)
+            os.environ["ALMANAC_SEARCH_BACKEND"] = "grep"
+            os.environ.pop("ALMANAC_DEBUG", None)
+            from almanac.config import reset_config
 
             reset_config()
             checks = fixture_checks(Path(tmp))

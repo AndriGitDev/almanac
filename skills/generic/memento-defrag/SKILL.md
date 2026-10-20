@@ -1,15 +1,15 @@
 ---
-name: memento-defrag
+name: almanac-defrag
 description: Review Almanac for stale low-value notes and archive confirmed candidates. Use for periodic vault maintenance.
 ---
 
-# Memento Defrag
+# Almanac Defrag
 
 Archive stale notes without deleting knowledge.
 
 ## Process
 
-1. Locate the vault from config or default to `~/memento`.
+1. Locate the vault from config or default to `~/almanac`.
 2. Read notes under `notes/` and parse frontmatter.
 3. Identify archive candidates:
    - Certainty 1 or 2 and older than 60 days
@@ -23,7 +23,7 @@ Archive stale notes without deleting knowledge.
 5. Show candidates to the user and wait for confirmation.
 6. Move confirmed candidates to `archive/`.
 7. Update project indexes and active wikilinks where needed.
-8. Reindex with `memento_reindex` if available, otherwise use QMD if installed.
+8. Reindex with `almanac_reindex` if available, otherwise use QMD if installed.
 
 ## Rules
 

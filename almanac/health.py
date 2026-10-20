@@ -42,7 +42,7 @@ _INCEPTION_ERROR_DETAIL_LIMIT = 500
 # coverage trend (MEM-154), so a single noisy run never trips the flag.
 _INCEPTION_TREND_MIN_CONSECUTIVE = 2
 _RECENT_FAILURE_ACTION_MARKERS = telemetry.RECENT_FAILURE_ACTION_MARKERS
-# Index-staleness thresholds live in memento.search_backend
+# Index-staleness thresholds live in almanac.search_backend
 # (STALE_INDEX_WARN_SECONDS / STALE_INDEX_FAIL_SECONDS); the backends own
 # pass/warn/fail classification via classify_index_lag().
 _RETRIEVAL_SKIP_ACTIONS = telemetry.RETRIEVAL_SKIP_ACTIONS
@@ -432,13 +432,11 @@ def _first_config_path() -> Path | None:
     candidates = []
     vault_path = Path(get_env("VAULT_PATH", _DEFAULT_CONFIG["vault_path"])).expanduser()
     if vault_path.exists():
-        candidates.extend((vault_path / "almanac.yml", vault_path / "memento.yml"))
+        candidates.append(vault_path / "almanac.yml")
     candidates.extend(
         [
             Path.home() / ".config" / "almanac" / "almanac.yml",
             Path.home() / ".almanac.yml",
-            Path.home() / ".config" / "memento-vault" / "memento.yml",
-            Path.home() / ".memento-vault.yml",
         ]
     )
     for candidate in candidates:
@@ -950,15 +948,11 @@ def _common_automation_failure_reasons(vault: Path, limit: int = 5) -> list[dict
 
 def _config_dir() -> Path:
     base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
-    new = base / "almanac"
-    old = base / "memento-vault"
-    return new if new.exists() or not old.exists() else old
+    return base / "almanac"
 
 
 def _home_config_dir() -> Path:
-    new = Path.home() / ".config" / "almanac"
-    old = Path.home() / ".config" / "memento-vault"
-    return new if new.exists() or not old.exists() else old
+    return Path.home() / ".config" / "almanac"
 
 
 def _config_file_path(filename: str) -> Path:
@@ -1022,17 +1016,6 @@ _CRITICAL_MANAGED_KEYS = {
     "almanac/adapters/claude.py",
     "almanac/adapters/opencode.py",
     "almanac/adapters/pi.py",
-    "memento/__init__.py",
-    "memento/config.py",
-    "memento/utils.py",
-    "memento/store.py",
-    "memento/search.py",
-    "memento/lifecycle.py",
-    "memento/pi_bridge.py",
-    "memento/adapters/__init__.py",
-    "memento/adapters/claude.py",
-    "memento/adapters/opencode.py",
-    "memento/adapters/pi.py",
 }
 
 
@@ -1055,7 +1038,7 @@ def _file_sha256(path: Path) -> str | None:
 
 def _managed_source_path(key: str) -> Path | None:
     root = _repo_root()
-    if key.startswith(("hooks/", "memento/", "almanac/")):
+    if key.startswith(("hooks/", "almanac/")):
         return root / key
     if key.startswith("skills/"):
         parts = key.split("/")
@@ -1076,7 +1059,7 @@ def _managed_source_path(key: str) -> Path | None:
 def _managed_dest_path(key: str) -> Path | None:
     if key.startswith("hooks/"):
         return Path.home() / ".claude" / key
-    if key.startswith(("memento/", "almanac/")):
+    if key.startswith("almanac/"):
         rel = key.split("/", 1)[1]
         package = key.split("/", 1)[0]
         return Path.home() / ".claude" / "hooks" / package / rel
@@ -1245,7 +1228,7 @@ def _check_claude_hooks(manifest: dict[str, Any] | None) -> CheckResult:
 def _mcp_entry_shape(data: Any) -> tuple[str, str | None]:
     if not isinstance(data, dict):
         return "invalid", "MCP config root must be an object"
-    entry = data.get("almanac", data.get("memento-vault"))
+    entry = data.get("almanac")
     if entry is None:
         return "missing", None
     if not isinstance(entry, dict):
@@ -1265,24 +1248,23 @@ def _mcp_entry_shape(data: Any) -> tuple[str, str | None]:
     command_name = Path(str(command)).name if command else ""
     python_command = command_name.startswith("python")
     has_module_args = isinstance(args, list) and any(
-        args[index] == "-m" and index + 1 < len(args) and args[index + 1] in {"almanac", "memento"}
-        for index in range(len(args))
+        args[index] == "-m" and index + 1 < len(args) and args[index + 1] == "almanac" for index in range(len(args))
     )
     if python_command and has_module_args and isinstance(env, dict) and env.get("PYTHONPATH"):
         return "local stdio", None
-    return "invalid", "local MCP entry must run python3 -m almanac (or memento) with PYTHONPATH"
+    return "invalid", "local MCP entry must run python3 -m almanac with PYTHONPATH"
 
 
 def _mcp_registration_shape(output: str) -> str:
     import re
 
     text = output.lower()
-    if "almanac" not in text and "memento-vault" not in text:
+    if "almanac" not in text:
         return "invalid"
     urls = re.findall(r"https?://[^\s]+", text)
     if urls:
         return "remote http" if any(url.rstrip("/").endswith("/mcp") for url in urls) else "invalid"
-    if re.search(r"\bpython(?:3(?:\.\d+)?)?\b", text) and re.search(r"(?:^|\s)-m\s+(?:almanac|memento)(?:\s|$)", text):
+    if re.search(r"\bpython(?:3(?:\.\d+)?)?\b", text) and re.search(r"(?:^|\s)-m\s+almanac(?:\s|$)", text):
         return "local stdio"
     return "invalid"
 
@@ -1297,7 +1279,7 @@ def _check_mcp_registration() -> CheckResult:
         try:
             with tempfile.TemporaryDirectory(prefix="almanac-health-mcp-check-") as scratch_dir:
                 # `claude`/`codex mcp get` reports live connectivity, which means
-                # it actually spawns the registered MCP server process (memento
+                # it actually spawns the registered MCP server process (almanac
                 # itself) to probe it. That spawned process is free to write its
                 # own runtime/cache state; a read-only health check must not let
                 # it land in this machine's real XDG runtime/cache dirs, so give
@@ -1318,7 +1300,7 @@ def _check_mcp_registration() -> CheckResult:
                 )
                 if completed.returncode != 0:
                     completed = subprocess.run(
-                        [client, "mcp", "get", "memento-vault"],
+                        [client, "mcp", "get", "almanac"],
                         text=True,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
@@ -1417,7 +1399,7 @@ def _check_mcp_config() -> list[CheckResult]:
     stale_paths = []
     for path in (
         Path.home() / ".claude" / "hooks" / "almanac" / "llm.py",
-        Path.home() / ".claude" / "hooks" / "memento" / "llm.py",
+        Path.home() / ".claude" / "hooks" / "almanac" / "llm.py",
         Path(__file__).with_name("llm.py"),
     ):
         if _has_stale_empty_mcp_config(path):
@@ -1456,8 +1438,7 @@ def _check_pi_bridge_config() -> CheckResult:
     if not isinstance(raw, dict):
         return CheckResult("pi bridge", WARN, "Pi bridge config root must be an object", {"path": str(path)})
     almanac = raw.get("almanac") if isinstance(raw.get("almanac"), dict) else None
-    memento = raw.get("memento") if isinstance(raw.get("memento"), dict) else None
-    candidate = (almanac or memento or {}).get("piBridge") if almanac or memento else raw.get("piBridge", raw)
+    candidate = almanac.get("piBridge") if almanac else raw.get("piBridge", raw)
     if not isinstance(candidate, dict):
         return CheckResult("pi bridge", WARN, "Pi bridge config must be an object", {"path": str(path)})
     invalid = []
@@ -1972,9 +1953,9 @@ def _lock_path_candidates(filename: str) -> list[Path]:
     configured = Path(VAULT_WRITE_LOCK_PATH if filename == "vault-write.lock" else INCEPTION_LOCK_PATH)
     candidates = [
         configured,
-        Path(os.environ.get("XDG_RUNTIME_DIR", Path.home() / ".cache")) / "memento-vault" / filename,
-        Path.home() / ".cache" / "memento-vault" / filename,
-        Path(os.environ.get("TMPDIR", "/tmp")) / f"memento-vault-{os.getuid()}" / filename,
+        Path(os.environ.get("XDG_RUNTIME_DIR", Path.home() / ".cache")) / "almanac" / filename,
+        Path.home() / ".cache" / "almanac" / filename,
+        Path(os.environ.get("TMPDIR", "/tmp")) / f"almanac-{os.getuid()}" / filename,
     ]
     unique = []
     seen = set()
@@ -2136,7 +2117,7 @@ def _last_inception_run(state: dict[str, Any]) -> tuple[datetime | None, str | N
 def _inception_coverage_snapshots(runs: Any) -> list[dict[str, Any]]:
     """Extract per-run (total_notes, processed_notes_total) pairs, in order.
 
-    Both fields are recorded by hooks/memento-inception.py's _record_run
+    Both fields are recorded by hooks/almanac-inception.py's _record_run
     (MEM-154). Older run entries recorded before this change -- or any
     malformed entry -- lack one or both fields and are skipped, so this
     degrades gracefully on state files that predate MEM-154 rather than

@@ -54,7 +54,7 @@ def test_cli_help_documents_safe_reinstall_and_dangerous_force():
     cli = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "bin",
-        "memento-vault",
+        "almanac",
     )
 
     result = subprocess.run([cli, "help"], check=True, text=True, capture_output=True)
@@ -70,7 +70,7 @@ def test_cli_health_delegates_to_python_module(tmp_path):
     cli = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "bin",
-        "memento-vault",
+        "almanac",
     )
     vault = tmp_path / "vault"
     for dirname in ("notes", "fleeting", "projects", "archive"):
@@ -80,8 +80,8 @@ def test_cli_health_delegates_to_python_module(tmp_path):
     env["HOME"] = str(tmp_path / "home")
     env["XDG_CONFIG_HOME"] = str(tmp_path / "config")
     env["XDG_RUNTIME_DIR"] = str(tmp_path / "runtime")
-    env["MEMENTO_VAULT_PATH"] = str(vault)
-    env["MEMENTO_SEARCH_BACKEND"] = "grep"
+    env["ALMANAC_VAULT_PATH"] = str(vault)
+    env["ALMANAC_SEARCH_BACKEND"] = "grep"
 
     result = subprocess.run([cli, "health", "--json"], text=True, capture_output=True, env=env, timeout=10)
 
@@ -97,7 +97,7 @@ def test_noninteractive_force_requires_explicit_env():
         "install.sh",
     )
     env = os.environ.copy()
-    env.pop("MEMENTO_FORCE", None)
+    env.pop("ALMANAC_FORCE", None)
 
     result = subprocess.run([installer, "--force"], input="", text=True, capture_output=True, env=env, timeout=5)
 
@@ -123,44 +123,44 @@ def test_uninstall_removes_current_installed_payloads(tmp_path):
     home = tmp_path / "home"
     claude = home / ".claude"
     codex = home / ".codex"
-    (claude / "hooks" / "memento").mkdir(parents=True)
+    (claude / "hooks" / "almanac").mkdir(parents=True)
     (claude / "skills").mkdir(parents=True)
     (claude / "agents").mkdir(parents=True)
     (codex / "skills").mkdir(parents=True)
     for file in [
-        "memento-triage.py",
+        "almanac-triage.py",
         "vault-commit.sh",
-        "memento-sweeper.py",
+        "almanac-sweeper.py",
         "wait-and-commit.py",
         "_backfill_certainty.py",
-        "memento-remote-sync.py",
-        "memento_utils.py",
+        "almanac-remote-sync.py",
+        "almanac_utils.py",
         "vault-briefing.py",
         "vault-recall.py",
         "vault-tool-context.py",
-        "memento-inception.py",
+        "almanac-inception.py",
         "tenet_reranker.py",
     ]:
         (claude / "hooks" / file).write_text("installed")
-    (claude / "hooks" / "memento" / "pi_bridge.py").write_text("installed")
-    for skill in ["memento", "memento-defrag", "start-fresh", "continue-work", "inception", "orra-init"]:
+    (claude / "hooks" / "almanac" / "pi_bridge.py").write_text("installed")
+    for skill in ["almanac", "almanac-defrag", "start-fresh", "continue-work", "inception", "orra-init"]:
         (claude / "skills" / skill).mkdir()
-    for skill in ["memento", "memento-defrag", "start-fresh", "continue-work", "concierge", "inception"]:
+    for skill in ["almanac", "almanac-defrag", "start-fresh", "continue-work", "concierge", "inception"]:
         (codex / "skills" / skill).mkdir()
     (claude / "agents" / "concierge.md").write_text("installed")
-    (claude / "memento-remote.env").write_text("MEMENTO_VAULT_URL=x")
-    (claude / "mcp-servers.json").write_text(json.dumps({"memento-vault": {"command": "python3"}, "other": {}}))
+    (claude / "almanac-remote.env").write_text("ALMANAC_VAULT_URL=x")
+    (claude / "mcp-servers.json").write_text(json.dumps({"almanac": {"command": "python3"}, "other": {}}))
     (claude / "settings.json").write_text(json.dumps({"hooks": {}, "permissions": {"allow": []}}))
     bashrc = home / ".bashrc"
     bashrc.write_text(
         "# user content before\n"
         "# Warm QMD embedding model on shell startup (detached, silent)\n"
-        f"[ -x {repo}/bin/memento-vault ] && {repo}/bin/memento-vault warmup >/dev/null 2>&1\n"
+        f"[ -x {repo}/bin/almanac ] && {repo}/bin/almanac warmup >/dev/null 2>&1\n"
         "# user content after\n"
     )
     bin_dir = home / ".local" / "bin"
     bin_dir.mkdir(parents=True)
-    (bin_dir / "memento-vault").symlink_to(os.path.join(repo, "bin", "memento-vault"))
+    (bin_dir / "almanac").symlink_to(os.path.join(repo, "bin", "almanac"))
 
     env = os.environ.copy()
     env["HOME"] = str(home)
@@ -174,16 +174,16 @@ def test_uninstall_removes_current_installed_payloads(tmp_path):
     )
 
     assert result.returncode == 0, result.stderr
-    assert not (claude / "hooks" / "memento-triage.py").exists()
-    assert not (claude / "hooks" / "memento").exists()
+    assert not (claude / "hooks" / "almanac-triage.py").exists()
+    assert not (claude / "hooks" / "almanac").exists()
     assert not (claude / "skills" / "orra-init").exists()
     assert not (codex / "skills" / "concierge").exists()
     assert not (claude / "agents" / "concierge.md").exists()
-    assert not (claude / "memento-remote.env").exists()
-    assert not (bin_dir / "memento-vault").exists()
+    assert not (claude / "almanac-remote.env").exists()
+    assert not (bin_dir / "almanac").exists()
     assert json.loads((claude / "mcp-servers.json").read_text()) == {"other": {}}
     assert "Warm QMD embedding" not in bashrc.read_text()
-    assert "memento-vault warmup" not in bashrc.read_text()
+    assert "almanac warmup" not in bashrc.read_text()
     assert "# user content before" in bashrc.read_text()
     assert "# user content after" in bashrc.read_text()
 
@@ -209,8 +209,8 @@ set -euo pipefail
 export HOME={tmp_path}
 SCRIPT_DIR={repo}
 CLAUDE_DIR={tmp_path}/.claude
-VAULT_PATH={tmp_path}/memento
-CONFIG_DIR={tmp_path}/.config/memento-vault
+VAULT_PATH={tmp_path}/almanac
+CONFIG_DIR={tmp_path}/.config/almanac
 MANIFEST=$CONFIG_DIR/manifest.json
 NEW_VERSION=0.0.0
 FORCE=false
@@ -240,8 +240,8 @@ export HOME={tmp_path}
 export PATH=/usr/bin:/bin
 SCRIPT_DIR={repo}
 CLAUDE_DIR={tmp_path}/.claude
-VAULT_PATH={tmp_path}/memento
-CONFIG_DIR={tmp_path}/.config/memento-vault
+VAULT_PATH={tmp_path}/almanac
+CONFIG_DIR={tmp_path}/.config/almanac
 MANIFEST=$CONFIG_DIR/manifest.json
 NEW_VERSION=0.0.0
 FORCE=false
@@ -261,8 +261,6 @@ setup_cli >/dev/null
     link = tmp_path / ".local" / "bin" / "almanac"
     assert link.is_symlink()
     assert os.readlink(link) == os.path.join(repo, "bin", "almanac")
-
-    assert not (tmp_path / ".local" / "bin" / "memento-vault").exists()
 
     result = subprocess.run([str(link), "version"], check=True, text=True, capture_output=True)
     with open(os.path.join(repo, "VERSION")) as f:
@@ -286,8 +284,8 @@ set -euo pipefail
 export HOME={tmp_path}
 SCRIPT_DIR={repo}
 CLAUDE_DIR={tmp_path}/.claude
-VAULT_PATH={tmp_path}/memento
-CONFIG_DIR={tmp_path}/.config/memento-vault
+VAULT_PATH={tmp_path}/almanac
+CONFIG_DIR={tmp_path}/.config/almanac
 MANIFEST=$CONFIG_DIR/manifest.json
 NEW_VERSION=0.0.0
 FORCE=false
@@ -299,7 +297,7 @@ REMOTE_API_KEY=
 MANIFEST_FILES_JSON='{{}}'
 QMD_AVAILABLE=false
 source {repo}/lib/install-lib.sh >/dev/null
-repair_stale_headless_mcp_config {target} memento/llm.py
+repair_stale_headless_mcp_config {target} almanac/llm.py
 """
 
     result = subprocess.run(["bash", "-c", script], check=True, text=True, capture_output=True)
@@ -311,11 +309,11 @@ repair_stale_headless_mcp_config {target} memento/llm.py
     assert "Repaired stale headless Claude MCP config" in result.stdout
 
 
-def test_setup_cli_skips_when_cli_is_already_on_path(tmp_path):
+def test_setup_cli_links_checkout_when_another_cli_is_on_path(tmp_path):
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     existing_dir = tmp_path / "existing"
     existing_dir.mkdir()
-    existing = existing_dir / "memento-vault"
+    existing = existing_dir / "almanac"
     existing.write_text("#!/usr/bin/env bash\nexit 0\n")
     existing.chmod(0o755)
     script = f"""
@@ -324,8 +322,8 @@ export HOME={tmp_path}
 export PATH={existing_dir}:/usr/bin:/bin
 SCRIPT_DIR={repo}
 CLAUDE_DIR={tmp_path}/.claude
-VAULT_PATH={tmp_path}/memento
-CONFIG_DIR={tmp_path}/.config/memento-vault
+VAULT_PATH={tmp_path}/almanac
+CONFIG_DIR={tmp_path}/.config/almanac
 MANIFEST=$CONFIG_DIR/manifest.json
 NEW_VERSION=0.0.0
 FORCE=false
@@ -342,22 +340,24 @@ setup_cli >/dev/null
 
     subprocess.run(["bash", "-c", script], check=True, text=True, capture_output=True)
 
-    assert not (tmp_path / ".local" / "bin" / "memento-vault").exists()
+    link = tmp_path / ".local" / "bin" / "almanac"
+    assert link.is_symlink()
+    assert os.readlink(link) == os.path.join(repo, "bin", "almanac")
 
 
 def test_setup_cli_does_not_overwrite_regular_file(tmp_path):
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     bin_dir = tmp_path / ".local" / "bin"
     bin_dir.mkdir(parents=True)
-    existing = bin_dir / "memento-vault"
+    existing = bin_dir / "almanac"
     existing.write_text("custom")
     script = f"""
 set -euo pipefail
 export HOME={tmp_path}
 SCRIPT_DIR={repo}
 CLAUDE_DIR={tmp_path}/.claude
-VAULT_PATH={tmp_path}/memento
-CONFIG_DIR={tmp_path}/.config/memento-vault
+VAULT_PATH={tmp_path}/almanac
+CONFIG_DIR={tmp_path}/.config/almanac
 MANIFEST=$CONFIG_DIR/manifest.json
 NEW_VERSION=0.0.0
 FORCE=false
@@ -378,7 +378,7 @@ setup_cli >/dev/null
     assert existing.read_text() == "custom"
 
 
-def test_shell_warmup_snippet_uses_memento_cli_without_shell_job_control():
+def test_shell_warmup_snippet_uses_almanac_cli_without_shell_job_control():
     """The login-shell warmup must not own a background qmd job."""
     install_lib = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -388,7 +388,7 @@ def test_shell_warmup_snippet_uses_memento_cli_without_shell_job_control():
     with open(install_lib) as f:
         contents = f.read()
 
-    assert 'qmd vsearch "warmup" -c memento -n 1 &>/dev/null &' not in re.search(
+    assert 'qmd vsearch "warmup" -c almanac -n 1 &>/dev/null &' not in re.search(
         r"cat >> \"\$shell_rc\" << WARMUP_EOF\n(?P<body>.*?)\nWARMUP_EOF", contents, re.S
     ).group("body")
     assert 'local warmup_cli="$SCRIPT_DIR/bin/almanac"' in contents
@@ -400,7 +400,7 @@ def test_shell_warmup_upgrades_legacy_snippet_in_local_reinstall(tmp_path):
     shell_rc = tmp_path / ".zshrc"
     shell_rc.write_text(
         "# Warm QMD embedding model on shell startup (background, silent)\n"
-        'command -v qmd &>/dev/null && qmd vsearch "warmup" -c memento -n 1 &>/dev/null &\n'
+        'command -v qmd &>/dev/null && qmd vsearch "warmup" -c almanac -n 1 &>/dev/null &\n'
     )
     script = f"""
 set -euo pipefail
@@ -408,8 +408,8 @@ export HOME={tmp_path}
 export SHELL=/bin/zsh
 SCRIPT_DIR={repo}
 CLAUDE_DIR={tmp_path}/.claude
-VAULT_PATH={tmp_path}/memento
-CONFIG_DIR={tmp_path}/.config/memento-vault
+VAULT_PATH={tmp_path}/almanac
+CONFIG_DIR={tmp_path}/.config/almanac
 MANIFEST=$CONFIG_DIR/manifest.json
 NEW_VERSION=0.0.0
 FORCE=false
@@ -438,7 +438,7 @@ def test_shell_warmup_upgrades_legacy_snippet_even_in_remote_mode(tmp_path):
     shell_rc = tmp_path / ".zshrc"
     shell_rc.write_text(
         "# Warm QMD embedding model on shell startup (background, silent)\n"
-        'command -v qmd &>/dev/null && qmd vsearch "warmup" -c memento -n 1 &>/dev/null &\n'
+        'command -v qmd &>/dev/null && qmd vsearch "warmup" -c almanac -n 1 &>/dev/null &\n'
     )
     script = f"""
 set -euo pipefail
@@ -446,8 +446,8 @@ export HOME={tmp_path}
 export SHELL=/bin/zsh
 SCRIPT_DIR={repo}
 CLAUDE_DIR={tmp_path}/.claude
-VAULT_PATH={tmp_path}/memento
-CONFIG_DIR={tmp_path}/.config/memento-vault
+VAULT_PATH={tmp_path}/almanac
+CONFIG_DIR={tmp_path}/.config/almanac
 MANIFEST=$CONFIG_DIR/manifest.json
 NEW_VERSION=0.0.0
 FORCE=false
@@ -476,7 +476,7 @@ def test_shell_warmup_upgrades_inline_python_snippet(tmp_path):
     shell_rc = tmp_path / ".bashrc"
     shell_rc.write_text(
         "# Warm QMD embedding model on shell startup (detached, silent)\n"
-        'command -v python3 >/dev/null 2>&1 && python3 -c \'import shutil, subprocess; q = shutil.which("qmd"); q and subprocess.Popen([q, "vsearch", "warmup", "-c", "memento", "-n", "1"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)\' >/dev/null 2>&1\n'
+        'command -v python3 >/dev/null 2>&1 && python3 -c \'import shutil, subprocess; q = shutil.which("qmd"); q and subprocess.Popen([q, "vsearch", "warmup", "-c", "almanac", "-n", "1"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)\' >/dev/null 2>&1\n'
     )
     script = f"""
 set -euo pipefail
@@ -484,8 +484,8 @@ export HOME={tmp_path}
 export SHELL=/bin/bash
 SCRIPT_DIR={repo}
 CLAUDE_DIR={tmp_path}/.claude
-VAULT_PATH={tmp_path}/memento
-CONFIG_DIR={tmp_path}/.config/memento-vault
+VAULT_PATH={tmp_path}/almanac
+CONFIG_DIR={tmp_path}/.config/almanac
 MANIFEST=$CONFIG_DIR/manifest.json
 NEW_VERSION=0.0.0
 FORCE=false
@@ -508,11 +508,11 @@ setup_shell_warmup >/dev/null
     assert contents.count("Warm QMD embedding model") == 1
 
 
-def test_memento_vault_warmup_returns_success_without_qmd(tmp_path):
+def test_almanac_warmup_returns_success_without_qmd(tmp_path):
     cli = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "bin",
-        "memento-vault",
+        "almanac",
     )
     env = os.environ.copy()
     env["PATH"] = "/usr/bin:/bin"
@@ -524,11 +524,11 @@ def test_memento_vault_warmup_returns_success_without_qmd(tmp_path):
     assert result.stderr == ""
 
 
-def test_memento_vault_warmup_starts_qmd_detached(tmp_path):
+def test_almanac_warmup_starts_qmd_detached(tmp_path):
     cli = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "bin",
-        "memento-vault",
+        "almanac",
     )
     log = tmp_path / "qmd.log"
     qmd = tmp_path / "qmd"
@@ -546,7 +546,7 @@ def test_memento_vault_warmup_starts_qmd_detached(tmp_path):
         if log.exists():
             break
         time.sleep(0.05)
-    assert log.read_text().strip() == "vsearch warmup -c memento -n 1"
+    assert log.read_text().strip() == "vsearch warmup -c almanac -n 1"
 
 
 # ---------------------------------------------------------------------------
@@ -555,7 +555,7 @@ def test_memento_vault_warmup_starts_qmd_detached(tmp_path):
 
 
 class FakeMCPHandler(http.server.BaseHTTPRequestHandler):
-    """Minimal JSON-RPC handler that mimics memento-vault /mcp endpoint."""
+    """Minimal JSON-RPC handler that mimics almanac /mcp endpoint."""
 
     # Class-level controls for test scenarios
     fail_count = 0  # Number of requests to reject before succeeding
@@ -595,7 +595,7 @@ class FakeMCPHandler(http.server.BaseHTTPRequestHandler):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "serverInfo": {"name": "memento-vault", "version": "1.99.0"},
+                "serverInfo": {"name": "almanac", "version": "1.99.0"},
             },
         }
         payload = json.dumps(response).encode()
@@ -639,7 +639,7 @@ class TestWarmup:
     def test_warmup_succeeds_on_healthy_server(self, fake_mcp_server):
         rc, stdout, stderr = _run_helper("warmup", fake_mcp_server["url"], "")
         assert rc == 0
-        assert "OK memento-vault v1.99.0" in stdout
+        assert "OK almanac v1.99.0" in stdout
 
     def test_warmup_appends_mcp_path(self, fake_mcp_server):
         """URL without /mcp should get it appended automatically."""
@@ -700,30 +700,30 @@ class TestClearAuthCache:
         cache.write_text(
             json.dumps(
                 {
-                    "memento-vault": {"timestamp": 1234567890},
+                    "almanac": {"timestamp": 1234567890},
                     "other-server": {"timestamp": 9999999999},
                 }
             )
         )
 
-        rc, stdout, _ = _run_helper("clear-auth-cache", str(tmp_path), "memento-vault")
+        rc, stdout, _ = _run_helper("clear-auth-cache", str(tmp_path), "almanac")
         assert rc == 0
         assert "Cleared" in stdout
 
         data = json.loads(cache.read_text())
-        assert "memento-vault" not in data
+        assert "almanac" not in data
         assert "other-server" in data
 
     def test_no_op_when_entry_absent(self, tmp_path):
         cache = tmp_path / "mcp-needs-auth-cache.json"
         cache.write_text(json.dumps({"other-server": {"timestamp": 123}}))
 
-        rc, stdout, _ = _run_helper("clear-auth-cache", str(tmp_path), "memento-vault")
+        rc, stdout, _ = _run_helper("clear-auth-cache", str(tmp_path), "almanac")
         assert rc == 0
         assert "No stale cache" in stdout
 
     def test_no_op_when_file_missing(self, tmp_path):
-        rc, stdout, _ = _run_helper("clear-auth-cache", str(tmp_path), "memento-vault")
+        rc, stdout, _ = _run_helper("clear-auth-cache", str(tmp_path), "almanac")
         assert rc == 0
 
 
@@ -826,7 +826,7 @@ class TestMergeSettings:
         assert len(backups) == 1
         assert backups[0].read_text() == "{not json"
 
-    def test_existing_remote_prefix_updates_only_memento_owned_hooks(self, tmp_path):
+    def test_existing_remote_prefix_updates_only_almanac_owned_hooks(self, tmp_path):
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
         settings_path = claude_dir / "settings.json"
@@ -838,7 +838,7 @@ class TestMergeSettings:
                         "SessionEnd": [
                             {
                                 "hooks": [
-                                    {"type": "command", "command": f"python3 {claude_dir}/hooks/memento-triage.py"}
+                                    {"type": "command", "command": f"python3 {claude_dir}/hooks/almanac-triage.py"}
                                 ]
                             },
                             {"hooks": [{"type": "command", "command": user_hook}]},
@@ -847,7 +847,7 @@ class TestMergeSettings:
                 }
             )
         )
-        prefix = "bash -c 'set -a; . /tmp/memento-remote.env; set +a; exec \"$@\"' -- "
+        prefix = "bash -c 'set -a; . /tmp/almanac-remote.env; set +a; exec \"$@\"' -- "
 
         result = subprocess.run(
             [
@@ -869,10 +869,10 @@ class TestMergeSettings:
         merged = json.loads(settings_path.read_text())
         commands = [hook["command"] for entry in merged["hooks"]["SessionEnd"] for hook in entry.get("hooks", [entry])]
         assert prefix + f"python3 {claude_dir}/hooks/almanac-triage.py" in commands
-        assert not any("memento-triage.py" in command for command in commands)
+        assert sum("almanac-triage.py" in command for command in commands) == 1
         assert user_hook in commands
 
-    def test_uninstall_settings_removes_only_memento_hooks_and_permissions(self, tmp_path):
+    def test_uninstall_settings_removes_only_almanac_hooks_and_permissions(self, tmp_path):
         claude_dir = tmp_path / ".claude"
         claude_dir.mkdir()
         vault = tmp_path / "vault"
@@ -886,7 +886,7 @@ class TestMergeSettings:
                             {
                                 "matcher": "",
                                 "hooks": [
-                                    {"type": "command", "command": f"python3 {claude_dir}/hooks/memento-triage.py"},
+                                    {"type": "command", "command": f"python3 {claude_dir}/hooks/almanac-triage.py"},
                                     {"type": "command", "command": user_hook},
                                 ],
                             }

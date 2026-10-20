@@ -566,7 +566,6 @@ def _is_concrete_query(text: str) -> bool:
             "schema",
             "manifest",
             "almanac.yml",
-            "memento.yml",
             "pyproject.toml",
             "workflow.md",
             "readme.md",

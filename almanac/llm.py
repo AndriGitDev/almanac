@@ -15,9 +15,9 @@ from urllib import request
 from almanac.config import get_config
 
 
-# Environment marker set on every headless LLM CLI child memento spawns (see
+# Environment marker set on every headless LLM CLI child almanac spawns (see
 # _run_cli). A `claude --print` child starts a fresh Claude Code session, which
-# re-fires memento's SessionStart/UserPromptSubmit/SessionEnd hooks. Those hooks
+# re-fires almanac's SessionStart/UserPromptSubmit/SessionEnd hooks. Those hooks
 # run agentic retrieval and triage synthesis, which spawn another LLM child,
 # which fires the hooks again — an unbounded fork bomb that pins every core.
 # Hooks check in_llm_subprocess() and no-op when this is set, breaking the loop.
@@ -26,7 +26,7 @@ LLM_SUBPROCESS_ENV = "ALMANAC_LLM_CHILD"
 
 def in_llm_subprocess() -> bool:
     """True when running inside an Almanac LLM CLI child process."""
-    return os.environ.get(LLM_SUBPROCESS_ENV) == "1" or os.environ.get("MEMENTO_LLM_CHILD") == "1"
+    return os.environ.get(LLM_SUBPROCESS_ENV) == "1" or os.environ.get("ALMANAC_LLM_CHILD") == "1"
 
 
 def _llm_child_env() -> dict:
@@ -220,7 +220,7 @@ def _claude_complete(prompt, model=None, timeout=30, bare=False):
     # Pass the prompt over stdin instead of argv. Large transcripts (>~2MB)
     # overflow ARG_MAX and raise OSError("Argument list too long"); stdin has
     # no such ceiling.
-    # Headless memento prompts are text-in/JSON-out. Do not inherit a user's
+    # Headless almanac prompts are text-in/JSON-out. Do not inherit a user's
     # interactive auto-permission toolbelt: SessionEnd runs detached after the
     # human has left, so tool side effects would be surprising and hard to stop.
     # Disable built-in tools and inherited MCP servers, with a denylist as
@@ -285,13 +285,13 @@ def _pi_complete(prompt, model=None, timeout=30):
     # `pi` is the local coding-agent CLI (https://pi.dev) that already routes
     # to cheap models via provider/model patterns like
     # "openrouter/deepseek/deepseek-v4-pro" (see WORKFLOW.md's model_routing
-    # table). Note: this is unrelated to memento/pi_bridge.py, which is the
-    # reverse direction -- the pi runtime embedding memento as an extension.
+    # table). Note: this is unrelated to almanac/pi_bridge.py, which is the
+    # reverse direction -- the pi runtime embedding almanac as an extension.
     # Same ARG_MAX hazard as codex/gemini: keep the prompt off argv, over
     # stdin. -p/--print makes it process-and-exit instead of interactive;
     # --no-tools/--no-session/--no-* strip pi's own agentic toolbelt and
     # session persistence so this is a bare text-in/text-out completion, not
-    # an agent run (memento's own retrieval_agent drives its own tool loop
+    # an agent run (almanac's own retrieval_agent drives its own tool loop
     # over this text contract).
     cmd = [
         "pi",

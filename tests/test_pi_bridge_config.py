@@ -6,8 +6,8 @@ import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CONFIG_MODULE = (REPO_ROOT / "extensions" / "memento-config.js").as_uri()
-STATUS_HELPER_MODULE = (REPO_ROOT / "extensions" / "memento-status.js").as_uri()
+CONFIG_MODULE = (REPO_ROOT / "extensions" / "almanac-config.js").as_uri()
+STATUS_HELPER_MODULE = (REPO_ROOT / "extensions" / "almanac-status.js").as_uri()
 
 
 def _run_node_load_config(cwd: Path, home: Path, env_overrides: dict[str, str] | None = None) -> dict:
@@ -76,21 +76,21 @@ console.log(JSON.stringify(payload));
 def test_pi_bridge_config_layers_files_and_env_over_defaults(tmp_path):
     home = tmp_path / "home"
     project = tmp_path / "project"
-    config_home = home / ".config" / "memento-vault"
+    config_home = home / ".config" / "almanac"
     config_home.mkdir(parents=True)
     project_pi = project / ".pi"
     project_pi.mkdir(parents=True)
     project.mkdir(exist_ok=True)
 
     (config_home / "pi-bridge.json").write_text(
-        json.dumps({"memento": {"piBridge": {"briefing": False, "toolContext": False, "autoCapture": False}}})
+        json.dumps({"almanac": {"piBridge": {"briefing": False, "toolContext": False, "autoCapture": False}}})
     )
     (project_pi / "settings.json").write_text(
         json.dumps({"piBridge": {"autoCapture": True, "processQueueOnSessionClose": True}})
     )
-    (project / "package.json").write_text(json.dumps({"memento": {"piBridge": {"promptRecall": False}}}))
+    (project / "package.json").write_text(json.dumps({"almanac": {"piBridge": {"promptRecall": False}}}))
 
-    payload = _run_node_load_config(project, home, {"MEMENTO_PI_TOOL_CONTEXT": "true"})
+    payload = _run_node_load_config(project, home, {"ALMANAC_PI_TOOL_CONTEXT": "true"})
     config = payload["config"]
 
     assert config["briefing"] is False

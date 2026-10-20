@@ -9,7 +9,7 @@
 set -euo pipefail
 
 MODEL_ID="cross-encoder/ms-marco-MiniLM-L-6-v2"
-CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/memento-vault/models/minilm-l6-v2"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/almanac/models/minilm-l6-v2"
 
 echo "Downloading ${MODEL_ID} to ${CACHE_DIR}..."
 mkdir -p "${CACHE_DIR}"

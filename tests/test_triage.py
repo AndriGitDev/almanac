@@ -1,4 +1,4 @@
-"""Tests for memento-triage: parse_transcript, is_substantial, write_fleeting."""
+"""Tests for almanac-triage: parse_transcript, is_substantial, write_fleeting."""
 
 import importlib.util
 import json
@@ -9,15 +9,15 @@ from unittest.mock import patch
 
 import pytest
 
-from memento.llm import LLMResult
+from almanac.llm import LLMResult
 
-# Import memento-triage.py (hyphenated filename)
+# Import almanac-triage.py (hyphenated filename)
 _spec = importlib.util.spec_from_file_location(
-    "memento_triage",
-    str(Path(__file__).parent.parent / "hooks" / "memento-triage.py"),
+    "almanac_triage",
+    str(Path(__file__).parent.parent / "hooks" / "almanac-triage.py"),
 )
 _mod = importlib.util.module_from_spec(_spec)
-sys.modules["memento_triage"] = _mod
+sys.modules["almanac_triage"] = _mod
 _spec.loader.exec_module(_mod)
 
 parse_transcript = _mod.parse_transcript
@@ -26,7 +26,7 @@ write_fleeting = _mod.write_fleeting
 append_session_to_project = _mod.append_session_to_project
 process_structured_notes = _mod.process_structured_notes
 run_structured_notes_worker = _mod._run_structured_notes_worker
-spawn_memento_agent = _mod.spawn_memento_agent
+spawn_almanac_agent = _mod.spawn_almanac_agent
 sentinel_path = _mod._sentinel_path
 run_remote_triage = _mod.run_remote_triage
 retry_local_extractions = _mod.retry_local_extractions
@@ -36,9 +36,9 @@ recover_dead_letter_extractions = _mod.recover_dead_letter_extractions
 @pytest.fixture(autouse=True)
 def _smart_store_patches(monkeypatch):
     """Patch smart_store dependencies so tests don't hit real backends."""
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda *a, **kw: _mod.get_vault())
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *a, **kw: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda *a, **kw: _mod.get_vault())
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *a, **kw: {})
 
 
 def _write_transcript(tmp_path, entries):
@@ -244,7 +244,7 @@ class TestParseTranscript:
         assert meta["exchange_count"] == 1
         assert meta["user_messages"] == 1
         assert len(meta["files_read"]) == 5
-        with patch("memento_triage.get_config", return_value=_DEFAULT_CONFIG):
+        with patch("almanac_triage.get_config", return_value=_DEFAULT_CONFIG):
             assert is_substantial(meta) is False
 
 
@@ -260,7 +260,7 @@ _DEFAULT_CONFIG = {
 
 class TestIsSubstantial:
     def _with_config(self, meta):
-        with patch("memento_triage.get_config", return_value=_DEFAULT_CONFIG):
+        with patch("almanac_triage.get_config", return_value=_DEFAULT_CONFIG):
             return is_substantial(meta)
 
     def test_high_exchange_count(self):
@@ -327,7 +327,7 @@ class TestIsSubstantial:
 
 class TestWriteFleeting:
     def test_includes_outcome(self, tmp_vault):
-        with patch("memento_triage.get_vault", return_value=tmp_vault):
+        with patch("almanac_triage.get_vault", return_value=tmp_vault):
             meta = {
                 "cwd": "/home/user/project",
                 "git_branch": "main",
@@ -344,7 +344,7 @@ class TestWriteFleeting:
         assert "→ Fixed the null pointer." in content
 
     def test_no_outcome(self, tmp_vault):
-        with patch("memento_triage.get_vault", return_value=tmp_vault):
+        with patch("almanac_triage.get_vault", return_value=tmp_vault):
             meta = {
                 "cwd": "/home/user/project",
                 "git_branch": "main",
@@ -421,8 +421,8 @@ class TestProcessStructuredNotes:
             return LLMResult(text=llm_payload, ok=True, error=None)
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", side_effect=_llm_complete),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", side_effect=_llm_complete),
         ):
             written = process_structured_notes("ses_open", str(transcript), meta, "api-service")
 
@@ -470,8 +470,8 @@ class TestProcessStructuredNotes:
             return LLMResult(text="[]", ok=True, error=None)
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", side_effect=_llm_complete),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", side_effect=_llm_complete),
         ):
             process_structured_notes("ses_target", str(transcript), meta, "api-service")
 
@@ -504,8 +504,8 @@ class TestProcessStructuredNotes:
         )
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)),
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -547,14 +547,14 @@ class TestProcessStructuredNotes:
             return LLMResult(text="[]", ok=True, error=None)
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", side_effect=_llm_complete),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", side_effect=_llm_complete),
             patch(
-                "memento_triage.get_config",
+                "almanac_triage.get_config",
                 return_value={"triage_transcript_max_chars": 50_000},
             ),
             patch(
-                "memento_triage.log_triage_health",
+                "almanac_triage.log_triage_health",
                 side_effect=lambda action, **kw: health_events.append((action, kw)),
             ),
         ):
@@ -591,8 +591,8 @@ class TestProcessStructuredNotes:
             return LLMResult(text="[]", ok=True, error=None)
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", side_effect=_llm_complete),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", side_effect=_llm_complete),
         ):
             process_structured_notes("sess-small", str(transcript), meta, "api-service")
 
@@ -613,13 +613,13 @@ class TestProcessStructuredNotes:
         health_events = []
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
             patch(
-                "memento_triage.llm_complete",
+                "almanac_triage.llm_complete",
                 return_value=LLMResult(text="", ok=False, error="Prompt is too long"),
             ),
             patch(
-                "memento_triage.log_triage_health",
+                "almanac_triage.log_triage_health",
                 side_effect=lambda action, **kw: health_events.append((action, kw)),
             ),
         ):
@@ -656,8 +656,8 @@ class TestProcessStructuredNotes:
         )
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)),
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -678,8 +678,8 @@ class TestProcessStructuredNotes:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="not json", ok=True, error=None)),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="not json", ok=True, error=None)),
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -699,9 +699,9 @@ class TestProcessStructuredNotes:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="not json", ok=True, error=None)),
-            patch("memento_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="not json", ok=True, error=None)),
+            patch("almanac_triage.log_retrieval") as mock_log,
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -723,16 +723,16 @@ class TestStructuredNotesWorker:
                 {
                     "session_id": "sess-123",
                     "transcript_path": "/tmp/transcript.jsonl",
-                    "meta": {"cwd": "/home/vic/Projects/memento-vault", "git_branch": "main"},
-                    "project_slug": "memento-vault",
+                    "meta": {"cwd": "/home/vic/Projects/almanac", "git_branch": "main"},
+                    "project_slug": "almanac",
                 }
             )
         )
         sentinel = tmp_path / "done.sentinel"
 
         with (
-            patch("memento_triage.process_structured_notes", side_effect=RuntimeError("codex worker boom")),
-            patch("memento_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.process_structured_notes", side_effect=RuntimeError("codex worker boom")),
+            patch("almanac_triage.log_retrieval") as mock_log,
         ):
             run_structured_notes_worker(str(payload), str(sentinel))
 
@@ -742,7 +742,7 @@ class TestStructuredNotesWorker:
             "structured_notes_failed",
             session_id="sess-123",
             error="codex worker boom",
-            project="memento-vault",
+            project="almanac",
         )
 
     def test_worker_logs_empty_result_from_process_structured_notes(self, tmp_path):
@@ -752,16 +752,16 @@ class TestStructuredNotesWorker:
                 {
                     "session_id": "sess-123",
                     "transcript_path": "/tmp/transcript.jsonl",
-                    "meta": {"cwd": "/home/vic/Projects/memento-vault", "git_branch": "main"},
-                    "project_slug": "memento-vault",
+                    "meta": {"cwd": "/home/vic/Projects/almanac", "git_branch": "main"},
+                    "project_slug": "almanac",
                 }
             )
         )
         sentinel = tmp_path / "done.sentinel"
 
         with (
-            patch("memento_triage.process_structured_notes", return_value=0),
-            patch("memento_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.process_structured_notes", return_value=0),
+            patch("almanac_triage.log_retrieval") as mock_log,
         ):
             run_structured_notes_worker(str(payload), str(sentinel))
 
@@ -770,12 +770,12 @@ class TestStructuredNotesWorker:
             "triage",
             "structured_notes_empty",
             session_id="sess-123",
-            project="memento-vault",
+            project="almanac",
         )
 
 
-class TestSpawnMementoAgent:
-    def test_spawn_memento_agent_uses_devnull_stdin(self, tmp_vault, tmp_path):
+class TestSpawnAlmanacAgent:
+    def test_spawn_almanac_agent_uses_devnull_stdin(self, tmp_vault, tmp_path):
         transcript = tmp_path / "transcript.jsonl"
         transcript.write_text(json.dumps(_user_msg("Figure out the cache bug")) + "\n")
         meta = {
@@ -788,10 +788,10 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.subprocess.Popen") as mock_popen,
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.subprocess.Popen") as mock_popen,
         ):
-            spawn_memento_agent("sess-1234", str(transcript), meta, "api-service")
+            spawn_almanac_agent("sess-1234", str(transcript), meta, "api-service")
 
         assert mock_popen.call_args.kwargs["stdin"] == _mod.subprocess.DEVNULL
 
@@ -808,8 +808,8 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="boom")),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="boom")),
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -829,10 +829,10 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
-            patch("memento_triage.log_retrieval") as mock_log,
-            patch("memento_triage.log_triage_health") as mock_health,
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
+            patch("almanac_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.log_triage_health") as mock_health,
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -865,8 +865,8 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -906,14 +906,14 @@ class TestSpawnMementoAgent:
         )
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
         ):
             process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text=payload, ok=True, error=None)),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text=payload, ok=True, error=None)),
         ):
             results = retry_local_extractions(tmp_vault, limit=10)
 
@@ -923,8 +923,8 @@ class TestSpawnMementoAgent:
         assert "session_id: sess-123" in note.read_text()
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text=payload, ok=True, error=None)),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text=payload, ok=True, error=None)),
         ):
             assert retry_local_extractions(tmp_vault, limit=10) == []
         assert sorted(path.name for path in (tmp_vault / "notes").glob("redis-cache-keys-need-explicit-ttl*.md")) == [
@@ -944,12 +944,12 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
             patch(
-                "memento_triage.get_config",
+                "almanac_triage.get_config",
                 return_value={"local_extraction_retry_max_attempts": 2, "triage_transcript_max_chars": 400_000},
             ),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
         ):
             process_structured_notes("sess-123", str(transcript), meta, "api-service")
             results = retry_local_extractions(tmp_vault, limit=10)
@@ -960,8 +960,8 @@ class TestSpawnMementoAgent:
 
         # Normal retry must skip dead-lettered entries.
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="still broken")),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="still broken")),
         ):
             assert retry_local_extractions(tmp_vault, limit=10) == []
 
@@ -991,12 +991,12 @@ class TestSpawnMementoAgent:
 
         # Create a dead-lettered entry (max_attempts=1 ensures immediate dead-letter).
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
             patch(
-                "memento_triage.get_config",
+                "almanac_triage.get_config",
                 return_value={"local_extraction_retry_max_attempts": 1, "triage_transcript_max_chars": 400_000},
             ),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
         ):
             process_structured_notes("sess-456", str(transcript), meta, "api-service")
             results = retry_local_extractions(tmp_vault, limit=10)
@@ -1004,8 +1004,8 @@ class TestSpawnMementoAgent:
 
         # Recovery with successful LLM must re-attempt and succeed.
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text=payload, ok=True, error=None)),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text=payload, ok=True, error=None)),
         ):
             recovered = recover_dead_letter_extractions(tmp_vault, limit=10)
         assert recovered[-1]["status"] == "ok"
@@ -1014,8 +1014,8 @@ class TestSpawnMementoAgent:
 
         # Once recovered, no dead-letters remain for this source.
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text=payload, ok=True, error=None)),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text=payload, ok=True, error=None)),
         ):
             assert recover_dead_letter_extractions(tmp_vault, limit=10) == []
 
@@ -1033,12 +1033,12 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
             patch(
-                "memento_triage.get_config",
+                "almanac_triage.get_config",
                 return_value={"local_extraction_retry_max_attempts": 1, "triage_transcript_max_chars": 400_000},
             ),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
         ):
             process_structured_notes("sess-789", str(transcript), meta, "api-service")
             results = retry_local_extractions(tmp_vault, limit=10)
@@ -1047,8 +1047,8 @@ class TestSpawnMementoAgent:
 
         # Recovery with failed LLM must not change attempt counter and stay dead-letter.
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="still failing")),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="still failing")),
         ):
             recovered = recover_dead_letter_extractions(tmp_vault, limit=10)
         assert recovered[-1]["status"] == "dead-letter"
@@ -1068,19 +1068,19 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
             patch(
-                "memento_triage.get_config",
+                "almanac_triage.get_config",
                 return_value={"local_extraction_retry_max_attempts": 1, "triage_transcript_max_chars": 400_000},
             ),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
         ):
             process_structured_notes("sess-miss", str(transcript), meta, "api-service")
             results = retry_local_extractions(tmp_vault, limit=10)
         assert results[-1]["status"] == "dead-letter"
 
         # Corrupt the spool path in the ledger so the payload is missing.
-        from memento import sync_ledger
+        from almanac import sync_ledger
 
         sources = sync_ledger.dead_letters(tmp_vault)
         for entry in sources:
@@ -1089,8 +1089,8 @@ class TestSpawnMementoAgent:
                 Path(spool).unlink(missing_ok=True)
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="not called")),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="not called")),
         ):
             results = recover_dead_letter_extractions(tmp_vault, limit=10)
         assert results[-1]["status"] == "dead-letter"
@@ -1111,9 +1111,9 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
-            patch("memento_triage.log_triage_health") as mock_health,
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text="", ok=False, error="codex timed out")),
+            patch("almanac_triage.log_triage_health") as mock_health,
         ):
             written = process_structured_notes("pi-sess-123", str(transcript), meta, "api-service")
 
@@ -1125,7 +1125,7 @@ class TestSpawnMementoAgent:
         kwargs = pi_health_calls[0].kwargs
         assert kwargs["hook"] == "pi-bridge"
         assert kwargs["operation"] == "triage"
-        assert kwargs["backend"] == "memento-triage.py"
+        assert kwargs["backend"] == "almanac-triage.py"
         assert kwargs["agent"] == "pi"
         assert kwargs["session_id"] == "pi-sess-123"
         assert kwargs["transcript_path"] == str(transcript)
@@ -1156,10 +1156,10 @@ class TestSpawnMementoAgent:
         )
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)),
-            patch("memento_triage.acquire_vault_write_lock", return_value=False),
-            patch("memento_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)),
+            patch("almanac_triage.acquire_vault_write_lock", return_value=False),
+            patch("almanac_triage.log_retrieval") as mock_log,
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -1196,8 +1196,8 @@ class TestSpawnMementoAgent:
         )
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)),
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -1228,8 +1228,8 @@ class TestSpawnMementoAgent:
             return LLMResult(text="[]", ok=True, error=None)
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", side_effect=mock_llm),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", side_effect=mock_llm),
         ):
             process_structured_notes("sess-123", str(transcript), meta, "api-service")
 
@@ -1247,8 +1247,8 @@ class TestSpawnMementoAgent:
         }
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.log_retrieval") as mock_log,
         ):
             written = process_structured_notes("sess-123", "/nonexistent/transcript.jsonl", meta, "api-service")
 
@@ -1277,10 +1277,10 @@ class TestMainHealthLogging:
 
         with (
             patch(
-                "memento_triage.read_hook_input",
+                "almanac_triage.read_hook_input",
                 return_value={"session_id": "unknown", "transcript_path": str(transcript)},
             ),
-            patch("memento_triage.parse_transcript", return_value=meta) as mock_parse,
+            patch("almanac_triage.parse_transcript", return_value=meta) as mock_parse,
         ):
             try:
                 _mod.main()
@@ -1295,12 +1295,12 @@ class TestMainHealthLogging:
 
         with (
             patch(
-                "memento_triage.read_hook_input",
+                "almanac_triage.read_hook_input",
                 return_value={"session_id": "sess-parse", "transcript_path": str(transcript)},
             ),
-            patch("memento_triage.parse_transcript", side_effect=RuntimeError("bad transcript")),
-            patch("memento_triage.log_retrieval") as mock_log,
-            patch("memento_triage.log_triage_health") as mock_health,
+            patch("almanac_triage.parse_transcript", side_effect=RuntimeError("bad transcript")),
+            patch("almanac_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.log_triage_health") as mock_health,
         ):
             try:
                 _mod.main()
@@ -1316,13 +1316,13 @@ class TestMainHealthLogging:
 
         with (
             patch(
-                "memento_triage.read_hook_input",
+                "almanac_triage.read_hook_input",
                 return_value={"transcript_path": str(transcript), "cwd": "/repo"},
             ),
-            patch("memento_triage.parse_transcript", side_effect=RuntimeError("bad pi transcript")),
-            patch("memento_triage.log_retrieval"),
-            patch("memento_triage.log_triage_health") as mock_health,
-            patch.dict("memento_triage.os.environ", {"MEMENTO_AGENT": "pi"}),
+            patch("almanac_triage.parse_transcript", side_effect=RuntimeError("bad pi transcript")),
+            patch("almanac_triage.log_retrieval"),
+            patch("almanac_triage.log_triage_health") as mock_health,
+            patch.dict("almanac_triage.os.environ", {"ALMANAC_AGENT": "pi"}),
         ):
             try:
                 _mod.main()
@@ -1334,7 +1334,7 @@ class TestMainHealthLogging:
             "pi_parse_transcript_failed",
             hook="pi-bridge",
             operation="triage",
-            backend="memento-triage.py",
+            backend="almanac-triage.py",
             agent="pi",
             session_id="unknown",
             cwd="/repo",
@@ -1345,7 +1345,7 @@ class TestMainHealthLogging:
         )
 
     def test_sentinel_path_sanitizes_path_like_session_ids(self, tmp_vault):
-        with patch("memento_triage.get_vault", return_value=tmp_vault):
+        with patch("almanac_triage.get_vault", return_value=tmp_vault):
             sentinel = sentinel_path("/Users/vic/.pi/agent/sessions/session.jsonl")
 
         assert sentinel.parent == tmp_vault / ".agent-done"
@@ -1358,17 +1358,17 @@ class TestMainHealthLogging:
                 {
                     "session_id": "sess-123",
                     "transcript_path": "/tmp/transcript.jsonl",
-                    "meta": {"cwd": "/home/vic/Projects/memento-vault", "git_branch": "main"},
-                    "project_slug": "memento-vault",
+                    "meta": {"cwd": "/home/vic/Projects/almanac", "git_branch": "main"},
+                    "project_slug": "almanac",
                 }
             )
         )
         sentinel = tmp_path / "done.sentinel"
 
         with (
-            patch("memento_triage.process_structured_notes", return_value=0),
-            patch("memento_triage.log_retrieval") as mock_log,
-            patch("memento_triage.log_triage_health") as mock_health,
+            patch("almanac_triage.process_structured_notes", return_value=0),
+            patch("almanac_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.log_triage_health") as mock_health,
         ):
             run_structured_notes_worker(str(payload), str(sentinel))
 
@@ -1377,7 +1377,7 @@ class TestMainHealthLogging:
             "triage",
             "structured_notes_empty",
             session_id="sess-123",
-            project="memento-vault",
+            project="almanac",
         )
         assert not any(call.args[0] == "structured_notes_empty" for call in mock_health.call_args_list)
 
@@ -1387,8 +1387,8 @@ class TestMainHealthLogging:
         sentinel = tmp_path / "done.sentinel"
 
         with (
-            patch("memento_triage.log_retrieval") as mock_log,
-            patch("memento_triage.log_triage_health") as mock_health,
+            patch("almanac_triage.log_retrieval") as mock_log,
+            patch("almanac_triage.log_triage_health") as mock_health,
         ):
             run_structured_notes_worker(str(payload), str(sentinel))
 
@@ -1417,7 +1417,7 @@ class TestRemoteTriage:
             "last_outcome": "Done.",
         }
 
-        with patch("memento_triage.parse_transcript", return_value=meta) as mock_parse:
+        with patch("almanac_triage.parse_transcript", return_value=meta) as mock_parse:
             run_remote_triage({"session_id": "unknown", "transcript_path": str(transcript)})
 
         assert mock_parse.call_args.kwargs["session_id"] is None
@@ -1437,8 +1437,8 @@ class TestRemoteTriage:
         }
 
         with (
-            patch("memento_triage.parse_transcript", return_value=meta),
-            patch("memento.remote_client.capture", return_value={"ok": True}) as mock_capture,
+            patch("almanac_triage.parse_transcript", return_value=meta),
+            patch("almanac.remote_client.capture", return_value={"ok": True}) as mock_capture,
         ):
             run_remote_triage({"session_id": "ses_open", "transcript_path": str(transcript)})
 
@@ -1472,10 +1472,10 @@ class TestTriageLlmTelemetry:
         )
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=failed),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=failed),
             patch(
-                "memento_triage.log_triage_health",
+                "almanac_triage.log_triage_health",
                 side_effect=lambda action, **kw: health_events.append((action, kw)),
             ),
         ):
@@ -1520,10 +1520,10 @@ class TestTriageLlmTelemetry:
         health_events = []
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=ok),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=ok),
             patch(
-                "memento_triage.log_triage_health",
+                "almanac_triage.log_triage_health",
                 side_effect=lambda action, **kw: health_events.append((action, kw)),
             ),
         ):
@@ -1564,10 +1564,10 @@ class TestTriageLlmTelemetry:
         health_events = []
 
         with (
-            patch("memento_triage.get_vault", return_value=tmp_vault),
-            patch("memento_triage.llm_complete", return_value=ok_but_unparseable),
+            patch("almanac_triage.get_vault", return_value=tmp_vault),
+            patch("almanac_triage.llm_complete", return_value=ok_but_unparseable),
             patch(
-                "memento_triage.log_triage_health",
+                "almanac_triage.log_triage_health",
                 side_effect=lambda action, **kw: health_events.append((action, kw)),
             ),
         ):

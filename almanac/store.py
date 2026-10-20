@@ -539,7 +539,7 @@ def durability_tier(frontmatter, now=None, *, hot_window_days=None):
 
     Certainty keeps meaning "how sure this is true"; it no longer confers
     decay immunity on its own. This is the one pure, side-effect-free
-    computation that decides what *does*: :func:`memento.search.apply_temporal_decay`
+    computation that decides what *does*: :func:`almanac.search.apply_temporal_decay`
     treats ``pinned``/``hot`` as decay-immune and lets ``warm``/``cold`` decay
     normally (a certainty-5 note nobody has looked at in 90 days sinks like
     any other). MEM-152's archive sweep is expected to reuse this same
@@ -589,7 +589,7 @@ def read_durability_tier(vault, rel_path, config=None, now=None):
     """Read a note's frontmatter off disk and compute its durability tier.
 
     Thin file-I/O wrapper around the pure :func:`durability_tier` so callers
-    (``memento.search.apply_temporal_decay``, and MEM-152's archive sweep)
+    (``almanac.search.apply_temporal_decay``, and MEM-152's archive sweep)
     don't each duplicate the read. ``vault`` may be a path-like or ``Path``;
     ``rel_path`` is vault-relative (e.g. ``"notes/example.md"``). Tolerates
     the same missing/unreadable/traversal cases
@@ -904,9 +904,9 @@ def append_project_session_line(content, line):
     mem-156-through-166-track-the-retrieval-surface-plan -- it is retired
     at :func:`update_project_index` (that call site no longer invokes this
     function at all; ``## Recent activity`` in a regenerated hub,
-    :func:`memento.hub.regenerate_project_hub`, is the bounded replacement).
-    This function itself is left unchanged, since ``memento/mcp_server.py``'s
-    fleeting-only capture path and ``hooks/memento-triage.py``'s
+    :func:`almanac.hub.regenerate_project_hub`, is the bounded replacement).
+    This function itself is left unchanged, since ``almanac/mcp_server.py``'s
+    fleeting-only capture path and ``hooks/almanac-triage.py``'s
     ``append_session_to_project`` still call it directly for their own
     session markers -- retiring those call sites is a follow-up, not part of
     this slice.
@@ -1380,12 +1380,12 @@ def _write_text_atomic(target, text):
 
 
 # split_frontmatter() and the _frontmatter_*() typed accessors below are thin
-# delegating wrappers over memento.frontmatter (MEM-166 consolidated the
-# hand-rolled parsers that used to live here, in memento.graph, memento.query,
-# and memento.contradictions into that one shared module). Re-exported here
+# delegating wrappers over almanac.frontmatter (MEM-166 consolidated the
+# hand-rolled parsers that used to live here, in almanac.graph, almanac.query,
+# and almanac.contradictions into that one shared module). Re-exported here
 # under their original names so every existing call site --
-# `from almanac.store import split_frontmatter`, `memento.store._frontmatter_scalar`,
-# etc. across memento/ and hooks/ -- keeps working unchanged.
+# `from almanac.store import split_frontmatter`, `almanac.store._frontmatter_scalar`,
+# etc. across almanac/ and hooks/ -- keeps working unchanged.
 split_frontmatter = frontmatter_module.split_frontmatter
 
 
@@ -1429,24 +1429,24 @@ _CITATION_FRONTMATTER_KEYS = {"citation_stale"}
 
 
 def _frontmatter_scalar(frontmatter, key):
-    """Thin delegating wrapper -- see :func:`memento.frontmatter.get_scalar` (MEM-166)."""
+    """Thin delegating wrapper -- see :func:`almanac.frontmatter.get_scalar` (MEM-166)."""
     return frontmatter_module.get_scalar(frontmatter, key)
 
 
 def _frontmatter_int(frontmatter, key):
-    """Thin delegating wrapper -- see :func:`memento.frontmatter.get_int` (MEM-166)."""
+    """Thin delegating wrapper -- see :func:`almanac.frontmatter.get_int` (MEM-166)."""
     return frontmatter_module.get_int(frontmatter, key)
 
 
 def _frontmatter_bool(frontmatter, key):
-    """Thin delegating wrapper -- see :func:`memento.frontmatter.get_bool` (MEM-166)."""
+    """Thin delegating wrapper -- see :func:`almanac.frontmatter.get_bool` (MEM-166)."""
     return frontmatter_module.get_bool(frontmatter, key)
 
 
 def _unmanaged_frontmatter_lines(frontmatter, managed_keys=None):
     """Return raw frontmatter lines for keys ``managed_keys`` does not cover.
 
-    Thin delegating wrapper over :func:`memento.frontmatter.unmanaged_lines`
+    Thin delegating wrapper over :func:`almanac.frontmatter.unmanaged_lines`
     (MEM-166) that keeps this module's historical default: ``managed_keys``
     defaults to ``_MANAGED_NOTE_FRONTMATTER_KEYS`` (the write-path contract
     fields) — this is what ``replace_note_at_path`` uses to round-trip
@@ -1664,7 +1664,7 @@ def fold_access_log_into_frontmatter(vault_path, *, lock_file=None):
     the fold with no new access-log entries is a no-op, and entries that
     share a timestamp with the cursor are never double-counted.
 
-    Only call this from a periodic trigger (e.g. hooks/memento-sweeper.py's
+    Only call this from a periodic trigger (e.g. hooks/almanac-sweeper.py's
     ``main()``) — never inline on every ``record_access``, which would
     rewrite notes (and dirty git) on every recall.
 
@@ -1756,11 +1756,11 @@ def append_stale_citation_review(note_path, citations, *, queue_path=None, check
     """Queue one note for citation-staleness supersession review (MEM-162).
 
     Called from the inject-time verification path
-    (``memento.retrieval_policy``/the tool-context path) when a selected
+    (``almanac.retrieval_policy``/the tool-context path) when a selected
     note's cited anchor no longer appears in its file. Never rewrites the
     note inline -- this only appends a JSONL line to a runtime-dir queue;
     :func:`fold_stale_citations_into_frontmatter` (run periodically from
-    ``hooks/memento-sweeper.py``) is the only writer that turns queued
+    ``hooks/almanac-sweeper.py``) is the only writer that turns queued
     entries into durable ``citation_stale: true`` frontmatter.
 
     Best-effort like ``log_retrieval``: a write failure warns once (via
@@ -2032,14 +2032,14 @@ def update_project_index(vault_path, project_slug, note_name, session_summary):
     multi-hundred-line files with duplicate headers, truncated entries, and
     stray fragments. This call site's session-summary append is retired
     outright (``session_summary`` is accepted only for call-site
-    compatibility with ``memento/mcp_server.py``, ``memento/smart_store.py``,
-    and ``memento/dedup_merge.py``, and is otherwise unused): the bounded
-    replacement is :func:`memento.hub.regenerate_project_hub`'s ``## Recent
+    compatibility with ``almanac/mcp_server.py``, ``almanac/smart_store.py``,
+    and ``almanac/dedup_merge.py``, and is otherwise unused): the bounded
+    replacement is :func:`almanac.hub.regenerate_project_hub`'s ``## Recent
     activity`` section, mechanically derived from note frontmatter dates on
     every regeneration rather than hand-maintained here.
 
-    ``memento/mcp_server.py``'s fleeting-only capture path and
-    ``hooks/memento-triage.py``'s ``append_session_to_project`` still call
+    ``almanac/mcp_server.py``'s fleeting-only capture path and
+    ``hooks/almanac-triage.py``'s ``append_session_to_project`` still call
     :func:`append_project_session_line` directly for their own session
     markers -- that call path is unchanged and out of scope for this retirement.
     """

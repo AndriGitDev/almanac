@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sourced library for memento-vault install.sh
+# Sourced library for almanac install.sh
 # Provides: logging, manifest helpers, safe_copy, and extracted setup functions.
 #
 # Expected globals (set by the caller before sourcing):
@@ -32,7 +32,7 @@ warn()  { echo -e "${YELLOW}[!]${NC} $1"; }
 error() { echo -e "${RED}[x]${NC} $1"; }
 step()  { echo -e "\n${BOLD}$1${NC}"; }
 skip()  { echo -e "${CYAN}[~]${NC} $1"; }
-can_prompt() { [ "${ALMANAC_NONINTERACTIVE:-${MEMENTO_NONINTERACTIVE:-}}" != "1" ] && [ -t 0 ]; }
+can_prompt() { [ "${ALMANAC_NONINTERACTIVE:-}" != "1" ] && [ -t 0 ]; }
 
 # --- Manifest helpers ---
 
@@ -94,7 +94,7 @@ save_manifest() {
 
 setup_cli() {
     local almanac_src="$SCRIPT_DIR/bin/almanac"
-    local cli_bin_dir="${ALMANAC_CLI_BIN_DIR:-${MEMENTO_CLI_BIN_DIR:-$HOME/.local/bin}}"
+    local cli_bin_dir="${ALMANAC_CLI_BIN_DIR:-$HOME/.local/bin}"
     local almanac_dest="$cli_bin_dir/almanac"
 
     if [ ! -x "$almanac_src" ]; then
@@ -277,7 +277,7 @@ validate_pi_bridge_environment() {
     set +e
     output=$(cd / && PYTHONPATH="$CLAUDE_DIR/hooks${PYTHONPATH:+:$PYTHONPATH}" \
         ALMANAC_VAULT_PATH="$VAULT_PATH" \
-        ALMANAC_SEARCH_BACKEND="${ALMANAC_SEARCH_BACKEND:-${MEMENTO_SEARCH_BACKEND:-grep}}" \
+        ALMANAC_SEARCH_BACKEND="${ALMANAC_SEARCH_BACKEND:-grep}" \
         python3 -m almanac.pi_bridge status --cwd "$SCRIPT_DIR" 2>&1)
     rc=$?
     set -e
@@ -580,7 +580,7 @@ setup_shell_warmup() {
         fish) shell_rc="$HOME/.config/fish/config.fish" ;;
     esac
 
-    local warmup_marker="qmd vsearch.*warmup|python3 -c .*qmd.*vsearch.*warmup|memento-vault warmup|almanac warmup"
+    local warmup_marker="qmd vsearch.*warmup|python3 -c .*qmd.*vsearch.*warmup|almanac warmup"
     local warmup_cli="$SCRIPT_DIR/bin/almanac"
     local warmup_cli_quoted
     printf -v warmup_cli_quoted '%q' "$warmup_cli"
@@ -600,7 +600,6 @@ text = path.read_text()
 patterns = [
     r'# Warm QMD embedding model on shell startup \([^)]+\)\n[^\n]*qmd vsearch "warmup"[^\n]*',
     r'# Warm QMD embedding model on shell startup \([^)]+\)\n[^\n]*python3 -c .*qmd.*vsearch.*warmup[^\n]*',
-    r'# Warm QMD embedding model on shell startup \([^)]+\)\n[^\n]*memento-vault warmup[^\n]*',
     r'# Warm QMD embedding model on shell startup \([^)]+\)\n[^\n]*almanac warmup[^\n]*',
 ]
 for pattern in patterns:

@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from memento import retrieval_dashboard
+from almanac import retrieval_dashboard
 
 
 def test_load_jsonl_normalizes_offset_aware_timestamps(tmp_path):
@@ -107,7 +107,7 @@ def _sample_entries() -> list[dict[str, object]]:
 
 def _recommendation_entries() -> list[dict[str, object]]:
     return [
-        {"ts": "2026-06-29T10:01:00Z", "hook": "recall", "action": "no-results", "query": "memento.yml"},
+        {"ts": "2026-06-29T10:01:00Z", "hook": "recall", "action": "no-results", "query": "almanac.yml"},
         {
             "ts": "2026-06-29T10:01:01Z",
             "hook": "mcp",
@@ -166,24 +166,24 @@ def _recommendation_entries() -> list[dict[str, object]]:
             "hook": "tool-context",
             "action": "decision",
             "decision": "no-results",
-            "dir_key": "memento/search",
-            "file_path": "memento/search.py",
+            "dir_key": "almanac/search",
+            "file_path": "almanac/search.py",
         },
         {
             "ts": "2026-06-29T10:01:09Z",
             "hook": "tool-context",
             "action": "decision",
             "decision": "no-results",
-            "dir_key": "memento/search",
-            "file_path": "memento/search.py",
+            "dir_key": "almanac/search",
+            "file_path": "almanac/search.py",
         },
         {
             "ts": "2026-06-29T10:01:10Z",
             "hook": "tool-context",
             "action": "decision",
             "decision": "no-results",
-            "dir_key": "memento/search",
-            "file_path": "memento/search.py",
+            "dir_key": "almanac/search",
+            "file_path": "almanac/search.py",
         },
         {
             "ts": "2026-06-29T10:01:11Z",
@@ -356,7 +356,7 @@ def test_build_report_adds_behavior_recommendations_without_leaking_queries(tmp_
     assert "Add a code-area tool or project map" in titles
     assert "Return fuller search results or tune detail_level" in titles
     assert "Prefer a purpose-built tool for common deep-retrieval prompts" in titles
-    assert "memento.yml" not in text
+    assert "almanac.yml" not in text
     assert "project history" not in text
     assert "pyproject.toml" not in html
     assert "detail_level work" not in text

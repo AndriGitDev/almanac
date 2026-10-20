@@ -14,50 +14,50 @@ from unittest.mock import patch
 
 import pytest
 
-from memento.llm import LLMResult
-from memento.retrieval_policy import (
+from almanac.llm import LLMResult
+from almanac.retrieval_policy import (
     PromptRecallRequest,
     PromptRecallRuntime,
     apply_stale_citation_marker,
     evaluate_citation_verification,
 )
-from memento.store import (
+from almanac.store import (
     _normalize_citations,
     append_stale_citation_review,
     fold_stale_citations_into_frontmatter,
     write_note,
 )
 
-# Import memento-triage.py (hyphenated filename) under its own sys.modules key
-# -- NOT "memento_triage" (test_triage.py already claims that name). Sharing a
+# Import almanac-triage.py (hyphenated filename) under its own sys.modules key
+# -- NOT "almanac_triage" (test_triage.py already claims that name). Sharing a
 # key would make whichever test file's module happens to import last silently
-# win the registration, so patch("memento_triage....") in one file could
+# win the registration, so patch("almanac_triage....") in one file could
 # target the OTHER file's module instance depending on collection order.
 _triage_spec = importlib.util.spec_from_file_location(
-    "memento_triage_citations",
-    str(Path(__file__).parent.parent / "hooks" / "memento-triage.py"),
+    "almanac_triage_citations",
+    str(Path(__file__).parent.parent / "hooks" / "almanac-triage.py"),
 )
 _triage_mod = importlib.util.module_from_spec(_triage_spec)
-sys.modules["memento_triage_citations"] = _triage_mod
+sys.modules["almanac_triage_citations"] = _triage_mod
 _triage_spec.loader.exec_module(_triage_mod)
 process_structured_notes = _triage_mod.process_structured_notes
 
-# Import memento-sweeper.py (hyphenated filename), same pattern as test_sweeper.py.
+# Import almanac-sweeper.py (hyphenated filename), same pattern as test_sweeper.py.
 _sweeper_spec = importlib.util.spec_from_file_location(
-    "memento_sweeper_citations",
-    str(Path(__file__).parent.parent / "hooks" / "memento-sweeper.py"),
+    "almanac_sweeper_citations",
+    str(Path(__file__).parent.parent / "hooks" / "almanac-sweeper.py"),
 )
 _sweeper_mod = importlib.util.module_from_spec(_sweeper_spec)
-sys.modules["memento_sweeper_citations"] = _sweeper_mod
+sys.modules["almanac_sweeper_citations"] = _sweeper_mod
 _sweeper_spec.loader.exec_module(_sweeper_mod)
 
 
 @pytest.fixture(autouse=True)
 def _smart_store_patches(monkeypatch):
     """Patch smart_store dependencies so triage tests don't hit real backends."""
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda *a, **kw: _triage_mod.get_vault())
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *a, **kw: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda *a, **kw: _triage_mod.get_vault())
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *a, **kw: {})
 
 
 def _user_msg(text, cwd="/home/user/project", branch="main"):
@@ -71,7 +71,7 @@ class TestNormalizeCitations:
     def test_drops_malformed_entries_keeps_valid_ones(self):
         result = _normalize_citations(
             [
-                {"file": "memento/store.py", "anchor": "def write_note("},
+                {"file": "almanac/store.py", "anchor": "def write_note("},
                 "not-a-dict",
                 {"file": "", "anchor": "x"},  # empty file
                 {"file": "a.py", "anchor": ""},  # empty anchor
@@ -80,7 +80,7 @@ class TestNormalizeCitations:
                 None,
             ]
         )
-        assert result == [{"file": "memento/store.py", "anchor": "def write_note("}]
+        assert result == [{"file": "almanac/store.py", "anchor": "def write_note("}]
 
     def test_truncates_oversized_anchor(self):
         long_anchor = "x" * 200
@@ -107,10 +107,10 @@ class TestWriteNoteCitations:
             note_type="discovery",
             tags=["x"],
             certainty=3,
-            citations=[{"file": "memento/store.py", "anchor": "def write_note(", "commit": "abc1234"}],
+            citations=[{"file": "almanac/store.py", "anchor": "def write_note(", "commit": "abc1234"}],
         )
         text = path.read_text()
-        assert 'citations: [{"file": "memento/store.py", "anchor": "def write_note(", "commit": "abc1234"}]' in text
+        assert 'citations: [{"file": "almanac/store.py", "anchor": "def write_note(", "commit": "abc1234"}]' in text
 
     def test_write_note_omits_citations_line_when_absent(self, tmp_vault):
         path = write_note(
@@ -138,7 +138,7 @@ class TestWriteNoteCitations:
 class TestStaleCitationQueueAndFold:
     @pytest.fixture(autouse=True)
     def _isolated_lock(self, monkeypatch, tmp_path):
-        monkeypatch.setattr("memento.store.VAULT_WRITE_LOCK_PATH", str(tmp_path / "locks" / "vault-write.lock"))
+        monkeypatch.setattr("almanac.store.VAULT_WRITE_LOCK_PATH", str(tmp_path / "locks" / "vault-write.lock"))
 
     @staticmethod
     def _seed_note(tmp_vault, stem="example", extra_frontmatter=""):
@@ -440,7 +440,7 @@ class TestPromptRecallStaleMarker:
 
 class TestBuildToolContextStaleMarker:
     def test_stale_citation_marks_tool_context_injection(self, tmp_path):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         vault = tmp_path / "vault"
         (vault / "notes").mkdir(parents=True)
@@ -460,14 +460,14 @@ class TestBuildToolContextStaleMarker:
         config["citation_verification_enabled"] = True
 
         with (
-            patch("memento.lifecycle.has_qmd", return_value=True),
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.get_vault", return_value=vault),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.get_vault", return_value=vault),
             # pytest tmp dirs live under /tmp on Linux, which SKIP_PREFIXES
             # excludes from tool context - bypass the fast-exit for this test.
-            patch("memento.lifecycle.should_skip_tool_context_path", return_value=False),
+            patch("almanac.lifecycle.should_skip_tool_context_path", return_value=False),
             patch(
-                "memento.lifecycle.qmd_search_with_extras",
+                "almanac.lifecycle.qmd_search_with_extras",
                 return_value=[
                     {
                         "path": "notes/auth-boundary.md",
@@ -477,9 +477,9 @@ class TestBuildToolContextStaleMarker:
                     }
                 ],
             ),
-            patch("memento.lifecycle.enhance_results", side_effect=lambda results, *a, **kw: results),
-            patch("memento.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}),
-            patch("memento.lifecycle.save_cache"),
+            patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *a, **kw: results),
+            patch("almanac.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}),
+            patch("almanac.lifecycle.save_cache"),
         ):
             result = lifecycle_module.build_tool_context("Read", "src/server/authMiddleware.ts", str(repo), "s1")
 
@@ -488,7 +488,7 @@ class TestBuildToolContextStaleMarker:
         assert "Auth boundary lives in middleware" in result.content
 
 
-# --- hooks/memento-triage.py: capture-side citation emission --------------
+# --- hooks/almanac-triage.py: capture-side citation emission --------------
 
 
 class TestTriageCitations:
@@ -517,9 +517,9 @@ class TestTriageCitations:
         )
 
         with (
-            patch("memento_triage_citations.get_vault", return_value=tmp_vault),
+            patch("almanac_triage_citations.get_vault", return_value=tmp_vault),
             patch(
-                "memento_triage_citations.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)
+                "almanac_triage_citations.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)
             ),
         ):
             written = process_structured_notes("sess-123", str(transcript), meta, "api-service")
@@ -555,9 +555,9 @@ class TestTriageCitations:
         )
 
         with (
-            patch("memento_triage_citations.get_vault", return_value=tmp_vault),
+            patch("almanac_triage_citations.get_vault", return_value=tmp_vault),
             patch(
-                "memento_triage_citations.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)
+                "almanac_triage_citations.llm_complete", return_value=LLMResult(text=llm_payload, ok=True, error=None)
             ),
         ):
             written = process_structured_notes("sess-456", str(transcript), meta, "api-service")
@@ -572,7 +572,7 @@ class TestTriageCitations:
         assert "citations" in prompt
 
 
-# --- hooks/memento-sweeper.py: wired into main() --------------------------
+# --- hooks/almanac-sweeper.py: wired into main() --------------------------
 
 
 class TestSweeperCitationFold:
@@ -587,7 +587,7 @@ class TestSweeperCitationFold:
         monkeypatch.setattr(_sweeper_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
         monkeypatch.setattr(_sweeper_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
         monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-        monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+        monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
         monkeypatch.setattr(_sweeper_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
         monkeypatch.setattr(_sweeper_mod, "sweep_archive_candidates", lambda vault_path: None)
         monkeypatch.setattr(_sweeper_mod, "fleeting_lifecycle_sweep", lambda vault_path: None)
@@ -614,7 +614,7 @@ class TestSweeperCitationFold:
         monkeypatch.setattr(_sweeper_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
         monkeypatch.setattr(_sweeper_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
         monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-        monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+        monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
         monkeypatch.setattr(_sweeper_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
         monkeypatch.setattr(_sweeper_mod, "sweep_archive_candidates", lambda vault_path: None)
         monkeypatch.setattr(_sweeper_mod, "fleeting_lifecycle_sweep", lambda vault_path: None)

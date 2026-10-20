@@ -101,8 +101,8 @@ class TestBm25Search:
         results = bm25_search(idx, "telescope Jupiter moons", min_score=999.0)
         assert len(results) == 0
 
-    def test_result_format_matches_memento(self):
-        """Each result dict has the keys memento_utils expects."""
+    def test_result_format_matches_almanac(self):
+        """Each result dict has the keys almanac_utils expects."""
         idx = build_bm25_index(DOCS_THREE_TOPICS)
         results = bm25_search(idx, "garlic olive oil basil")
         assert len(results) >= 1

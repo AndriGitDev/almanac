@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from memento import sync_ledger
-from memento.archive import (
+from almanac import sync_ledger
+from almanac.archive import (
     ArchiveConflictError,
     ArchiveError,
     export_archive,
@@ -301,7 +301,7 @@ def test_import_rejects_unsupported_payload_paths(tmp_path):
             "manifest.json",
             json.dumps(
                 {
-                    "archive_format": "memento-portable-archive",
+                    "archive_format": "almanac-portable-archive",
                     "archive_version": 1,
                     "content_roots": ["notes", "fleeting", "projects", "archive"],
                     "files": [{"path": ".search/index.sqlite", "size": 4}],
@@ -324,7 +324,7 @@ def test_import_rejects_unsupported_manifest_content_roots(tmp_path):
             "manifest.json",
             json.dumps(
                 {
-                    "archive_format": "memento-portable-archive",
+                    "archive_format": "almanac-portable-archive",
                     "archive_version": 1,
                     "content_roots": ["notes", ".git"],
                     "files": [],
@@ -343,15 +343,15 @@ def test_import_rejects_unsupported_tombstone_paths_without_deleting_files(tmp_p
             "manifest.json",
             json.dumps(
                 {
-                    "archive_format": "memento-portable-archive",
+                    "archive_format": "almanac-portable-archive",
                     "archive_version": 1,
                     "content_roots": ["notes", "fleeting", "projects", "archive"],
-                    "files": [{"path": ".memento/tombstones.jsonl", "size": 1}],
+                    "files": [{"path": ".almanac/tombstones.jsonl", "size": 1}],
                 }
             ),
         )
         zf.writestr(
-            "payload/.memento/tombstones.jsonl",
+            "payload/.almanac/tombstones.jsonl",
             json.dumps({"ts": "2026-01-01T00:00:00Z", "path": ".git/config", "reason": "deleted"}) + "\n",
         )
 
@@ -448,9 +448,9 @@ def test_import_rejects_tombstone_symlink_destination_without_deleting_target(tm
 
 def _init_vault_repo_with_home(tmp_path: Path, vault: Path) -> Path:
     home = tmp_path / "home"
-    config_dir = home / ".config" / "memento-vault"
+    config_dir = home / ".config" / "almanac"
     config_dir.mkdir(parents=True)
-    (config_dir / "memento.yml").write_text(f"vault_path: {vault}\n", encoding="utf-8")
+    (config_dir / "almanac.yml").write_text(f"vault_path: {vault}\n", encoding="utf-8")
     subprocess.run(["git", "init"], cwd=vault, check=True, capture_output=True, text=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=vault, check=True)
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=vault, check=True)
@@ -517,13 +517,13 @@ def test_cli_archive_export_import_round_trip(tmp_path):
     dest = tmp_path / "dest"
 
     subprocess.run(
-        ["./bin/memento-vault", "archive", "export", "--vault", str(source), str(archive)],
+        ["./bin/almanac", "archive", "export", "--vault", str(source), str(archive)],
         check=True,
         text=True,
         capture_output=True,
     )
     subprocess.run(
-        ["./bin/memento-vault", "archive", "import", "--vault", str(dest), str(archive)],
+        ["./bin/almanac", "archive", "import", "--vault", str(dest), str(archive)],
         check=True,
         text=True,
         capture_output=True,

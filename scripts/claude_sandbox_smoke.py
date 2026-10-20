@@ -2,7 +2,7 @@
 """Strict smoke test for Almanac's sandboxed Claude CLI worker.
 
 This intentionally exercises the same shared Claude backend used by detached
-SessionEnd structured-note extraction. It is a local Beislið gate, not a
+SessionEnd structured-note extraction. It is an optional local check, not a
 portable CI test: if Claude auth/config is broken on the shipping machine, the
 gate should fail before release.
 """

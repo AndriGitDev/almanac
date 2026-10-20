@@ -29,8 +29,8 @@ _repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_repo_root))
 sys.path.insert(0, str(_repo_root / "hooks"))
 
-from memento.config import get_config  # noqa: E402
-from memento.store import (  # noqa: E402
+from almanac.config import get_config  # noqa: E402
+from almanac.store import (  # noqa: E402
     INCEPTION_STATE_PATH,
     acquire_inception_lock,
     load_inception_state,
@@ -43,11 +43,11 @@ from memento.store import (  # noqa: E402
 import importlib.util as _ilu  # noqa: E402
 
 _spec = _ilu.spec_from_file_location(
-    "memento_inception",
-    str(_repo_root / "hooks" / "memento-inception.py"),
+    "almanac_inception",
+    str(_repo_root / "hooks" / "almanac-inception.py"),
 )
 if _spec is None or _spec.loader is None:
-    print("error: cannot locate hooks/memento-inception.py", file=sys.stderr)
+    print("error: cannot locate hooks/almanac-inception.py", file=sys.stderr)
     sys.exit(2)
 _mod = _ilu.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)

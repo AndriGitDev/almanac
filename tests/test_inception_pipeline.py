@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from memento_inception import (
+from almanac_inception import (
     main,
     check_dependencies,
     parse_args,
@@ -185,7 +185,7 @@ class TestMainPipeline:
         # the only way to consolidate them is writing a new pattern note.
         # With LLM returning empty, synthesis fails and nothing gets written.
         with _force_cluster(["zustand-state-reset", "react-query-wrapper"]):
-            with patch("memento_inception.call_llm", return_value=""):
+            with patch("almanac_inception.call_llm", return_value=""):
                 result = _run_main(mock_config, inception_state_path, ["--full"], db_path=str(mock_qmd_db))
         assert result == 0
         state = json.loads(inception_state_path.read_text())
@@ -244,7 +244,7 @@ class TestMainPipeline:
         self, mock_config, sample_notes, tmp_vault, inception_state_path, mock_qmd_db
     ):
         """MEM-154: every run entry records total_notes and
-        processed_notes_total so memento/health.py can compute a coverage
+        processed_notes_total so almanac/health.py can compute a coverage
         ratio and backlog trend from state history alone, without
         rescanning the vault. processed_notes_total must reflect *this*
         run's consolidation (mark_consolidated runs before record_run)."""
@@ -298,7 +298,7 @@ class TestMainBackendSelection:
             import pytest
 
             pytest.skip("sqlite-vec extension loading is unavailable")
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         class _FixedDimsProvider:
             def dimensions(self):
@@ -318,7 +318,7 @@ class TestMainBackendSelection:
             db_path=tmp_vault / ".search" / "search.db",
             embedding_provider=_FixedDimsProvider(),
         )
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
         # Remove the pre-seeded pattern so check_ledger_dedup returns
         # "create" instead of "skip" for this exact stem set (mirrors
@@ -327,7 +327,7 @@ class TestMainBackendSelection:
 
         with _force_cluster(["redis-cache-ttl", "redis-eviction-policy", "redis-cache-invalidation"]):
             with _mock_llm_response():
-                with patch("memento_inception.get_backend", return_value=backend):
+                with patch("almanac_inception.get_backend", return_value=backend):
                     result = _run_main(mock_config, inception_state_path, ["--full"])
 
         assert result == 0
@@ -344,7 +344,7 @@ class TestMainBackendSelection:
         grep_like = MagicMock()
         grep_like.is_available.return_value = True
 
-        with patch("memento_inception.get_backend", return_value=grep_like):
+        with patch("almanac_inception.get_backend", return_value=grep_like):
             result = _run_main(mock_config, inception_state_path, ["--full"])
 
         assert result == 3
@@ -377,7 +377,7 @@ def _force_cluster(stems):
     Lets tests exercise the consolidation-tracking paths without depending on
     HDBSCAN finding enough density in mock embeddings.
     """
-    return patch("memento_inception.cluster_notes", return_value={0: list(stems)})
+    return patch("almanac_inception.cluster_notes", return_value={0: list(stems)})
 
 
 def _mock_llm_response():
@@ -391,14 +391,14 @@ def _mock_llm_response():
             "related": [],
         }
     )
-    return patch("memento_inception.call_llm", return_value=response)
+    return patch("almanac_inception.call_llm", return_value=response)
 
 
 def _run_main(config, state_path, argv, db_path=None, lock_path=None):
     """Run the main pipeline with mocked config and paths."""
     args = parse_args(argv)
 
-    with patch("memento_inception.get_config", return_value=config):
+    with patch("almanac_inception.get_config", return_value=config):
         kwargs = {}
         if db_path:
             kwargs["db_path"] = db_path

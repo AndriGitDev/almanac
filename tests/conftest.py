@@ -12,12 +12,12 @@ sys.path.insert(0, str(repo_root))
 sys.path.insert(0, str(repo_root / "hooks"))
 
 _inception_spec = _ilu.spec_from_file_location(
-    "memento_inception",
-    str(Path(__file__).parent.parent / "hooks" / "memento-inception.py"),
+    "almanac_inception",
+    str(Path(__file__).parent.parent / "hooks" / "almanac-inception.py"),
 )
 if _inception_spec and _inception_spec.loader:
     _inception_mod = _ilu.module_from_spec(_inception_spec)
-    sys.modules["memento_inception"] = _inception_mod
+    sys.modules["almanac_inception"] = _inception_mod
     _inception_spec.loader.exec_module(_inception_mod)
 
 
@@ -28,30 +28,30 @@ def isolate_remote_vault_env(monkeypatch):
     Individual tests that cover env-based behavior set these variables with
     monkeypatch after this fixture has cleared the ambient shell state.
     """
-    monkeypatch.delenv("MEMENTO_API_KEY", raising=False)
-    monkeypatch.delenv("MEMENTO_VAULT_URL", raising=False)
+    monkeypatch.delenv("ALMANAC_API_KEY", raising=False)
+    monkeypatch.delenv("ALMANAC_VAULT_URL", raising=False)
 
 
 @pytest.fixture(autouse=True)
 def isolate_triage_health_log(monkeypatch, tmp_path):
     """Keep always-on triage health telemetry out of the user's real config dir."""
     health_log = tmp_path / "triage-health.jsonl"
-    monkeypatch.setattr("memento.store.TRIAGE_HEALTH_LOG_PATH", str(health_log), raising=False)
-    monkeypatch.setattr("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log), raising=False)
+    monkeypatch.setattr("almanac.store.TRIAGE_HEALTH_LOG_PATH", str(health_log), raising=False)
+    monkeypatch.setattr("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log), raising=False)
 
 
 @pytest.fixture(autouse=True)
 def isolate_recall_dedup_state(monkeypatch, tmp_path):
     """Keep recall dedup state out of the user's real runtime dir."""
-    monkeypatch.setattr("memento.lifecycle.RECALL_DEDUP_PATH", str(tmp_path / "recall-dedup.json"), raising=False)
+    monkeypatch.setattr("almanac.lifecycle.RECALL_DEDUP_PATH", str(tmp_path / "recall-dedup.json"), raising=False)
 
 
 @pytest.fixture(autouse=True)
 def isolate_access_log_state(monkeypatch, tmp_path):
     """Keep derived access logs out of the user's real runtime dir."""
-    monkeypatch.setattr("memento.store.ACCESS_LOG_PATH", str(tmp_path / "access-log.jsonl"), raising=False)
-    monkeypatch.setattr("memento.store.ACCESS_LOG_STATS_PATH", str(tmp_path / "access-log-stats.json"), raising=False)
-    monkeypatch.setattr("memento.store._ACCESS_LOG_CACHE", {"signature": None, "stats": {}}, raising=False)
+    monkeypatch.setattr("almanac.store.ACCESS_LOG_PATH", str(tmp_path / "access-log.jsonl"), raising=False)
+    monkeypatch.setattr("almanac.store.ACCESS_LOG_STATS_PATH", str(tmp_path / "access-log-stats.json"), raising=False)
+    monkeypatch.setattr("almanac.store._ACCESS_LOG_CACHE", {"signature": None, "stats": {}}, raising=False)
 
 
 @pytest.fixture(autouse=True)
@@ -62,7 +62,7 @@ def _reset_index_debouncer():
     leaked timer could fire a reindex against another test's backend.
     """
     yield
-    from memento.store import _reset_debouncer
+    from almanac.store import _reset_debouncer
 
     _reset_debouncer()
 
@@ -71,7 +71,7 @@ def _reset_index_debouncer():
 def isolate_stale_citation_queue(monkeypatch, tmp_path):
     """Keep the citation-staleness review queue out of the user's real runtime dir (MEM-162)."""
     monkeypatch.setattr(
-        "memento.store.STALE_CITATIONS_QUEUE_PATH", str(tmp_path / "stale-citations.jsonl"), raising=False
+        "almanac.store.STALE_CITATIONS_QUEUE_PATH", str(tmp_path / "stale-citations.jsonl"), raising=False
     )
 
 
@@ -80,15 +80,15 @@ def isolate_vault_write_lock(monkeypatch, tmp_path):
     """Default the vault write lock to a per-test file, not the user's real runtime dir.
 
     Without this, any test path that goes through write_smart_store_note()/
-    acquire_vault_write_lock() (e.g. hooks/memento-triage.py's structured-notes
-    writer) contends for the real ``~/.cache/memento-vault/vault-write.lock``
-    -- shared with whatever live memento-vault MCP server or sibling
+    acquire_vault_write_lock() (e.g. hooks/almanac-triage.py's structured-notes
+    writer) contends for the real ``~/.cache/almanac/vault-write.lock``
+    -- shared with whatever live almanac MCP server or sibling
     ticket-worktree agent happens to be running on the same machine. A test
     class that needs the real default (or a specific shared lock file for a
     lock-contention test) can still override this with its own
-    ``monkeypatch.setattr("memento.store.VAULT_WRITE_LOCK_PATH", ...)``.
+    ``monkeypatch.setattr("almanac.store.VAULT_WRITE_LOCK_PATH", ...)``.
     """
-    monkeypatch.setattr("memento.store.VAULT_WRITE_LOCK_PATH", str(tmp_path / "vault-write.lock"), raising=False)
+    monkeypatch.setattr("almanac.store.VAULT_WRITE_LOCK_PATH", str(tmp_path / "vault-write.lock"), raising=False)
 
 
 @pytest.fixture
@@ -273,7 +273,7 @@ def mock_qmd_db(tmp_path):
 
         conn.execute(
             "INSERT INTO documents (collection, path, title, hash, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
-            ("memento", path, stem, doc_hash, "2026-03-22", "2026-03-22"),
+            ("almanac", path, stem, doc_hash, "2026-03-22", "2026-03-22"),
         )
 
         for seq in range(n_chunks):
@@ -325,19 +325,19 @@ def mock_qmd_db(tmp_path):
 @pytest.fixture
 def mock_config(tmp_vault):
     """Return a config dict pointing at the tmp vault."""
-    from memento.config import DEFAULT_CONFIG
+    from almanac.config import DEFAULT_CONFIG
 
     config = dict(DEFAULT_CONFIG)
     config["vault_path"] = str(tmp_vault)
     config["inception_enabled"] = True
     config["inception_backend"] = "codex"
-    config["qmd_collection"] = "memento"
+    config["qmd_collection"] = "almanac"
     return config
 
 
 @pytest.fixture
 def inception_state_path(tmp_path):
     """Return a temp path for inception state."""
-    state_dir = tmp_path / "config" / "memento-vault"
+    state_dir = tmp_path / "config" / "almanac"
     state_dir.mkdir(parents=True)
     return state_dir / "inception-state.json"

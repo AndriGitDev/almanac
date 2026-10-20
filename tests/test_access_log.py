@@ -4,17 +4,17 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 
-from memento import store
-from memento.config import get_vault_id
-from memento.mcp_server import memento_get
-from memento.store import apply_access_log_boost, record_access
+from almanac import store
+from almanac.config import get_vault_id
+from almanac.mcp_server import almanac_get
+from almanac.store import apply_access_log_boost, record_access
 
 
 def test_record_access_writes_derived_jsonl_without_touching_notes(tmp_vault, monkeypatch):
     note_path = tmp_vault / "notes" / "example.md"
     note_path.write_text("---\ntitle: Example\n---\n\nbody\n")
     before = note_path.read_text()
-    monkeypatch.setattr("memento.config.get_config", lambda: {"vault_path": str(tmp_vault)}, raising=False)
+    monkeypatch.setattr("almanac.config.get_config", lambda: {"vault_path": str(tmp_vault)}, raising=False)
 
     record_access(
         ["notes/example.md"], hook="mcp", tool="search", query="redis cache ttl", session_id="sess-1", result_count=1
@@ -37,7 +37,7 @@ def test_record_access_writes_derived_jsonl_without_touching_notes(tmp_vault, mo
 
 def test_apply_access_log_boost_prefers_recent_frequent_hits(tmp_path, tmp_vault, monkeypatch):
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
-    monkeypatch.setattr("memento.config.get_config", lambda: {"vault_path": str(tmp_vault)}, raising=False)
+    monkeypatch.setattr("almanac.config.get_config", lambda: {"vault_path": str(tmp_vault)}, raising=False)
     vault_id = get_vault_id()
     stats_path = Path(store.ACCESS_LOG_STATS_PATH)
     stats_path.write_text(
@@ -78,8 +78,8 @@ def test_apply_access_log_boost_prefers_recent_frequent_hits(tmp_path, tmp_vault
 
 
 def test_access_log_boost_can_be_disabled(tmp_path, monkeypatch):
-    monkeypatch.setattr("memento.config.get_config", lambda: {"vault_path": str(tmp_path / "vault")}, raising=False)
-    monkeypatch.setattr("memento.store.get_config", lambda: {"access_log_enabled": False}, raising=False)
+    monkeypatch.setattr("almanac.config.get_config", lambda: {"vault_path": str(tmp_path / "vault")}, raising=False)
+    monkeypatch.setattr("almanac.store.get_config", lambda: {"access_log_enabled": False}, raising=False)
 
     record_access(["notes/disabled.md"], hook="mcp", tool="search", query="disabled boost", session_id="sess-2")
     assert not Path(store.ACCESS_LOG_PATH).exists()
@@ -89,13 +89,13 @@ def test_access_log_boost_can_be_disabled(tmp_path, monkeypatch):
     assert boosted == results
 
 
-def test_memento_get_records_access(tmp_vault, monkeypatch):
+def test_almanac_get_records_access(tmp_vault, monkeypatch):
     note_path = tmp_vault / "notes" / "example.md"
     note_path.write_text("---\ntitle: Example\n---\n\nbody\n")
-    monkeypatch.setattr("memento.config.get_config", lambda: {"vault_path": str(tmp_vault)}, raising=False)
-    monkeypatch.setattr("memento.mcp_server.get_vault", lambda: tmp_vault, raising=False)
+    monkeypatch.setattr("almanac.config.get_config", lambda: {"vault_path": str(tmp_vault)}, raising=False)
+    monkeypatch.setattr("almanac.mcp_server.get_vault", lambda: tmp_vault, raising=False)
 
-    result = memento_get(str(note_path.resolve()))
+    result = almanac_get(str(note_path.resolve()))
 
     assert result["title"] == "Example"
     entry = json.loads(Path(store.ACCESS_LOG_PATH).read_text().strip())

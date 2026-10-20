@@ -1,7 +1,7 @@
 """Pi coding agent transcript parser.
 
 Parses Pi JSONL session transcripts into the same metadata and prompt text
-shape used by the shared memento triage pipeline. Pi transcripts may contain
+shape used by the shared almanac triage pipeline. Pi transcripts may contain
 reasoning/thinking blocks and large tool results; this adapter omits private
 reasoning and summarizes/caps tool payloads before LLM triage sees them.
 """

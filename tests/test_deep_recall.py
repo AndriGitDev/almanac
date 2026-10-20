@@ -8,9 +8,9 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
-from memento.llm import LLMResult
+from almanac.llm import LLMResult
 
-from memento import lifecycle
+from almanac import lifecycle
 
 _vr_spec = _ilu.spec_from_file_location(
     "vault_recall_hook",
@@ -53,7 +53,7 @@ class TestSpawnDeepRecall:
             },
         ]
 
-        with patch("memento.lifecycle._subprocess.Popen") as mock_popen:
+        with patch("almanac.lifecycle._subprocess.Popen") as mock_popen:
             spawn_deep_recall("What changed about caching last time?", results, config)
 
         # Should have spawned a subprocess
@@ -84,7 +84,7 @@ class TestSpawnDeepRecall:
             input_file_path = cmd[3]
             return MagicMock()
 
-        with patch("memento.lifecycle._subprocess.Popen", side_effect=capture_popen):
+        with patch("almanac.lifecycle._subprocess.Popen", side_effect=capture_popen):
             spawn_deep_recall("How did we handle this before?", results, config)
 
         assert input_file_path is not None
@@ -100,7 +100,7 @@ class TestSpawnDeepRecall:
         config = {"deep_recall_backend": "codex"}
         results = [{"title": "x", "snippet": "y", "path": "p", "score": 0.3}]
 
-        with patch("memento.lifecycle._subprocess.Popen", side_effect=OSError("fail")):
+        with patch("almanac.lifecycle._subprocess.Popen", side_effect=OSError("fail")):
             spawn_deep_recall("What changed?", results, config)
 
         # Pending file should be cleaned up
@@ -111,7 +111,7 @@ class TestSpawnDeepRecall:
         config = {"deep_recall_backend": "claude"}
         results = [{"title": "x", "snippet": "y", "path": "p", "score": 0.3}]
 
-        with patch("memento.lifecycle._subprocess.Popen") as mock_popen:
+        with patch("almanac.lifecycle._subprocess.Popen") as mock_popen:
             spawn_deep_recall("What changed?", results, config)
 
         cmd = mock_popen.call_args[0][0]
@@ -280,7 +280,7 @@ class TestDeepRecallGate:
     """The gate in run_recall should only trigger when all conditions are met."""
 
     def _make_config(self, **overrides):
-        from memento.config import DEFAULT_CONFIG
+        from almanac.config import DEFAULT_CONFIG
 
         config = dict(DEFAULT_CONFIG)
         config.update(
@@ -325,17 +325,17 @@ class TestDeepRecallGate:
         ]
 
         with (
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.get_vault", return_value=vault),
-            patch("memento.lifecycle.has_qmd", return_value=True),
-            patch("memento.lifecycle.read_hook_input", return_value=self._mock_hook_input("Fix the broken test")),
-            patch("memento.lifecycle.qmd_search_with_extras", return_value=results),
-            patch("memento.lifecycle.enhance_results", return_value=results),
-            patch("memento.lifecycle.prf_expand_query", return_value="Fix the broken test"),
-            patch("memento.lifecycle.detect_project", return_value=("unknown", None)),
-            patch("memento.lifecycle.recently_injected_paths", return_value=set()),
-            patch("memento.lifecycle.log_retrieval"),
-            patch("memento.lifecycle.spawn_deep_recall") as mock_spawn,
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.get_vault", return_value=vault),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.read_hook_input", return_value=self._mock_hook_input("Fix the broken test")),
+            patch("almanac.lifecycle.qmd_search_with_extras", return_value=results),
+            patch("almanac.lifecycle.enhance_results", return_value=results),
+            patch("almanac.lifecycle.prf_expand_query", return_value="Fix the broken test"),
+            patch("almanac.lifecycle.detect_project", return_value=("unknown", None)),
+            patch("almanac.lifecycle.recently_injected_paths", return_value=set()),
+            patch("almanac.lifecycle.log_retrieval"),
+            patch("almanac.lifecycle.spawn_deep_recall") as mock_spawn,
         ):
             lifecycle.run_recall()
 
@@ -352,20 +352,20 @@ class TestDeepRecallGate:
         results = [{"path": "notes/a.md", "title": "A", "snippet": "X", "score": 0.4}]
 
         with (
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.get_vault", return_value=vault),
-            patch("memento.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.get_vault", return_value=vault),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
             patch(
-                "memento.lifecycle.read_hook_input",
+                "almanac.lifecycle.read_hook_input",
                 return_value=self._mock_hook_input("What did we decide last time about the cache?"),
             ),
-            patch("memento.lifecycle.qmd_search_with_extras", return_value=results),
-            patch("memento.lifecycle.enhance_results", return_value=results),
-            patch("memento.lifecycle.prf_expand_query", return_value="What did we decide last time about the cache?"),
-            patch("memento.lifecycle.detect_project", return_value=("unknown", None)),
-            patch("memento.lifecycle.recently_injected_paths", return_value=set()),
-            patch("memento.lifecycle.log_retrieval"),
-            patch("memento.lifecycle.spawn_deep_recall") as mock_spawn,
+            patch("almanac.lifecycle.qmd_search_with_extras", return_value=results),
+            patch("almanac.lifecycle.enhance_results", return_value=results),
+            patch("almanac.lifecycle.prf_expand_query", return_value="What did we decide last time about the cache?"),
+            patch("almanac.lifecycle.detect_project", return_value=("unknown", None)),
+            patch("almanac.lifecycle.recently_injected_paths", return_value=set()),
+            patch("almanac.lifecycle.log_retrieval"),
+            patch("almanac.lifecycle.spawn_deep_recall") as mock_spawn,
         ):
             lifecycle.run_recall()
 
@@ -391,19 +391,19 @@ class TestDeepRecallGate:
         ]
 
         with (
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.get_vault", return_value=vault),
-            patch("memento.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.get_vault", return_value=vault),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
             patch(
-                "memento.lifecycle.read_hook_input",
+                "almanac.lifecycle.read_hook_input",
                 return_value=self._mock_hook_input("What did we decide last time about the cache?"),
             ),
-            patch("memento.lifecycle.qmd_search_with_extras", return_value=results),
-            patch("memento.lifecycle.enhance_results", return_value=results),
-            patch("memento.lifecycle.detect_project", return_value=("unknown", None)),
-            patch("memento.lifecycle.recently_injected_paths", return_value=set()),
-            patch("memento.lifecycle.log_retrieval"),
-            patch("memento.lifecycle.spawn_deep_recall") as mock_spawn,
+            patch("almanac.lifecycle.qmd_search_with_extras", return_value=results),
+            patch("almanac.lifecycle.enhance_results", return_value=results),
+            patch("almanac.lifecycle.detect_project", return_value=("unknown", None)),
+            patch("almanac.lifecycle.recently_injected_paths", return_value=set()),
+            patch("almanac.lifecycle.log_retrieval"),
+            patch("almanac.lifecycle.spawn_deep_recall") as mock_spawn,
         ):
             lifecycle.run_recall()
 
@@ -420,20 +420,20 @@ class TestDeepRecallGate:
         results = [{"path": "notes/a.md", "title": "A", "snippet": "X", "score": 0.4}]
 
         with (
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.get_vault", return_value=vault),
-            patch("memento.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.get_vault", return_value=vault),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
             patch(
-                "memento.lifecycle.read_hook_input",
+                "almanac.lifecycle.read_hook_input",
                 return_value=self._mock_hook_input("What did we decide last time about the cache?"),
             ),
-            patch("memento.lifecycle.qmd_search_with_extras", return_value=results),
-            patch("memento.lifecycle.enhance_results", return_value=results),
-            patch("memento.lifecycle.prf_expand_query", return_value="What did we decide last time about the cache?"),
-            patch("memento.lifecycle.detect_project", return_value=("unknown", None)),
-            patch("memento.lifecycle.recently_injected_paths", return_value=set()),
-            patch("memento.lifecycle.log_retrieval"),
-            patch("memento.lifecycle.spawn_deep_recall") as mock_spawn,
+            patch("almanac.lifecycle.qmd_search_with_extras", return_value=results),
+            patch("almanac.lifecycle.enhance_results", return_value=results),
+            patch("almanac.lifecycle.prf_expand_query", return_value="What did we decide last time about the cache?"),
+            patch("almanac.lifecycle.detect_project", return_value=("unknown", None)),
+            patch("almanac.lifecycle.recently_injected_paths", return_value=set()),
+            patch("almanac.lifecycle.log_retrieval"),
+            patch("almanac.lifecycle.spawn_deep_recall") as mock_spawn,
         ):
             lifecycle.run_recall()
 
@@ -454,20 +454,20 @@ class TestDeepRecallGate:
         results = [{"path": "notes/a.md", "title": "A", "snippet": "X", "score": 0.4}]
 
         with (
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.get_vault", return_value=vault),
-            patch("memento.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.get_vault", return_value=vault),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
             patch(
-                "memento.lifecycle.read_hook_input",
+                "almanac.lifecycle.read_hook_input",
                 return_value=self._mock_hook_input("What did we decide last time about the cache?"),
             ),
-            patch("memento.lifecycle.qmd_search_with_extras", return_value=results),
-            patch("memento.lifecycle.enhance_results", return_value=results),
-            patch("memento.lifecycle.prf_expand_query", return_value="What did we decide last time about the cache?"),
-            patch("memento.lifecycle.detect_project", return_value=("unknown", None)),
-            patch("memento.lifecycle.recently_injected_paths", return_value=set()),
-            patch("memento.lifecycle.log_retrieval"),
-            patch("memento.lifecycle.spawn_deep_recall") as mock_spawn,
+            patch("almanac.lifecycle.qmd_search_with_extras", return_value=results),
+            patch("almanac.lifecycle.enhance_results", return_value=results),
+            patch("almanac.lifecycle.prf_expand_query", return_value="What did we decide last time about the cache?"),
+            patch("almanac.lifecycle.detect_project", return_value=("unknown", None)),
+            patch("almanac.lifecycle.recently_injected_paths", return_value=set()),
+            patch("almanac.lifecycle.log_retrieval"),
+            patch("almanac.lifecycle.spawn_deep_recall") as mock_spawn,
         ):
             lifecycle.run_recall()
 
@@ -497,7 +497,7 @@ class TestDeepRecallWorker:
 
         codex_output = '[{"title": "Cache invalidation", "reason": "Related approach"}]'
 
-        with patch("memento.lifecycle.llm_complete", return_value=LLMResult(text=codex_output, ok=True, error=None)):
+        with patch("almanac.lifecycle.llm_complete", return_value=LLMResult(text=codex_output, ok=True, error=None)):
             run_deep_recall_worker(input_path, "codex")
 
         assert os.path.exists(pending_path)
@@ -516,7 +516,7 @@ class TestDeepRecallWorker:
         with open(input_path, "w") as f:
             json.dump({"prompt": "test", "initial_results": [], "timestamp": time.time()}, f)
 
-        with patch("memento.lifecycle.llm_complete", return_value=LLMResult(text="[]", ok=True, error=None)):
+        with patch("almanac.lifecycle.llm_complete", return_value=LLMResult(text="[]", ok=True, error=None)):
             run_deep_recall_worker(input_path, "codex")
 
         # Input file should be deleted
@@ -563,7 +563,7 @@ class TestDeepRecallWorker:
             )
 
         with patch(
-            "memento.lifecycle.llm_complete",
+            "almanac.lifecycle.llm_complete",
             return_value=LLMResult(text='[{"title": "Test", "reason": "reason"}]', ok=True, error=None),
         ) as mock_complete:
             run_deep_recall_worker(input_path, "claude")
@@ -601,7 +601,7 @@ class TestDeepRecallWorkerAgenticGate:
             json.dump({"status": "pending", "timestamp": time.time()}, f)
 
     def _config(self, **overrides):
-        from memento.config import DEFAULT_CONFIG
+        from almanac.config import DEFAULT_CONFIG
 
         config = dict(DEFAULT_CONFIG)
         config.update(overrides)
@@ -615,10 +615,10 @@ class TestDeepRecallWorkerAgenticGate:
         llm_output = '[{"title": "Cache invalidation", "reason": "Related approach"}]'
 
         with (
-            patch("memento.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=False)),
-            patch("memento.lifecycle.agentic_retrieve") as mock_agentic,
+            patch("almanac.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=False)),
+            patch("almanac.lifecycle.agentic_retrieve") as mock_agentic,
             patch(
-                "memento.lifecycle.llm_complete", return_value=LLMResult(text=llm_output, ok=True, error=None)
+                "almanac.lifecycle.llm_complete", return_value=LLMResult(text=llm_output, ok=True, error=None)
             ) as mock_complete,
         ):
             run_deep_recall_worker(input_path, "codex")
@@ -641,10 +641,10 @@ class TestDeepRecallWorkerAgenticGate:
         ]
 
         with (
-            patch("memento.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
-            patch("memento.lifecycle.agentic_retrieve", return_value=list(agentic_results)) as mock_agentic,
-            patch("memento.lifecycle.llm_complete") as mock_complete,
-            patch("memento.lifecycle.log_retrieval") as mock_log,
+            patch("almanac.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
+            patch("almanac.lifecycle.agentic_retrieve", return_value=list(agentic_results)) as mock_agentic,
+            patch("almanac.lifecycle.llm_complete") as mock_complete,
+            patch("almanac.lifecycle.log_retrieval") as mock_log,
         ):
             run_deep_recall_worker(input_path, "codex")
 
@@ -677,9 +677,9 @@ class TestDeepRecallWorkerAgenticGate:
         ]
 
         with (
-            patch("memento.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
-            patch("memento.lifecycle.agentic_retrieve", return_value=agentic_results),
-            patch("memento.lifecycle.llm_complete") as mock_complete,
+            patch("almanac.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
+            patch("almanac.lifecycle.agentic_retrieve", return_value=agentic_results),
+            patch("almanac.lifecycle.llm_complete") as mock_complete,
         ):
             run_deep_recall_worker(input_path, "codex")
 
@@ -696,10 +696,10 @@ class TestDeepRecallWorkerAgenticGate:
         llm_output = '[{"title": "Fallback suggestion", "reason": "from one-shot"}]'
 
         with (
-            patch("memento.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
-            patch("memento.lifecycle.agentic_retrieve", return_value=[]) as mock_agentic,
+            patch("almanac.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
+            patch("almanac.lifecycle.agentic_retrieve", return_value=[]) as mock_agentic,
             patch(
-                "memento.lifecycle.llm_complete", return_value=LLMResult(text=llm_output, ok=True, error=None)
+                "almanac.lifecycle.llm_complete", return_value=LLMResult(text=llm_output, ok=True, error=None)
             ) as mock_complete,
         ):
             run_deep_recall_worker(input_path, "codex")
@@ -719,12 +719,12 @@ class TestDeepRecallWorkerAgenticGate:
         llm_output = '[{"title": "Fallback suggestion", "reason": "from one-shot"}]'
 
         with (
-            patch("memento.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
-            patch("memento.lifecycle.agentic_retrieve", side_effect=RuntimeError("provider exploded")),
+            patch("almanac.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
+            patch("almanac.lifecycle.agentic_retrieve", side_effect=RuntimeError("provider exploded")),
             patch(
-                "memento.lifecycle.llm_complete", return_value=LLMResult(text=llm_output, ok=True, error=None)
+                "almanac.lifecycle.llm_complete", return_value=LLMResult(text=llm_output, ok=True, error=None)
             ) as mock_complete,
-            patch("memento.lifecycle.log_retrieval") as mock_log,
+            patch("almanac.lifecycle.log_retrieval") as mock_log,
         ):
             run_deep_recall_worker(input_path, "codex")
 
@@ -746,9 +746,9 @@ class TestDeepRecallWorkerAgenticGate:
         agentic_results = [{"path": "notes/untitled.md", "title": "", "snippet": "", "score": 1.0}]
 
         with (
-            patch("memento.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
-            patch("memento.lifecycle.agentic_retrieve", return_value=agentic_results),
-            patch("memento.lifecycle.llm_complete") as mock_complete,
+            patch("almanac.lifecycle.get_config", return_value=self._config(agentic_retrieval_enabled=True)),
+            patch("almanac.lifecycle.agentic_retrieve", return_value=agentic_results),
+            patch("almanac.lifecycle.llm_complete") as mock_complete,
         ):
             run_deep_recall_worker(input_path, "codex")
 

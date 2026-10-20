@@ -1,7 +1,7 @@
 """
 Retrieval layer for LongMemEval benchmark.
 Uses rank_bm25 for per-question BM25 indexing, producing result dicts
-compatible with memento_utils enhancement functions.
+compatible with almanac_utils enhancement functions.
 """
 
 from dataclasses import dataclass
@@ -42,7 +42,7 @@ def build_bm25_index(documents):
 
 
 def bm25_search(index, query, limit=10, min_score=0.0):
-    """Search a BM25 index and return results in memento-compatible format.
+    """Search a BM25 index and return results in almanac-compatible format.
 
     Args:
         index: BM25Index from build_bm25_index
@@ -51,7 +51,7 @@ def bm25_search(index, query, limit=10, min_score=0.0):
         min_score: minimum BM25 score threshold
 
     Returns:
-        list of dicts matching memento_utils format:
+        list of dicts matching almanac_utils format:
         [{"path": str, "title": str, "score": float, "snippet": str}]
         Sorted by score descending.
     """

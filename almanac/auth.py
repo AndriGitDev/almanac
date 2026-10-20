@@ -95,13 +95,10 @@ class AlmanacTokenVerifier:
         )
 
 
-MementoTokenVerifier = AlmanacTokenVerifier
-
-
 def create_auth_provider(config: dict | None = None) -> AuthProvider:
     """Create an auth provider based on configuration.
 
-    If ALMANAC_API_KEY (or legacy MEMENTO_API_KEY) env var or config['api_key'] is set, uses BearerTokenAuth.
+    If ALMANAC_API_KEY env var or config['api_key'] is set, uses BearerTokenAuth.
     Otherwise, falls back to NoAuth (local mode).
     """
     if config is None:

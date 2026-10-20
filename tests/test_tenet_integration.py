@@ -12,14 +12,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-from memento.config import DEFAULT_CONFIG
-from memento.graph import (
+from almanac.config import DEFAULT_CONFIG
+from almanac.graph import (
     apply_pagerank_boost,
     build_wikilink_graph,
     compute_pagerank,
     ppr_expand,
 )
-from memento.search import enhance_results
+from almanac.search import enhance_results
 
 
 @pytest.fixture
@@ -158,7 +158,7 @@ class TestEnhanceResultsPipeline:
         graph = build_wikilink_graph(linked_vault)
         pagerank = compute_pagerank(graph)
 
-        with patch("memento.search.load_or_build_graph", return_value=(graph, pagerank)):
+        with patch("almanac.search.load_or_build_graph", return_value=(graph, pagerank)):
             enhanced = enhance_results(
                 results,
                 config=integration_config,
@@ -185,7 +185,7 @@ class TestEnhanceResultsPipeline:
         ]
 
         # Patch load_or_build_graph to fail
-        with patch("memento.search.load_or_build_graph", side_effect=ImportError("no networkx")):
+        with patch("almanac.search.load_or_build_graph", side_effect=ImportError("no networkx")):
             enhanced = enhance_results(results, config=integration_config)
 
         # Should still return results (fallback to wikilinks, which may not expand
@@ -200,7 +200,7 @@ class TestEnhanceResultsPipeline:
         integration_config["ppr_enabled"] = False
         results = [{"path": "notes/note-a.md", "title": "Core arch", "score": 0.9}]
 
-        with patch("memento.search.load_or_build_graph") as mock_load:
+        with patch("almanac.search.load_or_build_graph") as mock_load:
             enhance_results(results, config=integration_config)
 
         mock_load.assert_not_called()
@@ -220,14 +220,14 @@ class TestEnhanceResultsPipeline:
         graph = build_wikilink_graph(linked_vault)
         pagerank = compute_pagerank(graph)
 
-        with patch("memento.search.load_or_build_graph", return_value=(graph, pagerank)):
+        with patch("almanac.search.load_or_build_graph", return_value=(graph, pagerank)):
             with_networkx = enhance_results(
                 [dict(r) for r in results],
                 config=integration_config,
                 cwd="/home/vic/Projects/test-project",
             )
 
-        with patch("memento.search.load_or_build_graph", side_effect=ImportError("no networkx")):
+        with patch("almanac.search.load_or_build_graph", side_effect=ImportError("no networkx")):
             without_networkx = enhance_results(
                 [dict(r) for r in results],
                 config=integration_config,
@@ -250,7 +250,7 @@ class TestEnhanceResultsPipeline:
         pagerank = compute_pagerank(graph)
         mock_load = MagicMock(return_value=(graph, pagerank))
 
-        with patch("memento.search.load_or_build_graph", mock_load):
+        with patch("almanac.search.load_or_build_graph", mock_load):
             enhanced = enhance_results(
                 [dict(r) for r in results],
                 config=integration_config,
@@ -285,8 +285,8 @@ Body of other note.
         pagerank = compute_pagerank(graph)
 
         with (
-            patch("memento.search.load_or_build_graph", return_value=(graph, pagerank)),
-            patch("memento.graph.get_vault", return_value=linked_vault),
+            patch("almanac.search.load_or_build_graph", return_value=(graph, pagerank)),
+            patch("almanac.graph.get_vault", return_value=linked_vault),
         ):
             enhanced = enhance_results(
                 results,

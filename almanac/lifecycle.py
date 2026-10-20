@@ -295,7 +295,7 @@ def triage_health_warning(rate_limited=False):
     With rate_limited=True (the injection surfaces: briefing, session
     context), the warning fires at most once per day — it was previously
     re-injected into 100% of session briefings for days at a time. Diagnostic
-    surfaces (memento health) pass False and always see it.
+    surfaces (almanac health) pass False and always see it.
     """
     try:
         cutoff = datetime.now() - timedelta(hours=TRIAGE_HEALTH_WINDOW_HOURS)
@@ -479,8 +479,8 @@ def format_qmd_result(result):
 def _find_hook_script(name):
     """Locate a worker hook script in both repo and installed layouts.
 
-    Repo layout:      <repo>/memento/lifecycle.py with <repo>/hooks/<name>
-    Installed layout: ~/.claude/hooks/memento/lifecycle.py with ~/.claude/hooks/<name>
+    Repo layout:      <repo>/almanac/lifecycle.py with <repo>/hooks/<name>
+    Installed layout: ~/.claude/hooks/almanac/lifecycle.py with ~/.claude/hooks/<name>
     """
     base = Path(__file__).resolve().parent.parent
     for candidate in (base / "hooks" / name, base / name):
@@ -498,7 +498,7 @@ def runtime_host_id(host_id: str | None = None) -> str:
     """Return a stable runtime host identifier for shared hook state scoping."""
     if host_id:
         return _safe_scope_part(host_id)
-    for env_name in ("MEMENTO_HOST_ID", "MEMENTO_HOST", "MEMENTO_CLIENT", "MEMENTO_ADAPTER"):
+    for env_name in ("ALMANAC_HOST_ID", "ALMANAC_HOST", "ALMANAC_CLIENT", "ALMANAC_ADAPTER"):
         value = os.environ.get(env_name)
         if value:
             return _safe_scope_part(value)
@@ -887,7 +887,7 @@ def build_briefing(
     cwd: str, session_id: str = "unknown", *, allow_deferred: bool = True, host_id: str | None = None
 ) -> LifecycleResult:
     """Build session-start briefing content."""
-    # Never brief inside a memento-spawned LLM child: that session exists only
+    # Never brief inside a almanac-spawned LLM child: that session exists only
     # to answer a retrieval/synthesis prompt, and briefing it would spawn its
     # own deferred search -> another LLM child -> recursion (see llm.py).
     if in_llm_subprocess():
@@ -1937,7 +1937,7 @@ def build_recall(
     host_id: str | None = None,
 ) -> LifecycleResult:
     """Build prompt recall content."""
-    # Skip recall inside a memento-spawned LLM child: recall runs agentic
+    # Skip recall inside a almanac-spawned LLM child: recall runs agentic
     # retrieval, which spawns another LLM child and recurses (see llm.py).
     if in_llm_subprocess():
         return empty_result("recall", "llm-subprocess")
@@ -2468,9 +2468,9 @@ def should_skip_tool_context_path(file_path: str) -> bool:
 
     path = Path(file_path)
     parts = path.parts
-    if path.name == "memento.ts" and "extensions" in parts:
+    if path.name == "almanac.ts" and "extensions" in parts:
         return True
-    if path.name == "pi_bridge.py" and "memento" in parts:
+    if path.name == "pi_bridge.py" and "almanac" in parts:
         return True
 
     vault = get_vault()
@@ -2818,7 +2818,7 @@ def log_tool_context_decision(
     """Log one terminal tool-context decision for diagnostic analysis.
 
     ``log_retrieval`` still controls whether anything is written (via
-    retrieval_log/MEMENTO_DEBUG). This helper makes the tool-context path
+    retrieval_log/ALMANAC_DEBUG). This helper makes the tool-context path
     measurable when diagnostic logging is enabled: every call emits a terminal
     decision, and optional candidate summaries explain why a note did or did
     not survive gating.

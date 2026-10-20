@@ -1,4 +1,4 @@
-"""Tests for tag normalization in memento_utils."""
+"""Tests for tag normalization in almanac_utils."""
 
 import sys
 from pathlib import Path
@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
-from memento.utils import normalize_note_tags, normalize_tags
+from almanac.utils import normalize_note_tags, normalize_tags
 
 
 _TEST_CONFIG = {
@@ -23,7 +23,7 @@ _TEST_CONFIG = {
 
 class TestNormalizeTags:
     def _normalize(self, tags):
-        with patch("memento.utils.get_config", return_value=_TEST_CONFIG):
+        with patch("almanac.utils.get_config", return_value=_TEST_CONFIG):
             return normalize_tags(tags)
 
     def test_basic_alias(self):
@@ -45,7 +45,7 @@ class TestNormalizeTags:
         assert self._normalize(["", "redis", ""]) == ["redis"]
 
     def test_no_aliases_configured(self):
-        with patch("memento.utils.get_config", return_value={"tag_aliases": {}}):
+        with patch("almanac.utils.get_config", return_value={"tag_aliases": {}}):
             assert normalize_tags(["k8s", "redis"]) == ["k8s", "redis"]
 
 
@@ -57,7 +57,7 @@ class TestNormalizeNoteTags:
 
     def test_normalizes_tags_in_file(self, tmp_path):
         note = self._write_note(tmp_path, "k8s, redis, js")
-        with patch("memento.utils.get_config", return_value=_TEST_CONFIG):
+        with patch("almanac.utils.get_config", return_value=_TEST_CONFIG):
             changed = normalize_note_tags(note)
         assert changed is True
         content = note.read_text()
@@ -67,13 +67,13 @@ class TestNormalizeNoteTags:
 
     def test_no_change_when_already_normalized(self, tmp_path):
         note = self._write_note(tmp_path, "kubernetes, redis")
-        with patch("memento.utils.get_config", return_value=_TEST_CONFIG):
+        with patch("almanac.utils.get_config", return_value=_TEST_CONFIG):
             changed = normalize_note_tags(note)
         assert changed is False
 
     def test_preserves_body(self, tmp_path):
         note = self._write_note(tmp_path, "k8s, redis")
-        with patch("memento.utils.get_config", return_value=_TEST_CONFIG):
+        with patch("almanac.utils.get_config", return_value=_TEST_CONFIG):
             normalize_note_tags(note)
         content = note.read_text()
         assert "Body text." in content
@@ -86,7 +86,7 @@ class TestNormalizeNoteTags:
         """Frontmatter with --- in a value must not corrupt the note."""
         note = tmp_path / "dash-title.md"
         note.write_text("---\ntitle: foo --- bar\ntags: [k8s, redis]\ndate: 2026-01-01\n---\n\nBody text.")
-        with patch("memento.utils.get_config", return_value=_TEST_CONFIG):
+        with patch("almanac.utils.get_config", return_value=_TEST_CONFIG):
             changed = normalize_note_tags(note)
         assert changed is True
         content = note.read_text()
@@ -104,7 +104,7 @@ class TestNormalizeNoteTags:
         """--- in the body must not confuse the parser."""
         note = tmp_path / "body-dash.md"
         note.write_text("---\ntitle: Normal title\ntags: [k8s]\ndate: 2026-01-01\n---\n\nSome text\n---\nMore text.")
-        with patch("memento.utils.get_config", return_value=_TEST_CONFIG):
+        with patch("almanac.utils.get_config", return_value=_TEST_CONFIG):
             changed = normalize_note_tags(note)
         assert changed is True
         content = note.read_text()

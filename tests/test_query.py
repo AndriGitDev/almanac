@@ -1,15 +1,15 @@
-"""Tests for memento/query.py: the typed metadata filter core.
+"""Tests for almanac/query.py: the typed metadata filter core.
 
 Covers build_metadata_filter (the shared predicate extracted for MEM-158 so
-memento_search can reuse memento_query's filter semantics) and the
+almanac_search can reuse almanac_query's filter semantics) and the
 read_note_record path-lookup wrapper. query_notes itself is covered end to
-end in tests/test_mcp_server.py::TestMementoQuery; the agreement test below
+end in tests/test_mcp_server.py::TestAlmanacQuery; the agreement test below
 asserts query_notes and build_metadata_filter produce the same accepted set
 for the same fixture and filters, since query_notes now delegates to
 build_metadata_filter internally.
 """
 
-from memento.query import (
+from almanac.query import (
     QueryValidationError,
     _iter_note_records,
     build_metadata_filter,
@@ -125,7 +125,7 @@ class TestReadNoteRecord:
 
     def test_block_style_tags_are_now_visible(self, tmp_vault):
         """MEM-166: the known fix -- block-style tags used to be invisible here,
-        same gap memento.graph.read_note_metadata had."""
+        same gap almanac.graph.read_note_metadata had."""
         (tmp_vault / "notes" / "block.md").write_text(
             "---\ntitle: Block\ntype: discovery\ntags:\n  - alpha\n  - beta\n---\n\nBody.\n"
         )

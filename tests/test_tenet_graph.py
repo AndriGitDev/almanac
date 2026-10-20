@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from memento.graph import (
+from almanac.graph import (
     apply_pagerank_boost,
     build_related_view,
     build_wikilink_graph,
@@ -46,21 +46,21 @@ def _write_note(vault, stem, body, frontmatter=None):
 
 
 class TestReadNoteMetadata:
-    """Characterization tests for memento.graph.read_note_metadata, migrated
-    to memento.frontmatter in MEM-166. Covers every schema field shape it
+    """Characterization tests for almanac.graph.read_note_metadata, migrated
+    to almanac.frontmatter in MEM-166. Covers every schema field shape it
     reads plus the fixture corpus edge cases (no frontmatter, missing note,
     body-level `---`, unknown keys) so consolidation is behavior-frozen
     except the one documented fix (block-style tags)."""
 
     def test_missing_note_returns_none(self, tmp_vault, mock_config):
-        with patch("memento.graph.get_vault", return_value=tmp_vault):
+        with patch("almanac.graph.get_vault", return_value=tmp_vault):
             assert read_note_metadata("does-not-exist") is None
 
     def test_no_frontmatter_returns_all_none_scalars_and_empty_lists(self, tmp_vault, mock_config):
         (tmp_vault / "notes").mkdir(parents=True, exist_ok=True)
         (tmp_vault / "notes" / "bare.md").write_text("Just a body, no frontmatter.\n")
 
-        with patch("memento.graph.get_vault", return_value=tmp_vault):
+        with patch("almanac.graph.get_vault", return_value=tmp_vault):
             meta = read_note_metadata("bare")
 
         assert meta["title"] is None
@@ -86,7 +86,7 @@ class TestReadNoteMetadata:
             },
         )
 
-        with patch("memento.graph.get_vault", return_value=tmp_vault):
+        with patch("almanac.graph.get_vault", return_value=tmp_vault):
             meta = read_note_metadata("full")
 
         assert meta["title"] == "Full Note"
@@ -108,7 +108,7 @@ class TestReadNoteMetadata:
             "---\ntitle: Block Tagged\ntype: discovery\ntags:\n  - alpha\n  - beta\n---\n\nBody.\n"
         )
 
-        with patch("memento.graph.get_vault", return_value=tmp_vault):
+        with patch("almanac.graph.get_vault", return_value=tmp_vault):
             meta = read_note_metadata("block-tagged")
 
         assert meta["tags"] == ["alpha", "beta"]
@@ -118,7 +118,7 @@ class TestReadNoteMetadata:
         notes.mkdir(parents=True, exist_ok=True)
         (notes / "dashes.md").write_text("---\ntitle: Has Dashes\n---\n\nBody.\n\n---\n\nMore body.\n")
 
-        with patch("memento.graph.get_vault", return_value=tmp_vault):
+        with patch("almanac.graph.get_vault", return_value=tmp_vault):
             meta = read_note_metadata("dashes")
 
         assert meta["title"] == "Has Dashes"
@@ -130,7 +130,7 @@ class TestReadNoteMetadata:
             "---\ntitle: Unknown Keys\ntype: discovery\nhand-added: value\n---\n\nBody.\n"
         )
 
-        with patch("memento.graph.get_vault", return_value=tmp_vault):
+        with patch("almanac.graph.get_vault", return_value=tmp_vault):
             meta = read_note_metadata("unknown")
 
         assert meta["title"] == "Unknown Keys"
@@ -243,7 +243,7 @@ def test_load_or_build_uses_cache(tmp_vault, mock_config):
 
     cache_path = str(tmp_vault / "test-graph-cache.json")
 
-    with patch("memento.graph._GRAPH_CACHE", new=[None]):
+    with patch("almanac.graph._GRAPH_CACHE", new=[None]):
         # First call: builds
         g1, pr1 = load_or_build_graph(
             vault_path=str(tmp_vault),
@@ -252,7 +252,7 @@ def test_load_or_build_uses_cache(tmp_vault, mock_config):
         assert g1.has_edge("alpha", "beta")
 
         # Patch build_wikilink_graph so if it gets called we know cache was missed
-        with patch("memento.graph.build_wikilink_graph") as mock_build:
+        with patch("almanac.graph.build_wikilink_graph") as mock_build:
             g2, pr2 = load_or_build_graph(
                 vault_path=str(tmp_vault),
                 cache_path=cache_path,
@@ -269,10 +269,10 @@ def test_load_or_build_rebuilds_stale_cache(tmp_vault, mock_config):
 
     cache_path = str(tmp_vault / "stale-cache.json")
 
-    import memento.graph as memento_graph
+    import almanac.graph as almanac_graph
 
     # Clear in-process cache
-    memento_graph._GRAPH_CACHE = [None]
+    almanac_graph._GRAPH_CACHE = [None]
 
     # Build and write cache
     g, pr = load_or_build_graph(
@@ -285,7 +285,7 @@ def test_load_or_build_rebuilds_stale_cache(tmp_vault, mock_config):
     os.utime(cache_path, (two_hours_ago, two_hours_ago))
 
     # Clear in-process cache so it has to check disk
-    memento_graph._GRAPH_CACHE = [None]
+    almanac_graph._GRAPH_CACHE = [None]
 
     # Add a new note to prove the graph was rebuilt
     _write_note(tmp_vault, "gamma", "See [[alpha]].")
@@ -308,15 +308,15 @@ def test_load_or_build_rebuilds_when_note_written_after_cache_build(tmp_vault, m
 
     cache_path = str(tmp_vault / "fresh-write-cache.json")
 
-    import memento.graph as memento_graph
+    import almanac.graph as almanac_graph
 
-    memento_graph._GRAPH_CACHE = [None]
+    almanac_graph._GRAPH_CACHE = [None]
 
     g1, pr1 = load_or_build_graph(vault_path=str(tmp_vault), cache_path=cache_path)
     assert "gamma" not in g1.nodes
 
     # Clear in-process cache so the next call must consult disk + do the mtime scan.
-    memento_graph._GRAPH_CACHE = [None]
+    almanac_graph._GRAPH_CACHE = [None]
 
     # Write a new note whose mtime is strictly after the cache file's mtime,
     # well within the 1h TTL -- proves staleness is driven by note mtime,
@@ -325,7 +325,7 @@ def test_load_or_build_rebuilds_when_note_written_after_cache_build(tmp_vault, m
     new_note_path = _write_note(tmp_vault, "gamma", "See [[alpha]].")
     os.utime(new_note_path, (cache_mtime + 5, cache_mtime + 5))
 
-    with patch("memento.graph.build_wikilink_graph", wraps=memento_graph.build_wikilink_graph) as spy_build:
+    with patch("almanac.graph.build_wikilink_graph", wraps=almanac_graph.build_wikilink_graph) as spy_build:
         g2, pr2 = load_or_build_graph(vault_path=str(tmp_vault), cache_path=cache_path)
         spy_build.assert_called_once()
 
@@ -341,13 +341,13 @@ def test_load_or_build_reuses_cache_when_no_notes_changed(tmp_vault, mock_config
 
     cache_path = str(tmp_vault / "reuse-cache.json")
 
-    import memento.graph as memento_graph
+    import almanac.graph as almanac_graph
 
-    memento_graph._GRAPH_CACHE = [None]
+    almanac_graph._GRAPH_CACHE = [None]
     load_or_build_graph(vault_path=str(tmp_vault), cache_path=cache_path)
-    memento_graph._GRAPH_CACHE = [None]
+    almanac_graph._GRAPH_CACHE = [None]
 
-    with patch("memento.graph.build_wikilink_graph") as mock_build:
+    with patch("almanac.graph.build_wikilink_graph") as mock_build:
         load_or_build_graph(vault_path=str(tmp_vault), cache_path=cache_path)
         mock_build.assert_not_called()
 
@@ -434,7 +434,7 @@ def test_pagerank_boost_preserves_order_when_equal():
     assert results[2]["path"].endswith("third.md")
 
 
-# --- MEM-159: memento_related topology (resolve_note_reference,
+# --- MEM-159: almanac_related topology (resolve_note_reference,
 # graph_neighborhood, supersession_chain, build_related_view) ---
 
 
@@ -444,16 +444,16 @@ def _isolate_graph_cache(tmp_path, monkeypatch):
 
     build_related_view calls load_or_build_graph(vault) without an explicit
     cache_path, so without this it would read/write the same
-    ~/.cache/memento-vault/wikilink-graph.json every other worktree/test in
+    ~/.cache/almanac/wikilink-graph.json every other worktree/test in
     this repo uses.
     """
-    monkeypatch.setattr("memento.graph._GRAPH_CACHE_PATH", str(tmp_path / "related-view-cache.json"))
-    monkeypatch.setattr("memento.graph._GRAPH_CACHE", [None])
+    monkeypatch.setattr("almanac.graph._GRAPH_CACHE_PATH", str(tmp_path / "related-view-cache.json"))
+    monkeypatch.setattr("almanac.graph._GRAPH_CACHE", [None])
 
 
 class TestResolveNoteReference:
     def test_resolves_by_stem(self, tmp_vault, mock_config, monkeypatch):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "alpha", "See [[beta]].")
 
         stem, suggestions = resolve_note_reference("alpha")
@@ -462,7 +462,7 @@ class TestResolveNoteReference:
         assert suggestions == []
 
     def test_resolves_by_relative_path(self, tmp_vault, mock_config, monkeypatch):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "alpha", "See [[beta]].")
 
         stem, _ = resolve_note_reference("notes/alpha.md")
@@ -470,7 +470,7 @@ class TestResolveNoteReference:
         assert stem == "alpha"
 
     def test_resolves_by_exact_title(self, tmp_vault, mock_config, monkeypatch):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "redis-cache-ttl", "Body.", frontmatter={"title": "Redis cache requires explicit TTL"})
 
         stem, suggestions = resolve_note_reference("Redis cache requires explicit TTL")
@@ -479,7 +479,7 @@ class TestResolveNoteReference:
         assert suggestions == []
 
     def test_unresolved_returns_close_match_suggestions(self, tmp_vault, mock_config, monkeypatch):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "redis-cache-ttl", "Body.")
         _write_note(tmp_vault, "zustand-state-reset", "Body.")
 
@@ -489,7 +489,7 @@ class TestResolveNoteReference:
         assert "redis-cache-ttl" in suggestions
 
     def test_empty_note_reference_unresolved(self, tmp_vault, mock_config, monkeypatch):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
 
         stem, suggestions = resolve_note_reference("")
 
@@ -591,7 +591,7 @@ class TestGraphNeighborhood:
 
 class TestSupersessionChain:
     def test_walks_both_directions_oldest_to_newest(self, tmp_vault, mock_config, monkeypatch):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "note-v1", "First version.")
         _write_note(tmp_vault, "note-v2", "Second version.", frontmatter={"supersedes": '"[[note-v1]]"'})
         _write_note(tmp_vault, "note-v3", "Third version.", frontmatter={"supersedes": '"[[note-v2]]"'})
@@ -602,7 +602,7 @@ class TestSupersessionChain:
         assert [entry["hop"] for entry in chain] == [-1, 0, 1]
 
     def test_no_supersession_returns_only_self(self, tmp_vault, mock_config, monkeypatch):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "standalone", "No supersession here.")
 
         chain = supersession_chain("standalone")
@@ -613,7 +613,7 @@ class TestSupersessionChain:
 
 class TestBuildRelatedView:
     def test_full_shape_for_connected_note(self, tmp_vault, mock_config, monkeypatch, _isolate_graph_cache):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "alpha", "See [[beta]].")
         _write_note(tmp_vault, "beta", "No links.")
         _write_note(tmp_vault, "gamma", "See [[alpha]].")
@@ -631,7 +631,7 @@ class TestBuildRelatedView:
         assert "error" not in result
 
     def test_depth_is_clamped_in_response(self, tmp_vault, mock_config, monkeypatch, _isolate_graph_cache):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "alpha", "See [[beta]].")
         _write_note(tmp_vault, "beta", "No links.")
 
@@ -640,7 +640,7 @@ class TestBuildRelatedView:
         assert result["depth"] == 3
 
     def test_unresolved_note_returns_structured_error(self, tmp_vault, mock_config, monkeypatch, _isolate_graph_cache):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
         _write_note(tmp_vault, "redis-cache-ttl", "Body.")
 
         result = build_related_view("redis-cache-tt")  # typo
@@ -650,8 +650,8 @@ class TestBuildRelatedView:
         assert "redis-cache-ttl" in result["suggestions"]
 
     def test_networkx_unavailable_returns_structured_error(self, tmp_vault, mock_config, monkeypatch):
-        monkeypatch.setattr("memento.graph.get_vault", lambda: tmp_vault)
-        monkeypatch.setattr("memento.graph._HAS_NETWORKX", False)
+        monkeypatch.setattr("almanac.graph.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.graph._HAS_NETWORKX", False)
 
         result = build_related_view("alpha")
 

@@ -1,4 +1,4 @@
-"""Tests for hooks/memento-remote-sync.py."""
+"""Tests for hooks/almanac-remote-sync.py."""
 
 import hashlib
 import importlib.util
@@ -14,8 +14,8 @@ REPO_ROOT = Path(__file__).parent.parent
 
 def _load_remote_sync_module():
     spec = importlib.util.spec_from_file_location(
-        "memento_remote_sync_test",
-        str(REPO_ROOT / "hooks" / "memento-remote-sync.py"),
+        "almanac_remote_sync_test",
+        str(REPO_ROOT / "hooks" / "almanac-remote-sync.py"),
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -43,7 +43,7 @@ class TestRemoteSyncDryRun:
             patch.object(mod, "get_vault", return_value=vault),
             patch.object(mod, "get", return_value=None),
             patch.object(mod, "store") as store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--dry-run", str(note_path)]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--dry-run", str(note_path)]),
         ):
             mod.main()
 
@@ -68,7 +68,7 @@ class TestRemoteSyncDryRun:
                 },
             ),
             patch.object(mod, "store") as store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--dry-run", str(note_path)]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--dry-run", str(note_path)]),
         ):
             mod.main()
 
@@ -91,7 +91,7 @@ class TestRemoteSyncDryRun:
                 return_value={"path": "notes/same-title.md", "content": remote_content},
             ),
             patch.object(mod, "store") as store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--dry-run", str(note_path)]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--dry-run", str(note_path)]),
         ):
             mod.main()
 
@@ -99,7 +99,7 @@ class TestRemoteSyncDryRun:
         assert "Would conflict (remote exists, different content): Same title" in capsys.readouterr().out
 
     def test_direct_sync_skips_locally_tombstoned_note_path(self, tmp_path, capsys):
-        from memento.archive import record_tombstone
+        from almanac.archive import record_tombstone
 
         mod = _load_remote_sync_module()
         vault = tmp_path / "vault"
@@ -111,7 +111,7 @@ class TestRemoteSyncDryRun:
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
             patch.object(mod, "store") as store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", str(note_path)]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", str(note_path)]),
         ):
             mod.main()
 
@@ -129,7 +129,7 @@ class TestRemoteSyncDryRun:
             patch.object(mod, "get_vault", return_value=vault),
             patch.object(mod, "get", return_value=None),
             patch.object(mod, "store", return_value={"error": "remote unavailable"}),
-            patch.object(sys, "argv", ["memento-remote-sync.py", str(note_path)]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", str(note_path)]),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 mod.main()
@@ -151,7 +151,7 @@ class TestRemoteSyncDryRun:
             patch.object(mod, "get_vault", return_value=vault),
             patch.object(mod, "get", side_effect=RuntimeError("network down")),
             patch.object(mod, "store") as store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", str(note_path)]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", str(note_path)]),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 mod.main()
@@ -172,7 +172,7 @@ class TestRemoteSyncDryRun:
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
             patch.object(mod, "store") as store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", str(note_path), "--resolve-conflicts"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", str(note_path), "--resolve-conflicts"]),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 mod.main()
@@ -201,7 +201,7 @@ class TestRemoteSyncDryRun:
             patch.object(
                 sys,
                 "argv",
-                ["memento-remote-sync.py", "--resolve-conflicts", "local", str(note_path)],
+                ["almanac-remote-sync.py", "--resolve-conflicts", "local", str(note_path)],
             ),
         ):
             mod.main()
@@ -232,9 +232,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store", return_value={"path": "notes/note-b.md"}) as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -257,16 +257,16 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
         mock_store.assert_not_called()
 
     def test_catch_up_skips_locally_tombstoned_note_path(self, tmp_path, capsys):
-        from memento.archive import record_tombstone
+        from almanac.archive import record_tombstone
 
         mod = _load_remote_sync_module()
         vault = tmp_path / "vault"
@@ -278,9 +278,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=[]),
+            patch("almanac.remote_client.list_notes", return_value=[]),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -306,9 +306,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -333,9 +333,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=None),
+            patch("almanac.remote_client.list_notes", return_value=None),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             with pytest.raises(SystemExit) as exc_info:
                 mod.main()
@@ -355,9 +355,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up", "--dry-run"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up", "--dry-run"]),
         ):
             mod.main()
 
@@ -376,9 +376,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=[]),
+            patch("almanac.remote_client.list_notes", return_value=[]),
             patch.object(mod, "store", return_value={"path": "notes/x.md"}) as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up", "--batch", "2"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up", "--batch", "2"]),
         ):
             mod.main()
 
@@ -395,9 +395,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=[]),
+            patch("almanac.remote_client.list_notes", return_value=[]),
             patch.object(mod, "store", return_value={"path": "notes/note-a.md"}),
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -422,9 +422,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store", return_value={"path": "notes/new.md"}),
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -438,7 +438,7 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=False),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             with pytest.raises(SystemExit):
                 mod.main()
@@ -478,9 +478,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -506,9 +506,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -546,9 +546,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -589,9 +589,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -618,14 +618,14 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(
                 mod,
                 "get",
                 return_value={"path": "notes/local-name-2.md", "content": note.read_text()},
             ) as get,
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -652,7 +652,7 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(
                 mod,
                 "get",
@@ -663,7 +663,7 @@ class TestCatchUp:
             patch.object(
                 sys,
                 "argv",
-                ["memento-remote-sync.py", "--catch-up", "--resolve-conflicts=local"],
+                ["almanac-remote-sync.py", "--catch-up", "--resolve-conflicts=local"],
             ),
         ):
             mod.main()
@@ -688,7 +688,7 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(
                 mod,
                 "get",
@@ -702,7 +702,7 @@ class TestCatchUp:
             patch.object(
                 sys,
                 "argv",
-                ["memento-remote-sync.py", "--catch-up", "--batch", "1", "--resolve-conflicts=local"],
+                ["almanac-remote-sync.py", "--catch-up", "--batch", "1", "--resolve-conflicts=local"],
             ),
         ):
             mod.main()
@@ -728,7 +728,7 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(
                 mod,
                 "get",
@@ -742,7 +742,7 @@ class TestCatchUp:
             patch.object(
                 sys,
                 "argv",
-                ["memento-remote-sync.py", "--catch-up", "--batch", "1", "--resolve-conflicts=local"],
+                ["almanac-remote-sync.py", "--catch-up", "--batch", "1", "--resolve-conflicts=local"],
             ),
         ):
             mod.main()
@@ -773,10 +773,10 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "get", side_effect=fake_get) as get,
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -805,14 +805,14 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "get", side_effect=fake_get),
             patch.object(mod, "replace_note") as replace_note,
             patch.object(mod, "store") as mock_store,
             patch.object(
                 sys,
                 "argv",
-                ["memento-remote-sync.py", "--catch-up", "--resolve-conflicts=local"],
+                ["almanac-remote-sync.py", "--catch-up", "--resolve-conflicts=local"],
             ),
         ):
             mod.main()
@@ -842,10 +842,10 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "get", side_effect=fake_get),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -883,9 +883,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store", return_value={"path": "notes/evolving-note.md"}) as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 
@@ -922,9 +922,9 @@ class TestCatchUp:
         with (
             patch.object(mod, "is_remote", return_value=True),
             patch.object(mod, "get_vault", return_value=vault),
-            patch("memento.remote_client.list_notes", return_value=remote_inventory),
+            patch("almanac.remote_client.list_notes", return_value=remote_inventory),
             patch.object(mod, "store") as mock_store,
-            patch.object(sys, "argv", ["memento-remote-sync.py", "--catch-up"]),
+            patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
         ):
             mod.main()
 

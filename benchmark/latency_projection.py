@@ -145,10 +145,10 @@ def run_projection(max_notes=3000, step=500):
         "websocket connection handling",
     ]
 
-    collection = "memento-bench"
+    collection = "almanac-bench"
 
     # Check current real vault size for reference
-    from memento_utils import get_vault
+    from almanac_utils import get_vault
 
     real_vault = get_vault()
     real_count = len(list((real_vault / "notes").glob("*.md"))) if (real_vault / "notes").exists() else 0
@@ -162,7 +162,7 @@ def run_projection(max_notes=3000, step=500):
 
     results = []
 
-    with tempfile.TemporaryDirectory(prefix="memento-bench-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="almanac-bench-") as tmpdir:
         vault_path = Path(tmpdir) / "vault"
         vault_path.mkdir()
 

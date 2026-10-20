@@ -1,13 +1,13 @@
-"""Shared frontmatter parsing/serialization for Memento vault notes (MEM-166).
+"""Shared frontmatter parsing/serialization for Almanac vault notes (MEM-166).
 
 Before this module, at least three hand-rolled frontmatter parsers coexisted
-and drifted: :mod:`memento.graph`'s line-prefix matcher, :mod:`memento.query`'s
-``split(":", 1)`` scanner, and :mod:`memento.contradictions`'s ad-hoc tag
-splitting -- plus :mod:`memento.store`'s regex-based typed accessors
+and drifted: :mod:`almanac.graph`'s line-prefix matcher, :mod:`almanac.query`'s
+``split(":", 1)`` scanner, and :mod:`almanac.contradictions`'s ad-hoc tag
+splitting -- plus :mod:`almanac.store`'s regex-based typed accessors
 (``split_frontmatter``, ``_frontmatter_scalar``/``_frontmatter_int``/
-``_frontmatter_bool``) and :mod:`memento.smart_store`'s own copies of the
+``_frontmatter_bool``) and :mod:`almanac.smart_store`'s own copies of the
 same regexes. This module is the single place that subset grammar lives;
-every consumer above now reads through it (``memento.store`` keeps thin
+every consumer above now reads through it (``almanac.store`` keeps thin
 delegating wrappers for backward compatibility -- see its module docstring).
 
 **This is NOT a full YAML parser.** It implements exactly the subset that
@@ -40,7 +40,7 @@ the schema drift-lock counterpart, see :data:`KNOWN_FIELDS`) documents:
 
 Deliberately hand-rolled, not backed by PyYAML: this vault's frontmatter is a
 small, fully-specified subset, and staying dependency-free keeps note reads
-and writes portable across every environment Memento runs in (no optional
+and writes portable across every environment Almanac runs in (no optional
 parser dependency for a read-mostly hot path).
 """
 
@@ -154,7 +154,7 @@ def parse(text: str) -> tuple[dict[str, str | list[str]], str]:
 
 
 # --- Typed accessors (operate on a raw frontmatter blob + key, matching the
-# pre-MEM-166 memento.store._frontmatter_* call convention so those call
+# pre-MEM-166 almanac.store._frontmatter_* call convention so those call
 # sites move here unchanged) -------------------------------------------------
 
 
@@ -196,7 +196,7 @@ def get_date(frontmatter: str, key: str) -> datetime | None:
 
     Tolerant of the fuller ``date`` shape (``YYYY-MM-DDTHH:MM``) -- only the
     date prefix is significant, matching the existing convention
-    :func:`memento.hub._parse_date` established for hub regeneration.
+    :func:`almanac.hub._parse_date` established for hub regeneration.
     """
     raw = get_scalar(frontmatter, key)
     if not raw:
@@ -320,7 +320,7 @@ def serialize(fields: dict[str, Any], body: str, *, key_order: list[str] | None 
 # tests/test_frontmatter_schema.py asserts the two stay equal.
 #
 # Deliberately a literal copy rather than a live import: scripts/ is a CLI
-# entry point, not a package memento/ should import from at runtime, so drift
+# entry point, not a package almanac/ should import from at runtime, so drift
 # is caught by a test instead of a reverse dependency.
 KNOWN_FIELDS: dict[str, str] = {
     "title": "string",

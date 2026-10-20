@@ -1,13 +1,13 @@
-"""Tests for memento_daily_snapshot MCP tool and write_daily_snapshot helper."""
+"""Tests for almanac_daily_snapshot MCP tool and write_daily_snapshot helper."""
 
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-from memento.config import DEFAULT_CONFIG
-from memento.mcp_server import memento_daily_snapshot
-from memento.store import write_daily_snapshot
+from almanac.config import DEFAULT_CONFIG
+from almanac.mcp_server import almanac_daily_snapshot
+from almanac.store import write_daily_snapshot
 
 
 @pytest.fixture
@@ -19,10 +19,10 @@ def vault_config(tmp_vault):
 
 @pytest.fixture
 def _use_vault_config(vault_config, monkeypatch):
-    monkeypatch.setattr("memento.mcp_server.get_config", lambda: vault_config)
-    monkeypatch.setattr("memento.mcp_server.get_vault", lambda: Path(vault_config["vault_path"]))
-    monkeypatch.setattr("memento.store.get_config", lambda: vault_config)
-    monkeypatch.setattr("memento.config._CONFIG", vault_config)
+    monkeypatch.setattr("almanac.mcp_server.get_config", lambda: vault_config)
+    monkeypatch.setattr("almanac.mcp_server.get_vault", lambda: Path(vault_config["vault_path"]))
+    monkeypatch.setattr("almanac.store.get_config", lambda: vault_config)
+    monkeypatch.setattr("almanac.config._CONFIG", vault_config)
 
 
 # --- write_daily_snapshot (helper) ---
@@ -196,13 +196,13 @@ class TestWriteDailySnapshotWrite:
         assert source_lines == ["source: orra"]
 
 
-# --- memento_daily_snapshot MCP tool ---
+# --- almanac_daily_snapshot MCP tool ---
 
 
-class TestMementoDailySnapshotTool:
+class TestAlmanacDailySnapshotTool:
     @pytest.mark.usefixtures("_use_vault_config")
     def test_first_write(self, tmp_vault):
-        result = memento_daily_snapshot(
+        result = almanac_daily_snapshot(
             date="2026-04-23",
             repo_slug="care_git",
             content="Today's daily.",
@@ -215,24 +215,24 @@ class TestMementoDailySnapshotTool:
 
     @pytest.mark.usefixtures("_use_vault_config")
     def test_invalid_date_returns_error(self, tmp_vault):
-        result = memento_daily_snapshot(date="not-a-date", repo_slug="care_git", content="body")
+        result = almanac_daily_snapshot(date="not-a-date", repo_slug="care_git", content="body")
         assert result["reason"] == "invalid_date"
 
     @pytest.mark.usefixtures("_use_vault_config")
     def test_invalid_repo_slug_returns_error(self, tmp_vault):
-        result = memento_daily_snapshot(date="2026-04-23", repo_slug="Care/Git!", content="body")
+        result = almanac_daily_snapshot(date="2026-04-23", repo_slug="Care/Git!", content="body")
         assert result["reason"] == "invalid_repo_slug"
 
     @pytest.mark.usefixtures("_use_vault_config")
     def test_already_exists(self, tmp_vault):
-        memento_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="first")
-        result = memento_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="second")
+        almanac_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="first")
+        result = almanac_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="second")
         assert result["reason"] == "already_exists"
 
     @pytest.mark.usefixtures("_use_vault_config")
     def test_supersede(self, tmp_vault):
-        memento_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="first")
-        result = memento_daily_snapshot(
+        almanac_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="first")
+        result = almanac_daily_snapshot(
             date="2026-04-23",
             repo_slug="care_git",
             content="updated",
@@ -247,19 +247,19 @@ class TestMementoDailySnapshotTool:
     @pytest.mark.usefixtures("_use_vault_config")
     def test_missing_vault(self, tmp_path):
         missing = tmp_path / "nonexistent"
-        with patch("memento.mcp_server.get_vault", return_value=missing):
-            result = memento_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="body")
+        with patch("almanac.mcp_server.get_vault", return_value=missing):
+            result = almanac_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="body")
         assert result["reason"] == "vault_missing"
 
     @pytest.mark.usefixtures("_use_vault_config")
     def test_lock_timeout(self, tmp_vault):
-        with patch("memento.mcp_server.acquire_vault_write_lock", return_value=False):
-            result = memento_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="body")
+        with patch("almanac.mcp_server.acquire_vault_write_lock", return_value=False):
+            result = almanac_daily_snapshot(date="2026-04-23", repo_slug="care_git", content="body")
         assert result["reason"] == "lock_timeout"
 
     @pytest.mark.usefixtures("_use_vault_config")
     def test_frontmatter_extra_passed_through(self, tmp_vault):
-        result = memento_daily_snapshot(
+        result = almanac_daily_snapshot(
             date="2026-04-23",
             repo_slug="care_git",
             content="body",

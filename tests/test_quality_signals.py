@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from memento.graph import read_note_metadata
-from memento.search import apply_quality_signals, filter_by_project
+from almanac.graph import read_note_metadata
+from almanac.search import apply_quality_signals, filter_by_project
 
 
 def _write_note(vault, stem, frontmatter_lines, body="Body text."):
@@ -29,7 +29,7 @@ class TestReadNoteMetadataTags:
     def test_parses_inline_tag_list(self, vault):
         _write_note(vault, "tagged", ["title: Tagged", "type: session", "tags: [pi, queued]"])
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             meta = read_note_metadata("tagged")
 
         assert meta["tags"] == ["pi", "queued"]
@@ -38,7 +38,7 @@ class TestReadNoteMetadataTags:
     def test_missing_tags_returns_empty_list(self, vault):
         _write_note(vault, "untagged", ["title: Untagged", "type: discovery"])
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             meta = read_note_metadata("untagged")
 
         assert meta["tags"] == []
@@ -51,7 +51,7 @@ class TestReadNoteMetadataTags:
             ["title: Block Tagged", "type: session", "tags:", "  - pi", "  - queued"],
         )
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             meta = read_note_metadata("block-tagged")
 
         assert meta["tags"] == ["pi", "queued"]
@@ -60,7 +60,7 @@ class TestReadNoteMetadataTags:
         """Downstream effect of the block-tag fix: apply_quality_signals'
         queued-pi-session-capture rule now fires on block-style tags too,
         where before migration it silently kept these results."""
-        from memento.search import apply_quality_signals
+        from almanac.search import apply_quality_signals
 
         path = _write_note(
             vault,
@@ -69,7 +69,7 @@ class TestReadNoteMetadataTags:
         )
         results = [_result(path)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert kept == []
@@ -87,8 +87,8 @@ class TestApplyQualitySignals:
 
         logged = []
         with (
-            patch("memento.graph.get_vault", return_value=vault),
-            patch("memento.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
+            patch("almanac.graph.get_vault", return_value=vault),
+            patch("almanac.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
         ):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
@@ -98,27 +98,27 @@ class TestApplyQualitySignals:
     def test_drops_log_shaped_paths(self, vault):
         results = [
             _result("fleeting/2026-06-10.md", 0.95),
-            _result("projects/memento-vault.md", 0.9),
+            _result("projects/almanac.md", 0.9),
             _result("notes/valid.md", 0.5),
         ]
         _write_note(vault, "valid", ["title: Valid", "type: decision", "certainty: 4"])
 
         logged = []
         with (
-            patch("memento.graph.get_vault", return_value=vault),
-            patch("memento.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
+            patch("almanac.graph.get_vault", return_value=vault),
+            patch("almanac.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
         ):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert [r["path"] for r in kept] == ["notes/valid.md"]
         log_shaped = [k["path"] for _, k in logged if k.get("reason") == "log-shaped"]
-        assert log_shaped == ["fleeting/2026-06-10.md", "projects/memento-vault.md"]
+        assert log_shaped == ["fleeting/2026-06-10.md", "projects/almanac.md"]
 
     def test_penalizes_plain_session_notes(self, vault):
-        path = _write_note(vault, "plain-session-note", ["title: Manual note", "type: session", "tags: [memento]"])
+        path = _write_note(vault, "plain-session-note", ["title: Manual note", "type: session", "tags: [almanac]"])
         results = [_result(path, 0.8)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert len(kept) == 1
@@ -128,7 +128,7 @@ class TestApplyQualitySignals:
         path = _write_note(vault, "pi-manual-note", ["title: Manual Pi note", "type: session", "tags: [pi]"])
         results = [_result(path, 0.8)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert len(kept) == 1
@@ -138,7 +138,7 @@ class TestApplyQualitySignals:
         path = _write_note(vault, "uncertain", ["title: Uncertain", "type: discovery", "certainty: 1"])
         results = [_result(path, 1.0)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert kept[0]["score"] == pytest.approx(0.9)
@@ -147,7 +147,7 @@ class TestApplyQualitySignals:
         path = _write_note(vault, "valid", ["title: Valid", "type: decision", "tags: [caching]", "certainty: 4"])
         results = [_result(path, 0.7)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert kept[0]["score"] == 0.7
@@ -157,7 +157,7 @@ class TestApplyQualitySignals:
         decision = _write_note(vault, "decision-note", ["title: D", "type: decision", "certainty: 4"])
         results = [_result(session, 0.8), _result(decision, 0.75)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert [r["path"] for r in kept] == [decision, session]
@@ -174,7 +174,7 @@ class TestApplyQualitySignals:
         path = _write_note(vault, "session-y", ["title: S", "type: session"])
         results = [_result(path, 1.0)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(
                 results,
                 config={"quality_signals_enabled": True, "quality_session_note_factor": "0.5"},
@@ -188,7 +188,7 @@ class TestRequireProjectMatch:
         path = _write_note(vault, "general", ["title: General", "type: discovery"])
         results = [_result(path)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = filter_by_project(results, "/some/project")
 
         assert len(kept) == 1
@@ -202,8 +202,8 @@ class TestRequireProjectMatch:
 
         logged = []
         with (
-            patch("memento.graph.get_vault", return_value=vault),
-            patch("memento.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
+            patch("almanac.graph.get_vault", return_value=vault),
+            patch("almanac.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
         ):
             kept = filter_by_project(results, str(project_dir), require_match=True)
 
@@ -216,8 +216,8 @@ class TestRequireProjectMatch:
 
         logged = []
         with (
-            patch("memento.graph.get_vault", return_value=vault),
-            patch("memento.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
+            patch("almanac.graph.get_vault", return_value=vault),
+            patch("almanac.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
         ):
             kept = filter_by_project(results, str(tmp_path), require_match=True)
 
@@ -234,7 +234,7 @@ class TestSlugBasedProjectMatch:
         matching = _write_note(vault, "scoped", ["title: Scoped", "type: decision", "project: my-api"])
         results = [_result(matching)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = filter_by_project(results, str(project_dir), require_match=True)
 
         assert [r["path"] for r in kept] == [matching]
@@ -250,7 +250,7 @@ class TestSlugBasedProjectMatch:
         )
         results = [_result(legacy)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = filter_by_project(results, str(project_dir), require_match=True)
 
         assert [r["path"] for r in kept] == [legacy]
@@ -263,8 +263,8 @@ class TestSlugBasedProjectMatch:
 
         logged = []
         with (
-            patch("memento.graph.get_vault", return_value=vault),
-            patch("memento.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
+            patch("almanac.graph.get_vault", return_value=vault),
+            patch("almanac.search.log_retrieval", side_effect=lambda *a, **k: logged.append((a, k))),
         ):
             kept = filter_by_project(results, str(project_dir), require_match=True)
 
@@ -277,7 +277,7 @@ class TestSlugBasedProjectMatch:
         cased = _write_note(vault, "cased", ["title: Cased", "type: decision", "project: My-API"])
         results = [_result(cased)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = filter_by_project(results, str(project_dir), require_match=True)
 
         assert [r["path"] for r in kept] == [cased]
@@ -285,7 +285,7 @@ class TestSlugBasedProjectMatch:
 
 class TestToolContextRequiresProjectMatch:
     def test_build_tool_context_passes_require_project_match(self, tmp_path):
-        from memento.lifecycle import build_tool_context
+        from almanac.lifecycle import build_tool_context
 
         captured = {}
 
@@ -294,11 +294,11 @@ class TestToolContextRequiresProjectMatch:
             return []
 
         with (
-            patch("memento.lifecycle.has_qmd", return_value=True),
-            patch("memento.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}),
-            patch("memento.lifecycle.save_cache"),
-            patch("memento.lifecycle.qmd_search_with_extras", return_value=[{"path": "notes/x.md", "score": 0.9}]),
-            patch("memento.lifecycle.enhance_results", side_effect=_fake_enhance),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}),
+            patch("almanac.lifecycle.save_cache"),
+            patch("almanac.lifecycle.qmd_search_with_extras", return_value=[{"path": "notes/x.md", "score": 0.9}]),
+            patch("almanac.lifecycle.enhance_results", side_effect=_fake_enhance),
         ):
             build_tool_context("Read", "/workspace/src/server/authMiddleware.ts", "/repo", "s1")
 
@@ -314,7 +314,7 @@ class TestQualitySignalNormalization:
         )
         results = [_result(path)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert kept == []
@@ -323,7 +323,7 @@ class TestQualitySignalNormalization:
         path = _write_note(vault, "cased-session", ["title: S", "type: Session"])
         results = [_result(path, 1.0)]
 
-        with patch("memento.graph.get_vault", return_value=vault):
+        with patch("almanac.graph.get_vault", return_value=vault):
             kept = apply_quality_signals(results, config={"quality_signals_enabled": True})
 
         assert kept[0]["score"] == pytest.approx(0.85)

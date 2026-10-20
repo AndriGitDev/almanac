@@ -18,7 +18,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PORT="${ALMANAC_PORT:-${MEMENTO_PORT:-8745}}"
+PORT="${ALMANAC_PORT:-8745}"
 HOST=""
 ENABLE_TLS=false
 SKIP_MIGRATE=false
@@ -123,7 +123,7 @@ fi
 step "Step 2: Detect existing vault"
 
 VAULT_PATH=""
-if [ -f "$HOME/.config/almanac/almanac.yml" ] || [ -f "$HOME/.config/memento-vault/memento.yml" ]; then
+if [ -f "$HOME/.config/almanac/almanac.yml" ]; then
     VAULT_PATH=$(python3 -c "
 import sys
 sys.path.insert(0, '$SCRIPT_DIR')
@@ -133,11 +133,7 @@ print(load_config()['vault_path'])
 fi
 
 if [ -z "$VAULT_PATH" ]; then
-    if [ -d "$HOME/memento/notes" ] && [ ! -d "$HOME/almanac/notes" ]; then
-        VAULT_PATH="$HOME/memento"
-    else
-        VAULT_PATH="$HOME/almanac"
-    fi
+    VAULT_PATH="$HOME/almanac"
 fi
 
 if [ -d "$VAULT_PATH/notes" ]; then
@@ -152,10 +148,10 @@ fi
 
 step "Step 3: Configure authentication"
 
-API_KEY="${ALMANAC_API_KEY:-${MEMENTO_API_KEY:-}}"
+API_KEY="${ALMANAC_API_KEY:-}"
 ENV_FILE="$SCRIPT_DIR/.env"
 if [ -z "$API_KEY" ] && [ -f "$ENV_FILE" ]; then
-    API_KEY=$(sed -n 's/^ALMANAC_API_KEY=//p; s/^MEMENTO_API_KEY=//p' "$ENV_FILE" | head -1)
+    API_KEY=$(sed -n 's/^ALMANAC_API_KEY=//p' "$ENV_FILE" | head -1)
 fi
 if [ -z "$API_KEY" ]; then
     API_KEY=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
@@ -293,7 +289,7 @@ if [ "$SKIP_MIGRATE" != true ] && [ "$NOTE_COUNT" -gt 0 ]; then
                     docker cp "$VAULT_PATH/$dir/." "$CONTAINER_ID:/vault/$dir/"
                 fi
             done
-            for file in almanac.yml memento.yml vault-identity.json; do
+            for file in almanac.yml vault-identity.json; do
                 if [ -f "$VAULT_PATH/$file" ]; then
                     docker cp "$VAULT_PATH/$file" "$CONTAINER_ID:/vault/$file"
                 fi

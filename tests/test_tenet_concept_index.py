@@ -2,8 +2,8 @@
 
 import pytest
 
-from memento_inception import build_concept_index, write_concept_index
-from memento.graph import load_concept_index, lookup_concepts
+from almanac_inception import build_concept_index, write_concept_index
+from almanac.graph import load_concept_index, lookup_concepts
 
 
 # --- build_concept_index ---
@@ -126,7 +126,7 @@ class TestConceptIndexIntegration:
 
     def _merge_concept_hits(self, bm25_results, concept_hits, config=None, min_score=0.4):
         """Replicate the merge logic from PromptRecallRuntime.run()
-        (memento/retrieval_policy.py), including the MEM-141 min_score gate
+        (almanac/retrieval_policy.py), including the MEM-141 min_score gate
         and post-merge re-sort.
         """
         if config is None:

@@ -24,27 +24,27 @@ def _git_env(home: Path) -> dict[str, str]:
     env.update(
         {
             "HOME": str(home),
-            "GIT_AUTHOR_NAME": "Memento Test",
-            "GIT_AUTHOR_EMAIL": "memento-test@example.invalid",
-            "GIT_COMMITTER_NAME": "Memento Test",
-            "GIT_COMMITTER_EMAIL": "memento-test@example.invalid",
+            "GIT_AUTHOR_NAME": "Almanac Test",
+            "GIT_AUTHOR_EMAIL": "almanac-test@example.invalid",
+            "GIT_COMMITTER_NAME": "Almanac Test",
+            "GIT_COMMITTER_EMAIL": "almanac-test@example.invalid",
         }
     )
     return env
 
 
 def _write_home_config(home: Path, vault: Path, extra: str = "") -> None:
-    config_dir = home / ".config" / "memento-vault"
+    config_dir = home / ".config" / "almanac"
     config_dir.mkdir(parents=True)
-    config_dir.joinpath("memento.yml").write_text(f'vault_path: "{vault}"\n{extra}', encoding="utf-8")
+    config_dir.joinpath("almanac.yml").write_text(f'vault_path: "{vault}"\n{extra}', encoding="utf-8")
 
 
 def test_node_extension_harnesses_run_under_node_test() -> None:
     node = shutil.which("node")
     if not node:
-        pytest.fail("node is required for the memento extension harness")
+        pytest.fail("node is required for the Pi extension harnesses")
     result = subprocess.run(
-        [node, "--test", str(REPO_ROOT / "tests" / "node" / "memento-extension.test.mjs")],
+        [node, "--test", str(REPO_ROOT / "tests" / "node" / "almanac-extension.test.mjs")],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -104,7 +104,7 @@ def test_wait_and_commit_normalizes_tags_removes_sentinel_and_runs_commit_script
     commit_script.chmod(0o755)
 
     env = os.environ.copy()
-    env.update({"HOME": str(home), "MEMENTO_VAULT_PATH": str(vault)})
+    env.update({"HOME": str(home), "ALMANAC_VAULT_PATH": str(vault)})
     result = subprocess.run(
         [
             sys.executable,
@@ -139,14 +139,14 @@ def test_reindex_qmd_spawns_detached_update_and_embed_when_qmd_exists(
     vault = tmp_path / "vault"
     home.mkdir()
     vault.mkdir()
-    _write_home_config(home, vault, 'qmd_collection: "memento-test"\n')
+    _write_home_config(home, vault, 'qmd_collection: "almanac-test"\n')
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ.get('PATH', '')}")
 
-    import memento.config as memento_config
+    import almanac.config as almanac_config
 
-    memento_config.reset_config()
-    spec = importlib.util.spec_from_file_location("memento_triage_for_test", REPO_ROOT / "hooks" / "memento-triage.py")
+    almanac_config.reset_config()
+    spec = importlib.util.spec_from_file_location("almanac_triage_for_test", REPO_ROOT / "hooks" / "almanac-triage.py")
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -167,8 +167,8 @@ def test_reindex_qmd_spawns_detached_update_and_embed_when_qmd_exists(
     assert args[0] == sys.executable
     assert args[1] == "-c"
     assert args[3] == "7"
-    assert args[4] == "memento-test"
+    assert args[4] == "almanac-test"
     assert kwargs["stdout"] == subprocess.DEVNULL
     assert kwargs["stderr"] == subprocess.DEVNULL
     assert kwargs["start_new_session"] is True
-    memento_config.reset_config()
+    almanac_config.reset_config()

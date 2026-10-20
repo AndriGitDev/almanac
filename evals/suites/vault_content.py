@@ -67,7 +67,7 @@ def run(context) -> list[CheckResult]:
                 suite=SUITE,
                 title="Vault directory located",
                 status=FAIL,
-                remediation="Set MEMENTO_VAULT_PATH or run install.sh; no vault found.",
+                remediation="Set ALMANAC_VAULT_PATH or run install.sh; no vault found.",
             )
         ]
 

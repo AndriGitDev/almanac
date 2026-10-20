@@ -125,7 +125,7 @@ class TestAddFailureDoesNotKillInstaller:
         # `get` returns a snapshot; `remove` succeeds; `add` fails.
         claude_body = textwrap.dedent("""
             case "$1 ${2:-}" in
-                "mcp get") echo "memento-vault: http http://old.example.com/mcp"; exit 0 ;;
+                "mcp get") echo "almanac: http http://old.example.com/mcp"; exit 0 ;;
                 "mcp remove") exit 0 ;;
                 "mcp add") echo "boom: unsupported flag" >&2; exit 2 ;;
                 *) exit 0 ;;
@@ -149,7 +149,7 @@ class TestAddFailureDoesNotKillInstaller:
         claude_ok = 'echo "ok $@"; exit 0\n'
         codex_body = textwrap.dedent("""
             case "$1 ${2:-}" in
-                "mcp get") echo "memento-vault: stdio python3 -m memento"; exit 0 ;;
+                "mcp get") echo "almanac: stdio python3 -m almanac"; exit 0 ;;
                 "mcp remove") exit 0 ;;
                 "mcp add") echo "boom: write error" >&2; exit 3 ;;
                 *) exit 0 ;;
@@ -162,7 +162,7 @@ class TestAddFailureDoesNotKillInstaller:
         assert result.returncode == 0
         assert "codex mcp add failed" in result.stdout
         assert "Re-register manually" in result.stdout
-        assert "memento-vault: stdio" in result.stdout
+        assert "almanac: stdio" in result.stdout
 
     def test_both_clis_fail_installer_still_completes(self, tmp_path):
         fail = textwrap.dedent("""

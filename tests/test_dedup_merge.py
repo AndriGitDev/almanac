@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from memento.dedup_merge import find_merge_target, merge_into_canonical
-from memento.store import write_note
-from memento.search_backend import SearchBackend
+from almanac.dedup_merge import find_merge_target, merge_into_canonical
+from almanac.store import write_note
+from almanac.search_backend import SearchBackend
 
 
 def _seed_note(vault: Path, *, title: str, body: str) -> str:
@@ -71,9 +71,9 @@ def test_find_merge_target_above_threshold_returns_match(tmp_vault, monkeypatch)
     # Simulate a backend hit: a FakeBackend that returns a match
     path = _seed_note(tmp_vault, title="Redis cache guidance", body="Use TTL on Redis keys.")
     fake_backend = _FakeBackend(results=[{"path": path, "title": "Redis cache guidance", "score": 0.95}])
-    monkeypatch.setattr("memento.dedup_merge._is_embedding_backend", lambda _: True)
-    monkeypatch.setattr("memento.dedup_merge._get_backend", lambda: fake_backend)
-    monkeypatch.setattr("memento.dedup_merge.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.dedup_merge._is_embedding_backend", lambda _: True)
+    monkeypatch.setattr("almanac.dedup_merge._get_backend", lambda: fake_backend)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
 
     target = find_merge_target(
         "Redis cache TTL policy",
@@ -95,9 +95,9 @@ def test_find_merge_target_returns_none_for_low_similarity(tmp_vault, monkeypatc
     fake_backend = _FakeBackend(
         results=[{"path": "notes/docker-compose-networking.md", "title": "Docker compose networking", "score": 0.3}]
     )
-    monkeypatch.setattr("memento.dedup_merge._is_embedding_backend", lambda _: True)
-    monkeypatch.setattr("memento.dedup_merge._get_backend", lambda: fake_backend)
-    monkeypatch.setattr("memento.dedup_merge.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.dedup_merge._is_embedding_backend", lambda _: True)
+    monkeypatch.setattr("almanac.dedup_merge._get_backend", lambda: fake_backend)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
 
     target = find_merge_target(
         "PostgreSQL index tuning",
@@ -113,8 +113,8 @@ def test_find_merge_target_fallback_when_provider_unavailable(tmp_vault, monkeyp
     _seed_note(tmp_vault, title="Redis cache guidance", body="Use TTL on Redis keys.")
 
     # _is_embedding_backend returns False -> find_merge_target short-circuits to None
-    monkeypatch.setattr("memento.dedup_merge._is_embedding_backend", lambda _: False)
-    monkeypatch.setattr("memento.dedup_merge.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.dedup_merge._is_embedding_backend", lambda _: False)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
 
     target = find_merge_target("Redis cache guidance", "Set explicit TTL on Redis keys.", threshold=0.86)
     assert target is None
@@ -127,11 +127,11 @@ def test_find_merge_target_fallback_when_provider_unavailable(tmp_vault, monkeyp
 
 def test_merge_appends_body_with_header(tmp_vault, monkeypatch):
     """merge_into_canonical appends incoming body under a Merged-from section."""
-    monkeypatch.setattr("memento.dedup_merge.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.dedup_merge.load_access_log_stats", lambda: {})
-    monkeypatch.setattr("memento.dedup_merge.write_access_log_stats", lambda _: None)
-    monkeypatch.setattr("memento.dedup_merge._update_project_index", lambda *a, **kw: None)
-    monkeypatch.setattr("memento.dedup_merge._index_note", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.dedup_merge.load_access_log_stats", lambda: {})
+    monkeypatch.setattr("almanac.dedup_merge.write_access_log_stats", lambda _: None)
+    monkeypatch.setattr("almanac.dedup_merge._update_project_index", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge._index_note", lambda *a, **kw: None)
 
     path = _seed_note(tmp_vault, title="Redis cache guidance", body="Use TTL on Redis keys.")
 
@@ -156,11 +156,11 @@ def test_merge_appends_body_with_header(tmp_vault, monkeypatch):
 
 def test_merge_unions_tags(tmp_vault, monkeypatch):
     """Merged note has the union of old and new tags."""
-    monkeypatch.setattr("memento.dedup_merge.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.dedup_merge.load_access_log_stats", lambda: {})
-    monkeypatch.setattr("memento.dedup_merge.write_access_log_stats", lambda _: None)
-    monkeypatch.setattr("memento.dedup_merge._update_project_index", lambda *a, **kw: None)
-    monkeypatch.setattr("memento.dedup_merge._index_note", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.dedup_merge.load_access_log_stats", lambda: {})
+    monkeypatch.setattr("almanac.dedup_merge.write_access_log_stats", lambda _: None)
+    monkeypatch.setattr("almanac.dedup_merge._update_project_index", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge._index_note", lambda *a, **kw: None)
 
     path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")
     merge_into_canonical(
@@ -180,11 +180,11 @@ def test_merge_unions_tags(tmp_vault, monkeypatch):
 
 def test_merge_takes_max_certainty(tmp_vault, monkeypatch):
     """Merged note uses the higher certainty of the two."""
-    monkeypatch.setattr("memento.dedup_merge.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.dedup_merge.load_access_log_stats", lambda: {})
-    monkeypatch.setattr("memento.dedup_merge.write_access_log_stats", lambda _: None)
-    monkeypatch.setattr("memento.dedup_merge._update_project_index", lambda *a, **kw: None)
-    monkeypatch.setattr("memento.dedup_merge._index_note", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.dedup_merge.load_access_log_stats", lambda: {})
+    monkeypatch.setattr("almanac.dedup_merge.write_access_log_stats", lambda _: None)
+    monkeypatch.setattr("almanac.dedup_merge._update_project_index", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge._index_note", lambda *a, **kw: None)
 
     path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")  # certainty=3
     merge_into_canonical(
@@ -203,11 +203,11 @@ def test_merge_takes_max_certainty(tmp_vault, monkeypatch):
 
 def test_merge_idempotent_no_double_append(tmp_vault, monkeypatch):
     """Re-merging the same payload does not add a duplicate section."""
-    monkeypatch.setattr("memento.dedup_merge.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.dedup_merge.load_access_log_stats", lambda: {})
-    monkeypatch.setattr("memento.dedup_merge.write_access_log_stats", lambda _: None)
-    monkeypatch.setattr("memento.dedup_merge._update_project_index", lambda *a, **kw: None)
-    monkeypatch.setattr("memento.dedup_merge._index_note", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.dedup_merge.load_access_log_stats", lambda: {})
+    monkeypatch.setattr("almanac.dedup_merge.write_access_log_stats", lambda _: None)
+    monkeypatch.setattr("almanac.dedup_merge._update_project_index", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge._index_note", lambda *a, **kw: None)
 
     path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")
 
@@ -236,15 +236,15 @@ def test_merge_idempotent_no_double_append(tmp_vault, monkeypatch):
 
 def test_access_log_survives_merge(tmp_vault, monkeypatch):
     """After merge, the existing access-log stats for the canonical path survive."""
-    monkeypatch.setattr("memento.dedup_merge.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.dedup_merge._update_project_index", lambda *a, **kw: None)
-    monkeypatch.setattr("memento.dedup_merge._index_note", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.dedup_merge._update_project_index", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.dedup_merge._index_note", lambda *a, **kw: None)
 
     path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")
 
     # Pre-populate access log stats for the canonical
     initial_stats = {path: {"events": [{"ts": "2026-07-05T12:00:00", "rank": 1}]}}
-    monkeypatch.setattr("memento.dedup_merge.load_access_log_stats", lambda: initial_stats)
+    monkeypatch.setattr("almanac.dedup_merge.load_access_log_stats", lambda: initial_stats)
 
     merge_into_canonical(
         tmp_vault,

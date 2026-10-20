@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-from memento_utils import get_vault
+from almanac_utils import get_vault
 
 
 class Timer:
@@ -236,7 +236,7 @@ def run(multipliers):
 
     real_vault = get_vault()
     real_count = len(list((real_vault / "notes").glob("*.md")))
-    collection = "memento-scale-bench"
+    collection = "almanac-scale-bench"
 
     test_prompts = [
         ("cache", "How does the Redis cache invalidation work?"),
@@ -265,7 +265,7 @@ def run(multipliers):
     for mult in multipliers:
         import tempfile
 
-        with tempfile.TemporaryDirectory(prefix="memento-scale-") as tmpdir:
+        with tempfile.TemporaryDirectory(prefix="almanac-scale-") as tmpdir:
             vault_path = Path(tmpdir) / "vault"
 
             # Clone and scale

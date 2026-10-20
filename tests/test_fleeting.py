@@ -1,8 +1,8 @@
 """Tests for the fleeting note lifecycle sweep (MEM-153).
 
-Covers memento.archive.fleeting_lifecycle_sweep (promotion-by-resurfacing,
+Covers almanac.archive.fleeting_lifecycle_sweep (promotion-by-resurfacing,
 promotion-by-citation, expiry, gating, reporting shape) and
-memento.archive.promote_fleeting_note (the reusable move+frontmatter-stamp
+almanac.archive.promote_fleeting_note (the reusable move+frontmatter-stamp
 primitive it builds on). Reuses archive_note/restore_note (MEM-152) for
 expiry -- test_archive.py covers those primitives directly; this file only
 adds the MEM-153 fleeting-specific behavior on top.
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-import memento.archive as archive_mod
-from memento.archive import (
+import almanac.archive as archive_mod
+from almanac.archive import (
     ArchiveError,
     _fleeting_age_days,
     fleeting_lifecycle_sweep,
@@ -32,8 +32,8 @@ NOW = datetime(2026, 7, 6, 12, 0, tzinfo=timezone.utc)
 @pytest.fixture(autouse=True)
 def _isolate_vault_write_lock(tmp_path, monkeypatch):
     """MEM-153 mutates fleeting/notes/archive -- keep the write lock off the
-    real ~/.cache/memento-vault so this never races other worktrees' sweeps."""
-    monkeypatch.setattr("memento.store.VAULT_WRITE_LOCK_PATH", str(tmp_path / "vault-write.lock"))
+    real ~/.cache/almanac so this never races other worktrees' sweeps."""
+    monkeypatch.setattr("almanac.store.VAULT_WRITE_LOCK_PATH", str(tmp_path / "vault-write.lock"))
 
 
 def _config(**overrides) -> dict:
@@ -268,7 +268,7 @@ class TestPromotionPreservesFrontmatter:
         assert "Body text." in text
 
     def test_promotion_of_frontmatter_less_note_adds_only_promoted_at(self, tmp_vault):
-        # Matches the real memento.store.append_fleeting_session shape: no
+        # Matches the real almanac.store.append_fleeting_session shape: no
         # YAML frontmatter block at all, promoted here via citation (not
         # resurfaced_count, which needs a frontmatter block to live in).
         _write_fleeting(tmp_vault, "2026-05-19.md", body="# 2026-05-19\n\n- a session\n")

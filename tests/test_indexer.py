@@ -1,13 +1,13 @@
-"""Tests for memento.indexer — background vault indexer."""
+"""Tests for almanac.indexer — background vault indexer."""
 
 import os
 import time
 
 import pytest
 
-from memento.config import reset_config
-from memento.embedded_search import EmbeddedSearchBackend
-from memento.search_backend import reset_backend
+from almanac.config import reset_config
+from almanac.embedded_search import EmbeddedSearchBackend
+from almanac.search_backend import reset_backend
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ class TestScanFindsNewFiles:
     """scan_and_index picks up files not yet in the DB."""
 
     def test_indexes_all_new_files(self, vault, backend):
-        from memento.indexer import scan_and_index
+        from almanac.indexer import scan_and_index
 
         stats = scan_and_index(vault, backend)
         assert stats["indexed"] == 3
@@ -51,10 +51,10 @@ class TestScanFindsNewFiles:
         assert stats["removed"] == 0
 
     def test_indexed_files_are_searchable(self, vault, backend):
-        from memento.indexer import scan_and_index
+        from almanac.indexer import scan_and_index
 
         scan_and_index(vault, backend)
-        results = backend.search("Redis", "memento")
+        results = backend.search("Redis", "almanac")
         assert any(r["path"] == "notes/alpha.md" for r in results)
 
 
@@ -62,7 +62,7 @@ class TestScanSkipsIndexed:
     """Already-indexed files with unchanged mtime are skipped."""
 
     def test_second_scan_skips_all(self, vault, backend):
-        from memento.indexer import scan_and_index
+        from almanac.indexer import scan_and_index
 
         scan_and_index(vault, backend)
         stats = scan_and_index(vault, backend)
@@ -75,7 +75,7 @@ class TestScanCatchesUpdatedFiles:
     """Files with newer mtime than DB updated_at get re-indexed."""
 
     def test_modified_file_reindexed(self, vault, backend):
-        from memento.indexer import scan_and_index
+        from almanac.indexer import scan_and_index
 
         scan_and_index(vault, backend)
 
@@ -90,7 +90,7 @@ class TestScanCatchesUpdatedFiles:
         assert stats["skipped"] == 2
 
         # Verify the new content is searchable
-        results = backend.search("Memcached", "memento")
+        results = backend.search("Memcached", "almanac")
         assert any(r["path"] == "notes/alpha.md" for r in results)
 
 
@@ -98,7 +98,7 @@ class TestScanRemovesDeletedFiles:
     """DB entries for files no longer on disk get removed."""
 
     def test_deleted_file_removed_from_db(self, vault, backend):
-        from memento.indexer import scan_and_index
+        from almanac.indexer import scan_and_index
 
         scan_and_index(vault, backend)
 
@@ -117,7 +117,7 @@ class TestIndexSingle:
     """index_single indexes one file and makes it searchable."""
 
     def test_index_single_success(self, vault, backend):
-        from memento.indexer import index_single
+        from almanac.indexer import index_single
 
         new_note = vault / "projects" / "gamma.md"
         new_note.write_text("---\ntitle: Gamma project\n---\n\nGamma content about Kubernetes.\n")
@@ -125,11 +125,11 @@ class TestIndexSingle:
         result = index_single(vault, backend, "projects/gamma.md")
         assert result is True
 
-        results = backend.search("Kubernetes", "memento")
+        results = backend.search("Kubernetes", "almanac")
         assert any(r["path"] == "projects/gamma.md" for r in results)
 
     def test_index_single_missing_file(self, vault, backend):
-        from memento.indexer import index_single
+        from almanac.indexer import index_single
 
         result = index_single(vault, backend, "notes/nonexistent.md")
         assert result is False

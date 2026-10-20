@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Memento quality evals: one command, one scorecard.
+"""Almanac quality evals: one command, one scorecard.
 
 Usage:
     python3 evals/run_evals.py                  # all deterministic suites
@@ -8,7 +8,7 @@ Usage:
     python3 evals/run_evals.py --json           # machine-readable output
     python3 evals/run_evals.py --strict         # warnings also fail the exit code
     python3 evals/run_evals.py --now 2026-06-15T00:00:00Z  # freeze the eval clock
-                                                 # (env fallback: MEMENTO_EVAL_NOW)
+                                                 # (env fallback: ALMANAC_EVAL_NOW)
 
 Exit codes: 0 = no failures (warnings allowed unless --strict), 1 = failures.
 
@@ -139,10 +139,10 @@ def main():
     parser.add_argument("--json", action="store_true", help="emit JSON instead of text")
     parser.add_argument("--strict", action="store_true", help="warnings also fail the exit code")
     parser.add_argument("--llm", action="store_true", help="enable LLM extraction checks (spends tokens)")
-    parser.add_argument("--vault", help="override vault path (default: memento config)")
+    parser.add_argument("--vault", help="override vault path (default: almanac config)")
     parser.add_argument(
         "--now",
-        help="ISO-8601 UTC timestamp to freeze the eval clock for reproducible runs (env fallback: MEMENTO_EVAL_NOW)",
+        help="ISO-8601 UTC timestamp to freeze the eval clock for reproducible runs (env fallback: ALMANAC_EVAL_NOW)",
     )
     parser.add_argument(
         "--baseline-out",
@@ -155,7 +155,7 @@ def main():
     effective_now = eval_now()
     # Propagate to subprocesses (e.g. retrieval_probe.py) that don't receive
     # an explicit --now, so the whole eval run shares one frozen clock.
-    os.environ["MEMENTO_EVAL_NOW"] = effective_now.isoformat()
+    os.environ["ALMANAC_EVAL_NOW"] = effective_now.isoformat()
 
     context = {
         "vault": Path(args.vault).expanduser() if args.vault else find_vault(),

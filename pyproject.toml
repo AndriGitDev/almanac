@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-mcp = ["mcp[cli]>=1.0"]
+mcp = ["mcp[cli]>=1.0,<2"]
 embedded = ["onnxruntime", "sqlite-vec", "numpy", "tokenizers"]
 # Everything the full pytest suite needs beyond mcp+embedded: hdbscan/rank_bm25/optuna
 # back the Inception clustering, LongMemEval BM25, and hyperparameter-sweep benchmark
@@ -41,7 +41,7 @@ Upstream = "https://github.com/sandsower/memento-vault"
 version = { file = "VERSION" }
 
 [tool.setuptools.packages.find]
-include = ["almanac*", "memento*"]
+include = ["almanac*"]
 exclude = ["tests*", "hooks*", "scripts*", "tools*", "benchmark*", "docs*", "skills*", "agents*"]
 
 [tool.ruff]

@@ -47,7 +47,7 @@ class TestCollectEligibleNotes:
 
     def test_collect_from_notes_only(self, tmp_vault, mock_config):
         """Only files in notes/ are collected; archive/ is ignored."""
-        from memento_inception import collect_eligible_notes
+        from almanac_inception import collect_eligible_notes
 
         _write_note(tmp_vault / "notes" / "alpha.md", title="Alpha", date="2026-03-20T10:00")
         _write_note(tmp_vault / "archive" / "beta.md", title="Beta", date="2026-03-20T10:00")
@@ -61,7 +61,7 @@ class TestCollectEligibleNotes:
 
     def test_skip_inception_source(self, tmp_vault, mock_config):
         """Notes with source: inception are excluded to prevent recursion."""
-        from memento_inception import collect_eligible_notes
+        from almanac_inception import collect_eligible_notes
 
         _write_note(tmp_vault / "notes" / "human-note.md", title="Human note", date="2026-03-20T10:00")
         _write_note(
@@ -80,7 +80,7 @@ class TestCollectEligibleNotes:
 
     def test_skip_excluded_tags(self, tmp_vault, mock_config):
         """Notes matching inception_exclude_tags are excluded."""
-        from memento_inception import collect_eligible_notes
+        from almanac_inception import collect_eligible_notes
 
         mock_config["inception_exclude_tags"] = ["private", "draft"]
         _write_note(tmp_vault / "notes" / "public.md", title="Public", tags=["redis"], date="2026-03-20T10:00")
@@ -99,7 +99,7 @@ class TestCollectEligibleNotes:
 
     def test_skip_processed(self, tmp_vault, mock_config):
         """Already-processed notes are skipped in incremental mode."""
-        from memento_inception import collect_eligible_notes
+        from almanac_inception import collect_eligible_notes
 
         _write_note(tmp_vault / "notes" / "done.md", title="Done", date="2026-03-20T10:00")
         _write_note(tmp_vault / "notes" / "fresh.md", title="Fresh", date="2026-03-20T10:00")
@@ -113,7 +113,7 @@ class TestCollectEligibleNotes:
 
     def test_full_ignores_processed(self, tmp_vault, mock_config):
         """With full=True, processed notes are still included."""
-        from memento_inception import collect_eligible_notes
+        from almanac_inception import collect_eligible_notes
 
         _write_note(tmp_vault / "notes" / "done.md", title="Done", date="2026-03-20T10:00")
 
@@ -125,7 +125,7 @@ class TestCollectEligibleNotes:
 
     def test_incremental_date_filter(self, tmp_vault, mock_config):
         """Only notes newer than last_run_iso are included in incremental runs."""
-        from memento_inception import collect_eligible_notes
+        from almanac_inception import collect_eligible_notes
 
         _write_note(tmp_vault / "notes" / "old-note.md", title="Old", date="2026-03-10T08:00")
         _write_note(tmp_vault / "notes" / "new-note.md", title="New", date="2026-03-20T14:00")
@@ -141,7 +141,7 @@ class TestCollectEligibleNotes:
         """Notes without a date frontmatter fall back to file mtime for the incremental cutoff."""
         import os
         import time
-        from memento_inception import collect_eligible_notes
+        from almanac_inception import collect_eligible_notes
 
         # Note with no date, mtime set well before last_run
         old = tmp_vault / "notes" / "no-date-old.md"
@@ -162,7 +162,7 @@ class TestCollectEligibleNotes:
 
     def test_skip_dotfiles(self, tmp_vault, mock_config):
         """Hidden files (starting with .) are skipped."""
-        from memento_inception import collect_eligible_notes
+        from almanac_inception import collect_eligible_notes
 
         _write_note(tmp_vault / "notes" / ".tmp-write.md", title="Temp")
         _write_note(tmp_vault / "notes" / "visible.md", title="Visible", date="2026-03-20T10:00")
@@ -180,7 +180,7 @@ class TestParseNote:
 
     def test_parse_note_valid(self, tmp_vault):
         """Well-formed note parses all frontmatter fields correctly."""
-        from memento_inception import parse_note
+        from almanac_inception import parse_note
 
         path = tmp_vault / "notes" / "test-note.md"
         _write_note(
@@ -209,7 +209,7 @@ class TestParseNote:
 
     def test_parse_note_missing_frontmatter(self, tmp_vault):
         """Note without --- frontmatter delimiters is parsed gracefully."""
-        from memento_inception import parse_note
+        from almanac_inception import parse_note
 
         path = tmp_vault / "notes" / "no-fm.md"
         path.write_text("Just a plain markdown file.\nNo frontmatter here.", encoding="utf-8")
@@ -225,7 +225,7 @@ class TestParseNote:
 
     def test_parse_note_binary_file(self, tmp_vault):
         """Non-text (binary) file returns None."""
-        from memento_inception import parse_note
+        from almanac_inception import parse_note
 
         path = tmp_vault / "notes" / "binary.md"
         # Write invalid UTF-8 bytes
@@ -239,7 +239,7 @@ class TestParseNote:
         parsed so Inception can inherit them into synthesis notes (MEM-154).
         Not consumed by any reader on this branch yet -- MEM-148 landed
         separately -- but Inception must still read them here."""
-        from memento_inception import parse_note
+        from almanac_inception import parse_note
 
         path = tmp_vault / "notes" / "resurfaced-note.md"
         path.write_text(
@@ -255,7 +255,7 @@ class TestParseNote:
 
     def test_parse_note_defaults_resurfacing_signal_when_absent(self, tmp_vault):
         """Notes without the MEM-148 fields default to 0/None, not a crash."""
-        from memento_inception import parse_note
+        from almanac_inception import parse_note
 
         path = tmp_vault / "notes" / "no-resurfacing.md"
         path.write_text("---\ntitle: Plain\ntype: discovery\ntags: []\n---\n\nBody.\n", encoding="utf-8")

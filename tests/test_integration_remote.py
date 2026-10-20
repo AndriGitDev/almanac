@@ -61,17 +61,17 @@ def server(tmp_path_factory):
     env = {
         **os.environ,
         "PATH": clean_path,
-        "MEMENTO_SEARCH_BACKEND": "grep",
-        "MEMENTO_VAULT_PATH": str(vault),
-        "MEMENTO_TRANSPORT": "streamable-http",
-        "MEMENTO_HOST": "127.0.0.1",
-        "MEMENTO_PORT": str(port),
-        "MEMENTO_API_KEY": api_key,
+        "ALMANAC_SEARCH_BACKEND": "grep",
+        "ALMANAC_VAULT_PATH": str(vault),
+        "ALMANAC_TRANSPORT": "streamable-http",
+        "ALMANAC_HOST": "127.0.0.1",
+        "ALMANAC_PORT": str(port),
+        "ALMANAC_API_KEY": api_key,
         "PYTHONPATH": os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     }
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "memento", "--transport", "streamable-http"],
+        [sys.executable, "-m", "almanac", "--transport", "streamable-http"],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -94,20 +94,20 @@ def server(tmp_path_factory):
 @pytest.fixture(autouse=True)
 def _set_remote_env(server, monkeypatch):
     """Point remote_client at the test server."""
-    monkeypatch.setenv("MEMENTO_VAULT_URL", f"http://127.0.0.1:{server['port']}")
-    monkeypatch.setenv("MEMENTO_API_KEY", server["api_key"])
+    monkeypatch.setenv("ALMANAC_VAULT_URL", f"http://127.0.0.1:{server['port']}")
+    monkeypatch.setenv("ALMANAC_API_KEY", server["api_key"])
 
 
 class TestRemoteIntegration:
     def test_status(self):
-        from memento.remote_client import status
+        from almanac.remote_client import status
 
         result = status()
         assert "vault_id" in result or "vault_path" in result
         assert "error" not in result
 
     def test_search(self):
-        from memento.remote_client import search
+        from almanac.remote_client import search
 
         results = search("xylophone")
         assert len(results) >= 1
@@ -116,7 +116,7 @@ class TestRemoteIntegration:
         )
 
     def test_search_returns_content(self):
-        from memento.remote_client import search
+        from almanac.remote_client import search
 
         results = search("xylophone", include_content=True)
         assert len(results) >= 1
@@ -124,7 +124,7 @@ class TestRemoteIntegration:
         assert any(r.get("content") for r in results)
 
     def test_get(self):
-        from memento.remote_client import get
+        from almanac.remote_client import get
 
         result = get("notes/test-integration-note.md")
         assert result is not None
@@ -132,14 +132,14 @@ class TestRemoteIntegration:
         assert "xylophone" in result["content"]
 
     def test_query_aggregates_without_note_bodies(self):
-        from memento.remote_client import query
+        from almanac.remote_client import query
 
         result = query(aggregate_by="type")
         assert {entry["value"]: entry["count"] for entry in result["aggregations"]}["discovery"] >= 1
         assert "xylophone" not in str(result)
 
     def test_capture_and_dedup(self):
-        from memento.remote_client import capture
+        from almanac.remote_client import capture
 
         result = capture(
             session_summary="Integration test session summary",
@@ -162,8 +162,8 @@ class TestRemoteIntegration:
         assert result2.get("deduplicated") is True
 
     def test_auth_rejected_without_key(self, server, monkeypatch):
-        from memento.remote_client import status
+        from almanac.remote_client import status
 
-        monkeypatch.delenv("MEMENTO_API_KEY")
+        monkeypatch.delenv("ALMANAC_API_KEY")
         result = status()
         assert "error" in result

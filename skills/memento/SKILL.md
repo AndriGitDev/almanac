@@ -1,24 +1,24 @@
 ---
-name: memento
-description: Capture the current session to the memento vault. Use when you want to record decisions, discoveries, or patterns from this session. Also use when the user says "remember this" or "save this to memento".
+name: almanac
+description: Capture the current session to the almanac vault. Use when you want to record decisions, discoveries, or patterns from this session. Also use when the user says "remember this" or "save this to almanac".
 ---
 
-# Memento — manual session capture
+# Almanac — manual session capture
 
-Capture the current session as atomic Zettelkasten notes in the memento vault.
+Capture the current session as atomic Zettelkasten notes in the almanac vault.
 
-The vault location is configured in `memento.yml` (default: `~/memento`). Check `~/.config/memento-vault/memento.yml` or `~/memento/memento.yml` for the active config. If neither exists, use `~/memento`.
+The vault location is configured in `almanac.yml` (default: `~/almanac`). Check `~/.config/almanac/almanac.yml` or `~/almanac/almanac.yml` for the active config. If neither exists, use `~/almanac`.
 
 ## When to use
 
-- User invokes `/memento`
+- User invokes `/almanac`
 - User says "remember this", "save this", or similar
 - A session contains noteworthy decisions or discoveries worth preserving
 
 ## Arguments
 
-- `/memento` — capture the full current session
-- `/memento "context"` — capture with the user's framing of what matters
+- `/almanac` — capture the full current session
+- `/almanac "context"` — capture with the user's framing of what matters
 
 ## Process
 
@@ -82,26 +82,26 @@ The vault location is configured in `memento.yml` (default: `~/memento`). Check 
    ## Sessions
    ```
 
-6. **Run post-capture extensions.** Check if `~/.claude/skills/memento-post/SKILL.md` exists. If it does, read it and follow its instructions. This is the extension point for project-specific workflows (e.g., promoting notes to a team vault, tagging with domain-specific labels, notifying external systems). Skip this step if the file doesn't exist.
+6. **Run post-capture extensions.** Check if `~/.claude/skills/almanac-post/SKILL.md` exists. If it does, read it and follow its instructions. This is the extension point for project-specific workflows (e.g., promoting notes to a team vault, tagging with domain-specific labels, notifying external systems). Skip this step if the file doesn't exist.
 
 7. **Commit to vault repo.** After all writes are done, run:
 
    ```bash
-   ~/.claude/hooks/vault-commit.sh "memento: [short description of what was captured]"
+   ~/.claude/hooks/vault-commit.sh "almanac: [short description of what was captured]"
    ```
 
-8. **Sync to remote vault.** If `~/.claude/memento-remote.env` exists, sync each note you created to the remote vault:
+8. **Sync to remote vault.** If `~/.claude/almanac-remote.env` exists, sync each note you created to the remote vault:
 
    ```bash
-   (set -a; . ~/.claude/memento-remote.env; set +a; python3 ~/.claude/hooks/memento-remote-sync.py <note-paths>)
+   (set -a; . ~/.claude/almanac-remote.env; set +a; python3 ~/.claude/hooks/almanac-remote-sync.py <note-paths>)
    ```
 
-   Replace `<note-paths>` with the paths of notes you just created. The script is a no-op if `MEMENTO_VAULT_URL` is not set. Skip this step entirely if `~/.claude/memento-remote.env` does not exist.
+   Replace `<note-paths>` with the paths of notes you just created. The script is a no-op if `ALMANAC_VAULT_URL` is not set. Skip this step entirely if `~/.claude/almanac-remote.env` does not exist.
 
 9. **Trigger Inception check.** Manual captures bypass SessionEnd triage, so Inception's threshold check doesn't fire automatically. Run it explicitly:
 
    ```bash
-   python3 ~/.claude/hooks/memento-inception.py --verbose 2>&1 | tail -5
+   python3 ~/.claude/hooks/almanac-inception.py --verbose 2>&1 | tail -5
    ```
 
    This is a no-op if Inception is disabled, if there aren't enough new notes, or if another instance is already running. It runs in the foreground but returns quickly (~20ms) if the threshold isn't met.
@@ -114,5 +114,5 @@ The vault location is configured in `memento.yml` (default: `~/memento`). Check 
 - Never modify notes not created in this invocation
 - Never write to `fleeting/`
 - One idea per note — if you find yourself writing more than a paragraph, split it
-- If the user provided context via `/memento "..."`, use their framing as the primary lens
+- If the user provided context via `/almanac "..."`, use their framing as the primary lens
 - Use controlled tags — prefer reusing tags from existing notes over inventing new ones

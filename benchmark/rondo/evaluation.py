@@ -98,7 +98,7 @@ def load_outcomes(path: str | Path) -> list[dict[str, Any]]:
     """Load sanitized outcome summaries from JSON or JSONL.
 
     Outcome records must be compact summaries. Raw logs, transcripts, proofs,
-    ledgers, and very large multiline strings are rejected so Memento does not
+    ledgers, and very large multiline strings are rejected so Almanac does not
     become a run store.
     """
     source = Path(path)
@@ -140,7 +140,7 @@ def classify_memory_outcome(task: dict[str, Any], outcome: dict[str, Any]) -> di
         outcome.get("retrieved_note_refs") or outcome.get("retrieved_memory_refs") or outcome.get("memory_refs")
     )
     retrieval_queries = _string_list(
-        outcome.get("retrieval_queries") or outcome.get("memento_queries") or outcome.get("memory_queries")
+        outcome.get("retrieval_queries") or outcome.get("almanac_queries") or outcome.get("memory_queries")
     )
     memory_used = _safe_bool(outcome.get("memory_used"), default=bool(retrieved_refs or retrieval_queries))
     latency_ms = _safe_int(outcome.get("retrieval_latency_ms") or outcome.get("latency_ms"), default=None)

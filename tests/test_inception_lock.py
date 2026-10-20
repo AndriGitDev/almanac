@@ -4,7 +4,7 @@ import os
 import time
 
 
-from memento.store import acquire_inception_lock, release_inception_lock
+from almanac.store import acquire_inception_lock, release_inception_lock
 
 
 class TestAcquireInceptionLock:
