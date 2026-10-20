@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from memento_inception import NoteRecord, score_cluster
+from almanac_inception import NoteRecord, score_cluster
 
 
 def _make_record(stem, *, tags=None, date="", certainty=None, project=None):

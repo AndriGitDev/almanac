@@ -13,7 +13,7 @@ from unittest.mock import patch
 import numpy as np
 import pytest
 
-from memento_inception import (
+from almanac_inception import (
     NoteRecord,
     _order_by_date,
     find_contradiction_candidates,
@@ -202,7 +202,7 @@ class TestRunContradictionDetection:
         queue_path = tmp_path / "review-queue.jsonl"
         verdict = json.dumps({"contradicts": True, "newer_wins": True, "confidence": 0.9})
 
-        with patch("memento_inception.call_llm", return_value=verdict):
+        with patch("almanac_inception.call_llm", return_value=verdict):
             report = run_contradiction_detection(
                 stem_index,
                 matrix,
@@ -227,7 +227,7 @@ class TestRunContradictionDetection:
         queue_path = tmp_path / "review-queue.jsonl"
         verdict = json.dumps({"contradicts": True, "newer_wins": True, "confidence": 0.5})
 
-        with patch("memento_inception.call_llm", return_value=verdict):
+        with patch("almanac_inception.call_llm", return_value=verdict):
             report = run_contradiction_detection(
                 stem_index,
                 matrix,
@@ -252,7 +252,7 @@ class TestRunContradictionDetection:
         queue_path = tmp_path / "review-queue.jsonl"
         verdict = json.dumps({"contradicts": True, "newer_wins": False, "confidence": 0.95})
 
-        with patch("memento_inception.call_llm", return_value=verdict):
+        with patch("almanac_inception.call_llm", return_value=verdict):
             report = run_contradiction_detection(
                 stem_index,
                 matrix,
@@ -269,7 +269,7 @@ class TestRunContradictionDetection:
         vault, notes_dict, stem_index, matrix = self._setup(tmp_path)
         queue_path = tmp_path / "review-queue.jsonl"
 
-        with patch("memento_inception.call_llm", return_value="not valid json"):
+        with patch("almanac_inception.call_llm", return_value="not valid json"):
             report = run_contradiction_detection(
                 stem_index,
                 matrix,
@@ -290,7 +290,7 @@ class TestRunContradictionDetection:
         vault, notes_dict, stem_index, matrix = self._setup(tmp_path, older_date="", newer_date="")
         queue_path = tmp_path / "review-queue.jsonl"
 
-        with patch("memento_inception.call_llm") as mock_llm:
+        with patch("almanac_inception.call_llm") as mock_llm:
             report = run_contradiction_detection(
                 stem_index,
                 matrix,
@@ -326,7 +326,7 @@ class TestRunContradictionDetection:
         queue_path = tmp_path / "review-queue.jsonl"
         verdict = json.dumps({"contradicts": False, "newer_wins": False, "confidence": 0.1})
 
-        with patch("memento_inception.call_llm", return_value=verdict) as mock_llm:
+        with patch("almanac_inception.call_llm", return_value=verdict) as mock_llm:
             report = run_contradiction_detection(
                 stem_index,
                 matrix,
@@ -359,13 +359,13 @@ class TestMainInvokesContradictionDetection:
 
     def _run_main(self, config, state_path, argv, **kwargs):
         args = parse_args(argv)
-        with patch("memento_inception.get_config", return_value=config):
+        with patch("almanac_inception.get_config", return_value=config):
             return main(args, state_path=str(state_path), **kwargs)
 
     def test_disabled_by_default_skips_contradiction_detection(
         self, mock_config, sample_notes, tmp_vault, inception_state_path, mock_qmd_db
     ):
-        with patch("memento_inception.run_contradiction_detection") as mock_run:
+        with patch("almanac_inception.run_contradiction_detection") as mock_run:
             result = self._run_main(mock_config, inception_state_path, ["--full"], db_path=str(mock_qmd_db))
         assert result == 0
         mock_run.assert_not_called()
@@ -378,8 +378,8 @@ class TestMainInvokesContradictionDetection:
         def _boom(*args, **kwargs):
             raise RuntimeError("contradiction detection exploded")
 
-        with patch("memento_inception.run_contradiction_detection", side_effect=_boom) as mock_run:
-            with patch("memento_inception.call_llm", return_value=""):
+        with patch("almanac_inception.run_contradiction_detection", side_effect=_boom) as mock_run:
+            with patch("almanac_inception.call_llm", return_value=""):
                 result = self._run_main(mock_config, inception_state_path, ["--full"], db_path=str(mock_qmd_db))
 
         assert result == 0  # failure isolated -- clustering/synthesis still ran to completion

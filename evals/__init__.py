@@ -1,1 +1,1 @@
-"""Memento quality evals. See evals/README.md."""
+"""Almanac quality evals. See evals/README.md."""

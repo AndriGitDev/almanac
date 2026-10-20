@@ -32,7 +32,7 @@ def test_legacy_vault_health_check_keeps_direct_callers_and_points_to_health_com
 
     assert result.returncode == 0
     assert "Legacy structural vault check" in result.stdout
-    assert "memento-vault health" in result.stdout
+    assert "almanac health" in result.stdout
     assert "Vault health check passed." in result.stdout
 
 

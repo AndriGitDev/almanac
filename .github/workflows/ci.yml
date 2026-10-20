@@ -1,5 +1,5 @@
-# CI mirror of the local Beislið gates (.beislid/workflow.md), so PR
-# readiness is verified outside the agent's mutable session (GH #52).
+# Repository checks for pull requests and pushes to main.
+# See CONTRIBUTING.md for local setup and validation commands.
 #
 # Deliberately not in CI:
 # - claude-sandbox-smoke: runs a real completion through an authenticated
@@ -8,8 +8,8 @@
 #   run_evals.py --llm or without a suite filter): they need a real vault
 #   and a configured LLM backend; CI runs only the hermetic layers.
 # - full pytest is advisory (continue-on-error) until the embedded vector
-#   search environment issues are fixed; the blocking jobs run the same
-#   suites the Beislið gates run.
+#   search environment issues are fixed; the blocking jobs run the
+#   focused suites listed below.
 name: CI
 
 on:
@@ -37,7 +37,7 @@ jobs:
       - name: ruff format check
         run: python -m ruff format --check .
       - name: compileall
-        run: python -m compileall -q almanac memento hooks scripts
+        run: python -m compileall -q almanac hooks scripts
 
   gate-tests:
     name: Gate test suites
@@ -55,7 +55,7 @@ jobs:
       - name: frontmatter-schema-drift
         run: python scripts/check_frontmatter_schema.py
       - name: targeted-tests
-        run: python -m pytest tests/test_llm_backends.py tests/test_lifecycle.py tests/test_triage.py tests/test_store.py tests/test_frontmatter_schema.py tests/test_script_harnesses.py tests/test_beislid_workflow_gates.py
+        run: python -m pytest tests/test_llm_backends.py tests/test_lifecycle.py tests/test_triage.py tests/test_store.py tests/test_frontmatter_schema.py tests/test_script_harnesses.py
       - name: retrieval-tests
         run: python -m pytest tests/test_tenet_*.py tests/test_multi_hop.py tests/test_deep_recall.py
       - name: mcp-server-tests

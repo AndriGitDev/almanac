@@ -40,4 +40,4 @@ Implemented:
 ## Notes
 
 - runtime directory selection now verifies writability and falls back safely when `$XDG_RUNTIME_DIR` is present but unusable
-- historical PR1 quality gates used Ruff plus the full pytest suite; current branch shipping gates live in `.beislid/workflow.md`.
+- historical PR1 quality gates used Ruff plus the full pytest suite; current validation commands live in `CONTRIBUTING.md`.

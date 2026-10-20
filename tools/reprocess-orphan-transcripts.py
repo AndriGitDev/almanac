@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reprocess orphan Claude Code transcripts through memento-triage.
+"""Reprocess orphan Claude Code transcripts through almanac-triage.
 
 Usage:
     tools/reprocess-orphan-transcripts.py --list           # dry-run report
@@ -23,17 +23,17 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-# Make memento importable
+# Make almanac importable
 _repo = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_repo))
 
-from memento.adapters import parse_transcript  # noqa: E402
+from almanac.adapters import parse_transcript  # noqa: E402
 
-TRIAGE_HOOK = Path.home() / ".claude" / "hooks" / "memento-triage.py"
+TRIAGE_HOOK = Path.home() / ".claude" / "hooks" / "almanac-triage.py"
 TRANSCRIPT_ROOT = Path.home() / ".claude" / "projects"
-RETRIEVAL_LOG = Path.home() / ".config" / "memento-vault" / "retrieval.jsonl"
-CONFIG_PATH = Path.home() / ".config" / "memento-vault" / "memento.yml"
-OVERSIZE_SIDECAR = Path.home() / ".config" / "memento-vault" / "oversize-orphans.txt"
+RETRIEVAL_LOG = Path.home() / ".config" / "almanac" / "retrieval.jsonl"
+CONFIG_PATH = Path.home() / ".config" / "almanac" / "almanac.yml"
+OVERSIZE_SIDECAR = Path.home() / ".config" / "almanac" / "oversize-orphans.txt"
 # Sonnet's standard 200K context is ~800KB of text in the best case but
 # code-heavy transcripts tokenize less favorably. 500KB keeps us clear of
 # "prompt too long" rejections with headroom for the prompt scaffolding and
@@ -137,7 +137,7 @@ def write_oversize_sidecar(oversize: list[dict]) -> None:
 
 
 def _swap_config(disable_keys: dict[str, str]) -> str:
-    """Rewrite memento.yml with a few top-level keys forced. Returns backup path."""
+    """Rewrite almanac.yml with a few top-level keys forced. Returns backup path."""
     if not CONFIG_PATH.exists():
         return ""
     backup = str(CONFIG_PATH) + f".bak.{int(time.time())}"
@@ -168,7 +168,7 @@ def _restore_config(backup: str) -> None:
 
 
 def _vault_root() -> Path:
-    from memento.config import get_vault  # lazy: reads user config
+    from almanac.config import get_vault  # lazy: reads user config
 
     return Path(get_vault())
 
@@ -229,7 +229,7 @@ def run_triage(orphan: dict, timeout: int = 300) -> tuple[bool, str]:
             capture_output=True,
             text=True,
             timeout=timeout,
-            env={**os.environ, "MEMENTO_AGENT": "claude"},
+            env={**os.environ, "ALMANAC_AGENT": "claude"},
         )
     except subprocess.TimeoutExpired:
         return False, "timeout"

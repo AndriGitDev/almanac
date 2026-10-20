@@ -52,11 +52,11 @@ def read_note_record(vault: Path, path: Path) -> dict[str, Any] | None:
 def _read_note_record(vault: Path, path: Path) -> dict[str, Any] | None:
     """Read one note's frontmatter into a filter-ready metadata record.
 
-    MEM-166: parses via :mod:`memento.frontmatter` instead of a private
+    MEM-166: parses via :mod:`almanac.frontmatter` instead of a private
     ``split(":", 1)`` scanner. The one behavior change: ``tags`` written in
     block style (``tags:\n  - a\n  - b``) are now visible here, same as the
     inline ``tags: [a, b]`` form -- previously only the inline form was
-    understood by this scanner (the same gap :func:`memento.graph.read_note_metadata`
+    understood by this scanner (the same gap :func:`almanac.graph.read_note_metadata`
     had), so block-style tags were silently invisible to typed queries and
     project/type/tag filtering.
     """

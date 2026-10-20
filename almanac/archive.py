@@ -18,13 +18,11 @@ from typing import Iterable
 from almanac.config import get_vault_metadata_dir
 
 ARCHIVE_FORMAT = "almanac-portable-archive"
-LEGACY_ARCHIVE_FORMAT = "memento-portable-archive"
 ARCHIVE_VERSION = 1
 PAYLOAD_PREFIX = "payload/"
 CONTENT_ROOTS = ("notes", "fleeting", "projects", "archive")
-LEGACY_TOMBSTONES_REL = ".memento/tombstones.jsonl"
 TOMBSTONES_REL = ".almanac/tombstones.jsonl"
-STATE_FILES = ("vault-identity.json", ".sync/ledger.jsonl", TOMBSTONES_REL, LEGACY_TOMBSTONES_REL)
+STATE_FILES = ("vault-identity.json", ".sync/ledger.jsonl", TOMBSTONES_REL)
 
 
 class ArchiveError(RuntimeError):
@@ -239,7 +237,7 @@ def _iter_export_files(vault: Path, *, exclude_paths: Iterable[Path] = ()):
             seen.add(rel)
             yield rel, path
     for rel in STATE_FILES:
-        if rel in {TOMBSTONES_REL, LEGACY_TOMBSTONES_REL}:
+        if rel == TOMBSTONES_REL:
             continue
         path = vault / rel
         if path.is_symlink() or path.resolve() in excluded:
@@ -310,7 +308,7 @@ def _read_manifest(zf: zipfile.ZipFile) -> dict:
         raise ArchiveError("archive missing manifest.json") from exc
     except json.JSONDecodeError as exc:
         raise ArchiveError("archive manifest is not valid JSON") from exc
-    if manifest.get("archive_format") not in {ARCHIVE_FORMAT, LEGACY_ARCHIVE_FORMAT}:
+    if manifest.get("archive_format") != ARCHIVE_FORMAT:
         raise ArchiveError("not an Almanac portable archive")
     if manifest.get("archive_version") != ARCHIVE_VERSION:
         raise ArchiveError(f"unsupported archive version: {manifest.get('archive_version')}")
@@ -352,7 +350,7 @@ def _manifest_content_roots(manifest: dict) -> list[str]:
 
 
 def _read_payload_tombstones(zf: zipfile.ZipFile, members: dict[str, zipfile.ZipInfo]) -> list[dict]:
-    info = members.get(TOMBSTONES_REL) or members.get(LEGACY_TOMBSTONES_REL)
+    info = members.get(TOMBSTONES_REL)
     if not info:
         return []
     records = []
@@ -458,7 +456,7 @@ def _stage_import(
     for rel, info in members.items():
         if rel in incoming_tombstone_paths:
             continue
-        if rel in {TOMBSTONES_REL, LEGACY_TOMBSTONES_REL, ".sync/ledger.jsonl"}:
+        if rel in {TOMBSTONES_REL, ".sync/ledger.jsonl"}:
             continue
         if rel == "vault-identity.json" and (vault / rel).exists():
             continue
@@ -544,7 +542,7 @@ def import_archive(
                 tombstone_skipped += 1
                 continue
 
-            if rel in {TOMBSTONES_REL, LEGACY_TOMBSTONES_REL}:
+            if rel == TOMBSTONES_REL:
                 continue
             if rel == ".sync/ledger.jsonl":
                 if _merge_jsonl_file(dest, data.decode("utf-8")):
@@ -608,7 +606,7 @@ def import_archive(
 #
 # Nothing in the vault ages out on its own: 95.5% of notes never resurface
 # and there was no archival pressure. This scheduled sweep finds notes that
-# are durably cold (never resurfaced -- see memento.store.durability_tier),
+# are durably cold (never resurfaced -- see almanac.store.durability_tier),
 # old, and low-certainty, and archives them using the SAME tombstone
 # machinery export_archive()/import_archive() already rely on for portable
 # deletions -- never a second archive mechanism, never a hard delete.
@@ -718,7 +716,7 @@ def sweep_archive_candidates(vault, *, config=None, now=None, dry_run: bool = Fa
 
     A note qualifies only when ALL of the following hold:
 
-    1. Its durability tier (:func:`memento.store.read_durability_tier`) is
+    1. Its durability tier (:func:`almanac.store.read_durability_tier`) is
        ``"cold"`` -- pinned, hot, and warm notes (anything ever/recently
        resurfaced, or manually pinned) are never touched.
     2. Its ``date`` frontmatter age exceeds ``archive_sweep_age_days`` (config,
@@ -740,7 +738,7 @@ def sweep_archive_candidates(vault, *, config=None, now=None, dry_run: bool = Fa
     but never moves a file or writes a tombstone.
 
     Mutations (the actual archive step) happen under the vault write lock,
-    re-entrant like :func:`memento.store.fold_access_log_into_frontmatter` --
+    re-entrant like :func:`almanac.store.fold_access_log_into_frontmatter` --
     acquires only if not already held, never releases a lock a caller holds.
 
     Returns a report dict with keys ``enabled``, ``dry_run``,
@@ -850,7 +848,7 @@ def sweep_archive_candidates(vault, *, config=None, now=None, dry_run: bool = Fa
 
 # --- Fleeting note lifecycle (MEM-153) ---
 #
-# fleeting/<YYYY-MM-DD>.md notes (memento.store.append_fleeting_session)
+# fleeting/<YYYY-MM-DD>.md notes (almanac.store.append_fleeting_session)
 # accumulate forever today -- nothing promotes them to a durable notes/
 # entry and nothing expires them. This closes that gap by reusing the SAME
 # archive_note()/restore_note() tombstone machinery as the MEM-152 sweep
@@ -862,7 +860,7 @@ DEFAULT_FLEETING_PROMOTE_MIN_RESURFACED = 2
 DEFAULT_FLEETING_EXPIRE_DAYS = 14
 
 # docs/frontmatter-schema.md's "Source values" table describes `source:
-# mcp-capture` as "`memento_capture` session-summary note writer" -- there is
+# mcp-capture` as "`almanac_capture` session-summary note writer" -- there is
 # no distinct `type: session-summary` frontmatter enum value anywhere in the
 # schema (Note types are decision/discovery/pattern/bugfix/tool/architecture/
 # daily; mcp-capture notes are written with `type: discovery`). This is the
@@ -935,7 +933,7 @@ def _fleeting_age_days(path: Path, frontmatter: str, now: datetime):
 def _fleeting_notes_target(vault: Path, rel: str) -> tuple[str, Path]:
     """Compute the ``notes/`` destination for promoting ``fleeting/<name>.md``.
 
-    Mirrors ``memento.store.write_note``'s numeric-suffix-on-collision
+    Mirrors ``almanac.store.write_note``'s numeric-suffix-on-collision
     behavior so a promoted fleeting note never silently overwrites an
     existing notes/ file with the same stem.
     """
@@ -962,10 +960,10 @@ def promote_fleeting_note(vault: Path, fleeting_rel: str, *, now: datetime | Non
 
     Adds a ``promoted_at: <ISO date>`` frontmatter line while preserving
     every other frontmatter line verbatim (fleeting notes as written by
-    :func:`memento.store.append_fleeting_session` carry no YAML frontmatter
+    :func:`almanac.store.append_fleeting_session` carry no YAML frontmatter
     block at all today, so there is usually nothing to preserve -- but this
     round-trips any that do exist, the same way
-    ``memento.store.replace_note_at_path``/``_fold_note_frontmatter``
+    ``almanac.store.replace_note_at_path``/``_fold_note_frontmatter``
     preserve unmanaged keys elsewhere). Atomic move (``os.replace``) plus a
     single atomic rewrite of the destination via ``_write_text_atomic`` --
     never a full ``write_note()`` re-render that would rebuild the body.
@@ -1010,7 +1008,7 @@ def fleeting_lifecycle_sweep(vault, *, config=None, now=None, dry_run: bool = Fa
     1. ``resurfaced_count`` frontmatter is >= ``fleeting_promote_min_resurfaced``
        (config, default :data:`DEFAULT_FLEETING_PROMOTE_MIN_RESURFACED`) --
        the same durable resurfacing signal MEM-148 folds from the access log
-       (:func:`memento.store.fold_access_log_into_frontmatter`). A fleeting
+       (:func:`almanac.store.fold_access_log_into_frontmatter`). A fleeting
        note with no frontmatter block reads as 0 -- not an error, just "no
        signal yet."
     2. It is cited by a session-summary note: a ``[[stem]]`` wikilink to the

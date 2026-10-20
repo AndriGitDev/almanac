@@ -15,7 +15,7 @@ retrieval_probe.py, MEM-133):
    payloads -- mirroring the shapes capture_e2e.py:_validate_notes grades --
    pushed through the real smart_store/store MCP entry points into a temp
    vault, a real EmbeddedSearchBackend (FTS5, no embedding provider) index
-   build, then the real memento.search.qmd_search() entry point. Asserts
+   build, then the real almanac.search.qmd_search() entry point. Asserts
    each case's golden query returns the stored note in the top 5.
 2. Manual, --llm tier: the same loop starting from a fixture transcript
    through real triage extraction (capture_e2e.py's fixtures and
@@ -98,9 +98,9 @@ def run(context) -> list[CheckResult]:
             details=[f"MISS {c['id']}: {c['details']}" for c in checks if not c["ok"]]
             or [f"{len(passed)}/{len(checks)} capture-then-retrieve cases found their note"],
             remediation="A stored note did not surface for its golden query. Check whether "
-            "smart_store/store actually wrote it (memento/smart_store.py, memento/mcp_server.py) "
+            "smart_store/store actually wrote it (almanac/smart_store.py, almanac/mcp_server.py) "
             "and whether the search index was rebuilt from the vault after the write "
-            "(memento/embedded_search.py EmbeddedSearchBackend.reindex/index_note). This is "
+            "(almanac/embedded_search.py EmbeddedSearchBackend.reindex/index_note). This is "
             "exactly the gap MEM-134 exists to catch: capture quality and retrieval accuracy "
             "each passing their own evals does not mean a captured note is actually findable.",
         )
@@ -141,7 +141,7 @@ def run(context) -> list[CheckResult]:
                 title="Capture-then-retrieve loop from real triage extraction (fixture transcript)",
                 status=SKIP,
                 details=[llm.get("reason", "no LLM backend configured")],
-                remediation="Configure llm_backend (and any required credentials) in memento.yml to run this tier.",
+                remediation="Configure llm_backend (and any required credentials) in almanac.yml to run this tier.",
             )
         )
         return results
@@ -166,7 +166,7 @@ def run(context) -> list[CheckResult]:
             threshold=f"warn < {warn}, fail < {fail}",
             details=extraction_problems or ["both fixture transcripts extracted cleanly"],
             remediation="Same rubric and thresholds as capture_e2e.llm_extraction (live-model output is "
-            "not perfectly reproducible); see hooks/memento-triage.py.",
+            "not perfectly reproducible); see hooks/almanac-triage.py.",
         )
     )
 

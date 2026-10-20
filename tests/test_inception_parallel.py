@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from memento_inception import (
+from almanac_inception import (
     main,
     parse_args,
 )
@@ -42,7 +42,7 @@ def _synth_response(title="Test Pattern", body="Synthesized."):
 def _run_main(config, state_path, argv, db_path=None, lock_path=None):
     """Run the main pipeline with mocked config and paths."""
     args = parse_args(argv)
-    with patch("memento_inception.get_config", return_value=config):
+    with patch("almanac_inception.get_config", return_value=config):
         kwargs = {}
         if db_path:
             kwargs["db_path"] = db_path
@@ -78,13 +78,13 @@ class TestParallelSynthesis:
             1: ["zustand-state-reset", "react-query-wrapper"],
         }
 
-        with patch("memento_inception.call_llm", side_effect=_slow_llm):
-            with patch("memento_inception.cluster_notes", return_value=fake_clusters):
-                with patch("memento_inception._commit_and_reindex"):
-                    with patch("memento_inception.build_project_maps", return_value={}):
-                        with patch("memento_inception.write_project_maps"):
-                            with patch("memento_inception.build_concept_index", return_value={}):
-                                with patch("memento_inception.write_concept_index"):
+        with patch("almanac_inception.call_llm", side_effect=_slow_llm):
+            with patch("almanac_inception.cluster_notes", return_value=fake_clusters):
+                with patch("almanac_inception._commit_and_reindex"):
+                    with patch("almanac_inception.build_project_maps", return_value={}):
+                        with patch("almanac_inception.write_project_maps"):
+                            with patch("almanac_inception.build_concept_index", return_value={}):
+                                with patch("almanac_inception.write_concept_index"):
                                     _run_main(
                                         mock_config,
                                         inception_state_path,
@@ -105,9 +105,9 @@ class TestParallelSynthesis:
         original_write = None
 
         # Import the real write_pattern_note to delegate to
-        import memento_inception
+        import almanac_inception
 
-        original_write = memento_inception.write_pattern_note
+        original_write = almanac_inception.write_pattern_note
 
         def _tracking_write(synthesis, stems, vault_path):
             write_order.append(synthesis["title"])
@@ -126,13 +126,13 @@ class TestParallelSynthesis:
 
         mock_config["inception_parallel"] = 4
 
-        with patch("memento_inception.call_llm", side_effect=_ordered_llm):
-            with patch("memento_inception.write_pattern_note", side_effect=_tracking_write):
-                with patch("memento_inception._commit_and_reindex"):
-                    with patch("memento_inception.build_project_maps", return_value={}):
-                        with patch("memento_inception.write_project_maps"):
-                            with patch("memento_inception.build_concept_index", return_value={}):
-                                with patch("memento_inception.write_concept_index"):
+        with patch("almanac_inception.call_llm", side_effect=_ordered_llm):
+            with patch("almanac_inception.write_pattern_note", side_effect=_tracking_write):
+                with patch("almanac_inception._commit_and_reindex"):
+                    with patch("almanac_inception.build_project_maps", return_value={}):
+                        with patch("almanac_inception.write_project_maps"):
+                            with patch("almanac_inception.build_concept_index", return_value={}):
+                                with patch("almanac_inception.write_concept_index"):
                                     _run_main(
                                         mock_config,
                                         inception_state_path,
@@ -153,7 +153,7 @@ class TestParallelDedupAndDryRun:
 
     def test_dry_run_skips_llm_calls(self, mock_config, sample_notes, tmp_vault, inception_state_path, mock_qmd_db):
         """In dry-run mode, call_llm is never invoked."""
-        with patch("memento_inception.call_llm") as mock_llm:
+        with patch("almanac_inception.call_llm") as mock_llm:
             _run_main(
                 mock_config,
                 inception_state_path,
@@ -166,7 +166,7 @@ class TestParallelDedupAndDryRun:
         """Dry run produces no new note files on disk."""
         notes_before = set((tmp_vault / "notes").glob("*.md"))
 
-        with patch("memento_inception.call_llm", return_value=_synth_response()):
+        with patch("almanac_inception.call_llm", return_value=_synth_response()):
             _run_main(
                 mock_config,
                 inception_state_path,
@@ -193,13 +193,13 @@ class TestParallelDedupAndDryRun:
         }
 
         # First run: synthesize patterns
-        with patch("memento_inception.call_llm", side_effect=_counting_llm):
-            with patch("memento_inception.cluster_notes", return_value=fake_clusters):
-                with patch("memento_inception._commit_and_reindex"):
-                    with patch("memento_inception.build_project_maps", return_value={}):
-                        with patch("memento_inception.write_project_maps"):
-                            with patch("memento_inception.build_concept_index", return_value={}):
-                                with patch("memento_inception.write_concept_index"):
+        with patch("almanac_inception.call_llm", side_effect=_counting_llm):
+            with patch("almanac_inception.cluster_notes", return_value=fake_clusters):
+                with patch("almanac_inception._commit_and_reindex"):
+                    with patch("almanac_inception.build_project_maps", return_value={}):
+                        with patch("almanac_inception.write_project_maps"):
+                            with patch("almanac_inception.build_concept_index", return_value={}):
+                                with patch("almanac_inception.write_concept_index"):
                                     _run_main(
                                         mock_config,
                                         inception_state_path,
@@ -214,13 +214,13 @@ class TestParallelDedupAndDryRun:
         call_count[0] = 0
         state_path2 = inception_state_path.parent / "inception-state2.json"
 
-        with patch("memento_inception.call_llm", side_effect=_counting_llm):
-            with patch("memento_inception.cluster_notes", return_value=fake_clusters):
-                with patch("memento_inception._commit_and_reindex"):
-                    with patch("memento_inception.build_project_maps", return_value={}):
-                        with patch("memento_inception.write_project_maps"):
-                            with patch("memento_inception.build_concept_index", return_value={}):
-                                with patch("memento_inception.write_concept_index"):
+        with patch("almanac_inception.call_llm", side_effect=_counting_llm):
+            with patch("almanac_inception.cluster_notes", return_value=fake_clusters):
+                with patch("almanac_inception._commit_and_reindex"):
+                    with patch("almanac_inception.build_project_maps", return_value={}):
+                        with patch("almanac_inception.write_project_maps"):
+                            with patch("almanac_inception.build_concept_index", return_value={}):
+                                with patch("almanac_inception.write_concept_index"):
                                     _run_main(
                                         mock_config,
                                         state_path2,
@@ -254,12 +254,12 @@ class TestParallelErrorHandling:
 
         mock_config["inception_parallel"] = 4
 
-        with patch("memento_inception.call_llm", side_effect=_flaky_llm):
-            with patch("memento_inception._commit_and_reindex"):
-                with patch("memento_inception.build_project_maps", return_value={}):
-                    with patch("memento_inception.write_project_maps"):
-                        with patch("memento_inception.build_concept_index", return_value={}):
-                            with patch("memento_inception.write_concept_index"):
+        with patch("almanac_inception.call_llm", side_effect=_flaky_llm):
+            with patch("almanac_inception._commit_and_reindex"):
+                with patch("almanac_inception.build_project_maps", return_value={}):
+                    with patch("almanac_inception.write_project_maps"):
+                        with patch("almanac_inception.build_concept_index", return_value={}):
+                            with patch("almanac_inception.write_concept_index"):
                                 result = _run_main(
                                     mock_config,
                                     inception_state_path,
@@ -278,7 +278,7 @@ class TestParallelErrorHandling:
 
         mock_config["inception_parallel"] = 4
 
-        with patch("memento_inception.call_llm", side_effect=_always_fail):
+        with patch("almanac_inception.call_llm", side_effect=_always_fail):
             result = _run_main(
                 mock_config,
                 inception_state_path,
@@ -296,7 +296,7 @@ class TestParallelConfig:
 
     def test_default_config_has_inception_parallel(self):
         """DEFAULT_CONFIG includes inception_parallel = 4."""
-        from memento.config import DEFAULT_CONFIG
+        from almanac.config import DEFAULT_CONFIG
 
         assert "inception_parallel" in DEFAULT_CONFIG
         assert DEFAULT_CONFIG["inception_parallel"] == 4
@@ -315,12 +315,12 @@ class TestParallelConfig:
                 call_times.append((start, end))
             return _synth_response(title=f"Pattern {len(call_times)}")
 
-        with patch("memento_inception.call_llm", side_effect=_timed_llm):
-            with patch("memento_inception._commit_and_reindex"):
-                with patch("memento_inception.build_project_maps", return_value={}):
-                    with patch("memento_inception.write_project_maps"):
-                        with patch("memento_inception.build_concept_index", return_value={}):
-                            with patch("memento_inception.write_concept_index"):
+        with patch("almanac_inception.call_llm", side_effect=_timed_llm):
+            with patch("almanac_inception._commit_and_reindex"):
+                with patch("almanac_inception.build_project_maps", return_value={}):
+                    with patch("almanac_inception.write_project_maps"):
+                        with patch("almanac_inception.build_concept_index", return_value={}):
+                            with patch("almanac_inception.write_concept_index"):
                                 _run_main(
                                     mock_config,
                                     inception_state_path,

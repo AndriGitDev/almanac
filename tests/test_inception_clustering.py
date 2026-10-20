@@ -5,7 +5,7 @@ import pytest
 
 pytest.importorskip("hdbscan", reason="hdbscan not installed; install the 'test' extra to run this suite")
 
-from memento_inception import cluster_notes  # noqa: E402
+from almanac_inception import cluster_notes  # noqa: E402
 
 
 def make_cluster(rng, n, dim=768, noise=0.01):

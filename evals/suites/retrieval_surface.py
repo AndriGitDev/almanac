@@ -14,8 +14,8 @@ import tempfile
 from pathlib import Path
 
 from evals.common import CheckResult, FAIL, PASS
-from memento.retrieval_policy import ExplicitSearchRequest, ExplicitSearchRuntime, normalized_natural_query
-from memento.search_backend import GrepBackend, QMDBackend, SearchBackend
+from almanac.retrieval_policy import ExplicitSearchRequest, ExplicitSearchRuntime, normalized_natural_query
+from almanac.search_backend import GrepBackend, QMDBackend, SearchBackend
 
 SUITE = "retrieval_surface"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -78,21 +78,21 @@ class _EvalBackend(SearchBackend):
 def _backend_index_hook_probe() -> tuple[bool, list[str]]:
     details = []
     generic = _EvalBackend()
-    details.append(f"generic={generic.index_note('notes/a.md', collection='memento')} calls={generic.reindex_calls}")
+    details.append(f"generic={generic.index_note('notes/a.md', collection='almanac')} calls={generic.reindex_calls}")
 
     grep = GrepBackend()
-    details.append(f"grep={grep.index_note('notes/a.md', collection='memento')}")
+    details.append(f"grep={grep.index_note('notes/a.md', collection='almanac')}")
 
     qmd = QMDBackend()
     qmd_calls = []
     qmd.reindex = lambda collection, embed=True: qmd_calls.append((collection, embed)) or True  # type: ignore[method-assign]
-    details.append(f"qmd={qmd.index_note('notes/a.md', collection='memento')} calls={qmd_calls}")
+    details.append(f"qmd={qmd.index_note('notes/a.md', collection='almanac')} calls={qmd_calls}")
 
     embedded_ok = False
     try:
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
-        with tempfile.TemporaryDirectory(prefix="memento-eval-embedded-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="almanac-eval-embedded-") as tmp:
             vault = Path(tmp) / "vault"
             notes = vault / "notes"
             notes.mkdir(parents=True)
@@ -104,9 +104,9 @@ def _backend_index_hook_probe() -> tuple[bool, list[str]]:
         details.append(f"embedded=error:{type(exc).__name__}:{exc}")
 
     ok = (
-        generic.reindex_calls == [("memento", False)]
+        generic.reindex_calls == [("almanac", False)]
         and grep.index_note("notes/b.md") is True
-        and qmd_calls == [("memento", False)]
+        and qmd_calls == [("almanac", False)]
         and embedded_ok
     )
     return ok, details
@@ -140,9 +140,9 @@ def run(context) -> list[CheckResult]:
     )
 
     fallback_needles = [
-        "memento-vault search",
-        "python3 -m memento search",
-        "memento-vault recall",
+        "almanac search",
+        "python3 -m almanac search",
+        "almanac recall",
         "grep",
         "last-resort",
     ]
@@ -162,7 +162,7 @@ def run(context) -> list[CheckResult]:
     variant_examples = {
         "how should we store bearer tokens that appear in URLs": "store bearer token url",
         "how to publish an mcp server to the registry": "publish mcp server registry",
-        "memento installer remembering flags between upgrades": "memento installer remember flag upgrade",
+        "almanac installer remembering flags between upgrades": "almanac installer remember flag upgrade",
     }
     bad_variants = [
         f"{query!r} -> {normalized_natural_query(query)!r} (expected {expected!r})"
@@ -202,7 +202,7 @@ def run(context) -> list[CheckResult]:
     )
 
     proc = subprocess.run(
-        [sys.executable, "-m", "memento", "--help"],
+        [sys.executable, "-m", "almanac", "--help"],
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
@@ -213,7 +213,7 @@ def run(context) -> list[CheckResult]:
         _check(
             proc.returncode == 0 and "search|recall|reindex" in help_text,
             "local_cli_retrieval_help",
-            "Local python -m memento exposes search/recall/reindex subcommands",
+            "Local python -m almanac exposes search/recall/reindex subcommands",
             details=[help_text.strip()[:300]],
             remediation="Keep a non-MCP retrieval surface available for hookless/tool-limited agents.",
         )

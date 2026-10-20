@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Analyze the full memento pipeline from retrieval logs.
+"""Analyze the full almanac pipeline from retrieval logs.
 
-Compatibility wrapper for :mod:`memento.retrieval_dashboard`.
+Compatibility wrapper for :mod:`almanac.retrieval_dashboard`.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from memento.retrieval_dashboard import main  # noqa: E402
+from almanac.retrieval_dashboard import main  # noqa: E402
 
 
 if __name__ == "__main__":

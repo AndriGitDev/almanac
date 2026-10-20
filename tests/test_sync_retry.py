@@ -1,4 +1,4 @@
-"""Regression tests for hooks/memento-sync-retry.py — the retry replay path.
+"""Regression tests for hooks/almanac-sync-retry.py — the retry replay path.
 
 Covers the two Codex adversarial findings:
   1. Note retry must not crash on a broken dynamic import when there are
@@ -19,18 +19,18 @@ import pytest
 REPO_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from memento import sync_ledger  # noqa: E402
+from almanac import sync_ledger  # noqa: E402
 
 
 def _load_retry_module():
-    """Load hooks/memento-sync-retry.py as an importable module.
+    """Load hooks/almanac-sync-retry.py as an importable module.
 
     The hook is dash-cased, so we use spec_from_file_location to load it
     for tests.
     """
     spec = importlib.util.spec_from_file_location(
-        "memento_sync_retry_test",
-        str(REPO_ROOT / "hooks" / "memento-sync-retry.py"),
+        "almanac_sync_retry_test",
+        str(REPO_ROOT / "hooks" / "almanac-sync-retry.py"),
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -50,7 +50,7 @@ def retry_mod():
 class TestNoteRetryNoBrokenImport:
     def test_note_retry_parses_inline_without_importing_sibling(self, tmp_path, retry_mod):
         """The retry path must parse notes using its own inline parser.
-        Any attempt to import a `memento_remote_sync` module would raise
+        Any attempt to import a `almanac_remote_sync` module would raise
         ModuleNotFoundError, which would abort the whole run."""
         vault = tmp_path / "vault"
         vault.mkdir()
@@ -108,7 +108,7 @@ class TestNoteRetryNoBrokenImport:
         monkeypatch.setattr(retry_mod, "get_vault", lambda: vault)
         monkeypatch.setattr(retry_mod, "store", lambda **_: {"path": "remote/x.md"})
 
-        monkeypatch.setattr(sys, "argv", ["memento-sync-retry.py"])
+        monkeypatch.setattr(sys, "argv", ["almanac-sync-retry.py"])
         rc = retry_mod.main()
 
         assert rc == 0
@@ -124,7 +124,7 @@ class TestNoteRetryNoBrokenImport:
 class TestCaptureRetryPreservesMetadata:
     def _seed_envelope_failure(self, vault, *, fleeting_only, **meta):
         """Simulate a failed substantive capture by writing the envelope +
-        ledger entry the way hooks/memento-triage.py would."""
+        ledger entry the way hooks/almanac-triage.py would."""
         envelope = {
             "version": 1,
             "session_summary": "body text",
@@ -323,7 +323,7 @@ class TestMixedRun:
         monkeypatch.setattr(retry_mod, "is_remote", lambda: True)
         monkeypatch.setattr(retry_mod, "get_vault", lambda: vault)
         monkeypatch.setattr(retry_mod, "capture", fake_capture)
-        monkeypatch.setattr(sys, "argv", ["memento-sync-retry.py"])
+        monkeypatch.setattr(sys, "argv", ["almanac-sync-retry.py"])
 
         retry_mod.main()
 

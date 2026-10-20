@@ -16,14 +16,12 @@ from json import JSONDecodeError
 
 
 OWNED_HOOK_SCRIPTS = {
-    "memento-triage.py",
     "almanac-triage.py",
     "vault-briefing.py",
     "vault-recall.py",
     "vault-tool-context.py",
 }
 ALMANAC_SERVER_NAME = "almanac"
-LEGACY_SERVER_NAME = "memento-vault"
 
 
 # --- Manifest operations ---
@@ -236,9 +234,8 @@ def merge_settings(settings_path, claude_dir, vault_path, experimental, hook_env
 
     hooks = cfg.setdefault("hooks", {})
 
-    # An upgrade must replace the old SessionEnd command; running both would
-    # capture every session twice. Leave other legacy hooks alone until their
-    # same-named Almanac replacements have been written.
+    # Replace the owned SessionEnd command so remote environment prefixes
+    # update on reinstall and each session is captured once.
     if "SessionEnd" in hooks and isinstance(hooks["SessionEnd"], list):
         updated = []
         for entry in hooks["SessionEnd"]:
@@ -249,7 +246,7 @@ def merge_settings(settings_path, claude_dir, vault_path, experimental, hook_env
             if not isinstance(commands, list):
                 updated.append(entry)
                 continue
-            kept = [hook for hook in commands if "memento-triage.py" not in hook.get("command", "")]
+            kept = [hook for hook in commands if "almanac-triage.py" not in hook.get("command", "")]
             if kept:
                 replacement = dict(entry)
                 replacement["hooks"] = kept
@@ -375,16 +372,14 @@ def uninstall_settings(settings_path, claude_dir, vault_path):
 
 
 def uninstall_mcp_config(claude_dir):
-    """Remove Almanac and legacy entries from generic MCP config."""
+    """Remove Almanac entries from generic MCP config."""
     config_path = os.path.join(claude_dir, "mcp-servers.json")
     if not os.path.exists(config_path):
         print("mcp-servers.json not found; nothing to update")
         return
     cfg = _load_json_object_or_fresh(config_path, "mcp-servers.json")
-    owned = [name for name in (ALMANAC_SERVER_NAME, LEGACY_SERVER_NAME) if name in cfg]
-    if owned:
-        for name in owned:
-            del cfg[name]
+    if ALMANAC_SERVER_NAME in cfg:
+        del cfg[ALMANAC_SERVER_NAME]
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(config_path), suffix=".json")
         with os.fdopen(fd, "w") as f:
             json.dump(cfg, f, indent=2)
@@ -428,7 +423,7 @@ def warmup(remote_url, api_key):
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
-                "clientInfo": {"name": "memento-installer", "version": "1.0.0"},
+                "clientInfo": {"name": "almanac-installer", "version": "1.0.0"},
             },
         }
     ).encode()

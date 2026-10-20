@@ -346,4 +346,4 @@ The sparse `supersedes` field alone can't answer "what did we believe on date X"
 
 ## Automation consumption
 
-Automated runners (Rondo, Beislið, or any orchestrator) can use the vault as automation memory: a context packet before a run, explicit search/get during it, and sanitized lesson capture after it. The boundary is strict — the vault is curated memory, never a run ledger, proof store, or coordination database. The [automation MemoryProvider contract](automation-memory-provider.md) defines the operations, failure behavior, privacy expectations, and prohibitions.
+Automated runners (Rondo or any orchestrator) can use the vault as automation memory: a context packet before a run, explicit search/get during it, and sanitized lesson capture after it. The boundary is strict — the vault is curated memory, never a run ledger, proof store, or coordination database. The [automation MemoryProvider contract](automation-memory-provider.md) defines the operations, failure behavior, privacy expectations, and prohibitions.

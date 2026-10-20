@@ -1,6 +1,6 @@
 """Guard against the agentic-retrieval / triage fork bomb.
 
-memento spawns headless `claude --print` children for agentic retrieval and
+almanac spawns headless `claude --print` children for agentic retrieval and
 triage synthesis. Each child starts a fresh Claude Code session that re-fires
 the SessionStart/UserPromptSubmit/SessionEnd hooks; without a re-entrancy guard
 those hooks spawn another child, which fires the hooks again, recursively. The
@@ -10,9 +10,9 @@ entry points so they no-op inside a child.
 
 import subprocess
 
-from memento import llm
-from memento.llm import LLM_SUBPROCESS_ENV, _run_cli, in_llm_subprocess
-from memento.lifecycle import build_briefing, build_recall
+from almanac import llm
+from almanac.llm import LLM_SUBPROCESS_ENV, _run_cli, in_llm_subprocess
+from almanac.lifecycle import build_briefing, build_recall
 
 
 class TestInLlmSubprocess:
@@ -31,7 +31,7 @@ class TestInLlmSubprocess:
 
 class TestRunCliMarksChildEnv:
     """Every LLM CLI child must inherit the re-entrancy marker so its own
-    memento hooks recognise themselves as a child and stand down."""
+    almanac hooks recognise themselves as a child and stand down."""
 
     def _capture_env(self, monkeypatch):
         captured = {}
@@ -54,10 +54,10 @@ class TestRunCliMarksChildEnv:
         assert captured.get(LLM_SUBPROCESS_ENV) == "1"
 
     def test_parent_env_is_preserved(self, monkeypatch):
-        monkeypatch.setenv("MEMENTO_SENTINEL_FOR_TEST", "kept")
+        monkeypatch.setenv("ALMANAC_SENTINEL_FOR_TEST", "kept")
         captured = self._capture_env(monkeypatch)
         _run_cli(["echo", "hi"])
-        assert captured.get("MEMENTO_SENTINEL_FOR_TEST") == "kept"
+        assert captured.get("ALMANAC_SENTINEL_FOR_TEST") == "kept"
         assert captured.get(LLM_SUBPROCESS_ENV) == "1"
 
 

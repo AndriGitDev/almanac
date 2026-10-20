@@ -1,4 +1,4 @@
-# Thresholds for the memento quality evals.
+# Thresholds for the almanac quality evals.
 # Every metric has a warn and a fail bound.
 # Direction is fixed in code per metric; this file only tunes the bounds.
 # Rates are fractions between 0 and 1 unless the comment says otherwise.

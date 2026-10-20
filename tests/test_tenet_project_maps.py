@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 
-from memento_inception import build_project_maps, write_project_maps
-from memento.graph import load_project_maps, lookup_project_notes
+from almanac_inception import build_project_maps, write_project_maps
+from almanac.graph import load_project_maps, lookup_project_notes
 
 
 def test_almanac_inception_writes_indexes_to_active_config_directory(tmp_path, monkeypatch):
@@ -20,7 +20,7 @@ def test_almanac_inception_writes_indexes_to_active_config_directory(tmp_path, m
         spec.loader.exec_module(module)
         for legacy in (False, True):
             config_home = tmp_path / ("legacy" if legacy else "fresh")
-            selected = config_home / ("memento-vault" if legacy else "almanac")
+            selected = config_home / ("almanac" if legacy else "almanac")
             if legacy:
                 selected.mkdir(parents=True)
             monkeypatch.setenv("XDG_CONFIG_HOME", str(config_home))

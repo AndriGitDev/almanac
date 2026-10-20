@@ -11,11 +11,11 @@ from unittest.mock import patch
 import pytest
 
 _spec = importlib.util.spec_from_file_location(
-    "memento_sweeper",
-    str(Path(__file__).parent.parent / "hooks" / "memento-sweeper.py"),
+    "almanac_sweeper",
+    str(Path(__file__).parent.parent / "hooks" / "almanac-sweeper.py"),
 )
 _mod = importlib.util.module_from_spec(_spec)
-sys.modules["memento_sweeper"] = _mod
+sys.modules["almanac_sweeper"] = _mod
 _spec.loader.exec_module(_mod)
 
 
@@ -79,7 +79,7 @@ def test_triage_orphan_sets_pi_agent_env(monkeypatch, tmp_path):
 
     kwargs = popen_calls[0][1]
     proc = popen_calls[0][2]
-    assert kwargs["env"]["MEMENTO_AGENT"] == "pi"
+    assert kwargs["env"]["ALMANAC_AGENT"] == "pi"
     assert kwargs["stdin"] == _mod.subprocess.PIPE
     payload = json.loads(proc.input.decode())
     assert payload["agent"] == "pi"
@@ -99,7 +99,7 @@ def test_main_folds_access_log_into_frontmatter_before_triage(tmp_path, monkeypa
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
 
     fold_calls = []
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: fold_calls.append(vault_path))
@@ -124,7 +124,7 @@ def test_main_still_triages_when_fold_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
 
     def _boom(vault_path):
         raise RuntimeError("runtime dir unavailable")
@@ -149,7 +149,7 @@ def test_main_runs_archive_sweep_after_fold(tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
 
     sweep_calls = []
@@ -174,7 +174,7 @@ def test_main_still_triages_when_archive_sweep_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
 
     def _boom(vault_path):
@@ -200,7 +200,7 @@ def test_main_runs_fleeting_lifecycle_sweep_after_archive_sweep(tmp_path, monkey
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
     monkeypatch.setattr(_mod, "sweep_archive_candidates", lambda vault_path: None)
 
@@ -226,7 +226,7 @@ def test_main_still_triages_when_fleeting_lifecycle_sweep_raises(tmp_path, monke
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
     monkeypatch.setattr(_mod, "sweep_archive_candidates", lambda vault_path: None)
 
@@ -253,7 +253,7 @@ def test_main_runs_hub_regeneration_after_fleeting_lifecycle_sweep(tmp_path, mon
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
     monkeypatch.setattr(_mod, "sweep_archive_candidates", lambda vault_path: None)
     monkeypatch.setattr(_mod, "fleeting_lifecycle_sweep", lambda vault_path: None)
@@ -280,7 +280,7 @@ def test_main_still_triages_when_hub_regeneration_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
     monkeypatch.setattr(_mod, "sweep_archive_candidates", lambda vault_path: None)
     monkeypatch.setattr(_mod, "fleeting_lifecycle_sweep", lambda vault_path: None)
@@ -308,7 +308,7 @@ def test_main_runs_supersession_backlinks_after_fleeting_lifecycle_sweep(tmp_pat
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
     monkeypatch.setattr(_mod, "sweep_archive_candidates", lambda vault_path: None)
     monkeypatch.setattr(_mod, "fleeting_lifecycle_sweep", lambda vault_path: None)
@@ -335,7 +335,7 @@ def test_main_still_triages_when_supersession_backlinks_raises(tmp_path, monkeyp
     monkeypatch.setattr(_mod, "PI_SESSIONS", tmp_path / "no-pi-sessions")
     monkeypatch.setattr(_mod, "PI_SUBAGENTS", tmp_path / "no-pi-subagents")
     monkeypatch.delenv("PI_CODING_AGENT_SESSION_DIR", raising=False)
-    monkeypatch.delenv("MEMENTO_PI_TRANSCRIPT_ROOTS", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_TRANSCRIPT_ROOTS", raising=False)
     monkeypatch.setattr(_mod, "fold_access_log_into_frontmatter", lambda vault_path: None)
     monkeypatch.setattr(_mod, "sweep_archive_candidates", lambda vault_path: None)
     monkeypatch.setattr(_mod, "fleeting_lifecycle_sweep", lambda vault_path: None)

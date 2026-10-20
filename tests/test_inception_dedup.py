@@ -45,7 +45,7 @@ class TestBuildSynthesizedFromLedger:
 
     def test_ledger_empty_dir(self, tmp_path):
         """Empty notes dir returns empty dict."""
-        from memento_inception import build_synthesized_from_ledger
+        from almanac_inception import build_synthesized_from_ledger
 
         empty_dir = tmp_path / "notes"
         empty_dir.mkdir()
@@ -55,7 +55,7 @@ class TestBuildSynthesizedFromLedger:
 
     def test_ledger_finds_inception_notes(self, tmp_path):
         """Dir with inception-sourced notes builds correct ledger mapping."""
-        from memento_inception import build_synthesized_from_ledger
+        from almanac_inception import build_synthesized_from_ledger
 
         notes_dir = tmp_path / "notes"
         notes_dir.mkdir()
@@ -86,7 +86,7 @@ class TestBuildSynthesizedFromLedger:
 
     def test_ledger_ignores_non_inception(self, tmp_path):
         """Notes without source:inception are not included in the ledger."""
-        from memento_inception import build_synthesized_from_ledger
+        from almanac_inception import build_synthesized_from_ledger
 
         notes_dir = tmp_path / "notes"
         notes_dir.mkdir()
@@ -121,7 +121,7 @@ class TestCheckLedgerDedup:
 
     def test_dedup_skip_exact_match(self):
         """Cluster stems == existing pattern sources -> skip."""
-        from memento_inception import check_ledger_dedup
+        from almanac_inception import check_ledger_dedup
 
         ledger = {
             "redis-patterns": {"redis-cache-ttl", "redis-eviction-policy"},
@@ -134,7 +134,7 @@ class TestCheckLedgerDedup:
 
     def test_dedup_skip_subset(self):
         """Cluster is a subset of existing pattern sources -> skip."""
-        from memento_inception import check_ledger_dedup
+        from almanac_inception import check_ledger_dedup
 
         ledger = {
             "redis-patterns": {"redis-cache-ttl", "redis-eviction-policy", "redis-cache-invalidation"},
@@ -147,7 +147,7 @@ class TestCheckLedgerDedup:
 
     def test_dedup_merge_superset(self):
         """Cluster is a superset of existing pattern -> merge with that stem."""
-        from memento_inception import check_ledger_dedup
+        from almanac_inception import check_ledger_dedup
 
         ledger = {
             "redis-patterns": {"redis-cache-ttl", "redis-eviction-policy"},
@@ -160,7 +160,7 @@ class TestCheckLedgerDedup:
 
     def test_dedup_create_novel(self):
         """No overlap with existing patterns -> create new."""
-        from memento_inception import check_ledger_dedup
+        from almanac_inception import check_ledger_dedup
 
         ledger = {
             "redis-patterns": {"redis-cache-ttl", "redis-eviction-policy"},
@@ -177,7 +177,7 @@ class TestCheckTitleOverlap:
 
     def test_title_overlap_high(self):
         """High token overlap (>0.60) returns True."""
-        from memento_inception import check_title_overlap
+        from almanac_inception import check_title_overlap
 
         slug = "redis-cache-ttl-patterns"
         existing_stems = ["redis-cache-ttl"]
@@ -186,7 +186,7 @@ class TestCheckTitleOverlap:
 
     def test_title_overlap_low(self):
         """Low token overlap returns False."""
-        from memento_inception import check_title_overlap
+        from almanac_inception import check_title_overlap
 
         slug = "zustand-testing-mocks"
         existing_stems = ["redis-cache-ttl"]
@@ -195,7 +195,7 @@ class TestCheckTitleOverlap:
 
     def test_title_overlap_rephrased(self):
         """Rephrased title with 70% overlap is caught at 0.60 threshold."""
-        from memento_inception import check_title_overlap
+        from almanac_inception import check_title_overlap
 
         # Real case: "prefer-the-tightest-real-constraint-over-the-convenient-proxy"
         # vs "prefer-the-real-governing-constraint-over-the-convenient-proxy"
@@ -206,6 +206,6 @@ class TestCheckTitleOverlap:
 
     def test_title_overlap_empty(self):
         """Empty slug returns False."""
-        from memento_inception import check_title_overlap
+        from almanac_inception import check_title_overlap
 
         assert check_title_overlap("", existing_stems=["redis-cache-ttl"]) is False

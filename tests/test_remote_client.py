@@ -3,7 +3,7 @@
 import json
 from unittest.mock import patch, MagicMock
 
-from memento.remote_client import (
+from almanac.remote_client import (
     is_remote,
     list_notes,
     query,
@@ -24,7 +24,7 @@ class TestIsRemote:
         assert not is_remote()
 
     def test_true_when_url_set(self, monkeypatch):
-        monkeypatch.setenv("MEMENTO_VAULT_URL", "http://localhost:8745")
+        monkeypatch.setenv("ALMANAC_VAULT_URL", "http://localhost:8745")
         assert is_remote()
 
 
@@ -48,9 +48,9 @@ class TestCallTool:
         mock_resp.__exit__ = MagicMock(return_value=False)
         return mock_resp
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
-    def test_legacy_server_retry_only_after_unknown_tool(self, mock_urlopen, _mock_url):
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
+    def test_unknown_tool_returns_error_without_retry(self, mock_urlopen, _mock_url):
         unknown = MagicMock()
         unknown.read.return_value = json.dumps(
             {"jsonrpc": "2.0", "id": 1, "error": {"message": "Unknown tool: almanac_status"}}
@@ -59,14 +59,11 @@ class TestCallTool:
         unknown.__exit__ = MagicMock(return_value=False)
         mock_urlopen.side_effect = [unknown, self._mock_response({"status": "ok"})]
 
-        assert status() == {"status": "ok"}
-        assert [json.loads(call.args[0].data)["params"]["name"] for call in mock_urlopen.call_args_list] == [
-            "almanac_status",
-            "memento_status",
-        ]
+        assert status() == {"error": "Unknown tool: almanac_status"}
+        assert mock_urlopen.call_count == 1
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_search(self, mock_urlopen, mock_url):
         results = [
             {"path": "notes/foo.md", "title": "Foo", "score": 0.9, "snippet": "test"},
@@ -89,23 +86,23 @@ class TestCallTool:
         assert body["params"]["arguments"]["include_content"] is False
         assert body["params"]["arguments"]["token_budget"] == 2000
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_search_forwards_concrete_option(self, mock_urlopen, mock_url):
         mock_urlopen.return_value = self._mock_response({"results": [], "metadata": {"detail_level": "summary"}})
 
-        search("MEMENTO_VAULT_PATH", concrete=True)
+        search("ALMANAC_VAULT_PATH", concrete=True)
 
         req = mock_urlopen.call_args[0][0]
         body = json.loads(req.data)
         assert body["params"]["arguments"]["concrete"] is True
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_search_forwards_response_controls(self, mock_urlopen, mock_url):
         mock_urlopen.return_value = self._mock_response({"results": [], "metadata": {"detail_level": "full"}})
 
-        search_envelope("MEMENTO_VAULT_PATH", detail_level="full", include_content=True, token_budget=99)
+        search_envelope("ALMANAC_VAULT_PATH", detail_level="full", include_content=True, token_budget=99)
 
         req = mock_urlopen.call_args[0][0]
         body = json.loads(req.data)
@@ -113,8 +110,8 @@ class TestCallTool:
         assert body["params"]["arguments"]["include_content"] is True
         assert body["params"]["arguments"]["token_budget"] == 99
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_search_prefers_structured_content_result(self, mock_urlopen, mock_url):
         mcp_response = {
             "jsonrpc": "2.0",
@@ -144,8 +141,8 @@ class TestCallTool:
         assert len(found) == 1
         assert found[0]["title"] == "Foo"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_search_preserves_single_content_block_result_as_list(self, mock_urlopen, mock_url):
         mock_urlopen.return_value = self._mock_response(
             {"path": "notes/foo.md", "title": "Foo", "score": 0.9, "snippet": "test"}
@@ -155,8 +152,8 @@ class TestCallTool:
 
         assert found == [{"path": "notes/foo.md", "title": "Foo", "score": 0.9, "snippet": "test"}]
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_list_notes_preserves_single_content_block_result_as_list(self, mock_urlopen, mock_url):
         inventory = {"path": "notes/foo.md", "title": "Foo", "hash": "abc123"}
         mock_urlopen.return_value = self._mock_response(inventory)
@@ -165,8 +162,8 @@ class TestCallTool:
 
         assert result == [inventory]
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_search_unwraps_structured_result_envelope(self, mock_urlopen, mock_url):
         mock_urlopen.return_value = self._mock_response(
             {
@@ -179,16 +176,16 @@ class TestCallTool:
 
         assert found == [{"path": "notes/foo.md", "title": "Foo", "score": 0.9, "snippet": "test"}]
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_search_envelope_preserves_structured_miss(self, mock_urlopen, mock_url):
         miss = {"results": [], "miss": {"reason": "threshold_too_high", "recovery_hints": ["Lower min_score."]}}
         mock_urlopen.return_value = self._mock_response(miss)
 
         assert search_envelope("test query") == miss
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_query(self, mock_urlopen, mock_url):
         payload = {"aggregations": [{"value": "discovery", "count": 2}], "metadata": {"valid": True}}
         mock_urlopen.return_value = self._mock_response(payload)
@@ -204,8 +201,8 @@ class TestCallTool:
         assert body["params"]["arguments"]["aggregate_by"] == "type"
         assert body["params"]["arguments"]["certainty_min"] == 3
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_get(self, mock_urlopen, mock_url):
         note = {"path": "notes/foo.md", "title": "Foo", "content": "Body"}
         mock_urlopen.return_value = self._mock_response(note)
@@ -214,8 +211,8 @@ class TestCallTool:
         assert result is not None
         assert result["title"] == "Foo"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_store(self, mock_urlopen, mock_url):
         store_result = {"path": "notes/test-note.md", "title": "Test Note"}
         mock_urlopen.return_value = self._mock_response(store_result)
@@ -223,8 +220,8 @@ class TestCallTool:
         result = store("Test Note", "Body content", tags=["test"])
         assert result["path"] == "notes/test-note.md"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_smart_store(self, mock_urlopen, mock_url):
         smart_result = {"decision": "candidate_update", "created": False, "path": "notes/test-note.md"}
         mock_urlopen.return_value = self._mock_response(smart_result)
@@ -236,8 +233,8 @@ class TestCallTool:
         body = json.loads(req.data)
         assert body["params"]["name"] == "almanac_store_smart"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_capture_run_lesson(self, mock_urlopen, mock_url):
         capture_result = {"queued": True, "id": "arl-1"}
         mock_urlopen.return_value = self._mock_response(capture_result)
@@ -252,8 +249,8 @@ class TestCallTool:
         assert body["params"]["arguments"]["candidate"] == candidate
         assert body["params"]["arguments"]["approve_write"] is True
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_synthesize_failures(self, mock_urlopen, mock_url):
         synthesis_result = {"dry_run": True, "candidate_lessons": []}
         mock_urlopen.return_value = self._mock_response(synthesis_result)
@@ -267,8 +264,8 @@ class TestCallTool:
         assert body["params"]["arguments"]["project"] == "/repo"
         assert body["params"]["arguments"]["approve_writes"] is False
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_capture(self, mock_urlopen, mock_url):
         capture_result = {"session_id": "abc123", "note_path": "notes/session.md"}
         mock_urlopen.return_value = self._mock_response(capture_result)
@@ -276,8 +273,8 @@ class TestCallTool:
         result = capture("Session summary", cwd="/home/user/project")
         assert result["session_id"] == "abc123"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_status(self, mock_urlopen, mock_url):
         status_result = {"vault_id": "abc", "note_count": 42}
         mock_urlopen.return_value = self._mock_response(status_result)
@@ -285,9 +282,9 @@ class TestCallTool:
         result = status()
         assert result["note_count"] == 42
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client._api_key", return_value="test-key")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client._api_key", return_value="test-key")
+    @patch("almanac.remote_client.request.urlopen")
     def test_auth_header_sent(self, mock_urlopen, mock_key, mock_url):
         mock_urlopen.return_value = self._mock_response([])
 
@@ -296,8 +293,8 @@ class TestCallTool:
         req = mock_urlopen.call_args[0][0]
         assert req.get_header("Authorization") == "Bearer test-key"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_search_returns_empty_on_error(self, mock_urlopen, mock_url):
         from urllib.error import URLError
 
@@ -306,8 +303,8 @@ class TestCallTool:
         result = search("test")
         assert result == []
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_url_gets_mcp_suffix(self, mock_urlopen, mock_url):
         mock_urlopen.return_value = self._mock_response([])
 
@@ -316,8 +313,8 @@ class TestCallTool:
         req = mock_urlopen.call_args[0][0]
         assert req.full_url == "http://localhost:8745/mcp"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745/mcp")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745/mcp")
+    @patch("almanac.remote_client.request.urlopen")
     def test_url_no_double_mcp_suffix(self, mock_urlopen, mock_url):
         mock_urlopen.return_value = self._mock_response([])
 
@@ -326,8 +323,8 @@ class TestCallTool:
         req = mock_urlopen.call_args[0][0]
         assert req.full_url == "http://localhost:8745/mcp"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_list_notes(self, mock_urlopen, mock_url):
         inventory = [
             {"path": "notes/foo.md", "title": "Foo", "hash": "abc123"},
@@ -343,8 +340,8 @@ class TestCallTool:
         body = json.loads(mock_urlopen.call_args[0][0].data)
         assert body["params"]["name"] == "almanac_list"
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_list_notes_returns_none_on_error(self, mock_urlopen, mock_url):
         """list_notes() returns None on error to distinguish from empty remote.
 
@@ -358,8 +355,8 @@ class TestCallTool:
         result = list_notes()
         assert result is None
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_list_notes_returns_empty_list_when_remote_empty(self, mock_urlopen, mock_url):
         """An actual empty remote returns [], not None."""
         mock_urlopen.return_value = self._mock_response([])
@@ -367,14 +364,14 @@ class TestCallTool:
         result = list_notes()
         assert result == []
 
-    @patch("memento.remote_client._vault_url", return_value="http://localhost:8745")
-    @patch("memento.remote_client.request.urlopen")
+    @patch("almanac.remote_client._vault_url", return_value="http://localhost:8745")
+    @patch("almanac.remote_client.request.urlopen")
     def test_list_notes_returns_none_on_server_error(self, mock_urlopen, mock_url):
         """Server-side errors (JSON-RPC error result) also yield None."""
         error_response = {
             "jsonrpc": "2.0",
             "id": 1,
-            "error": {"code": -32601, "message": "Method not found: memento_list"},
+            "error": {"code": -32601, "message": "Method not found: almanac_list"},
         }
         mock_resp = MagicMock()
         mock_resp.read.return_value = json.dumps(error_response).encode()

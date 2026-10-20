@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Memento vault replay benchmark.
+Almanac vault replay benchmark.
 Parses real Claude Code session transcripts and replays prompts + file reads
 through the retrieval hooks to measure real-world performance.
 
@@ -127,7 +127,7 @@ def run_hook(hook_script, stdin_data, timeout=15):
             capture_output=True,
             text=True,
             timeout=timeout,
-            env={**os.environ, "MEMENTO_DEBUG": ""},
+            env={**os.environ, "ALMANAC_DEBUG": ""},
         )
         latency_ms = int((time.time() - t0) * 1000)
         return result.stdout.strip(), latency_ms
@@ -182,9 +182,9 @@ def replay_session(parsed, quiet=False):
 
     # Clean caches
     for f in [
-        "/tmp/memento-deferred-briefing.json",
-        "/tmp/memento-last-recall.json",
-        "/tmp/memento-tool-context-cache.json",
+        "/tmp/almanac-deferred-briefing.json",
+        "/tmp/almanac-last-recall.json",
+        "/tmp/almanac-tool-context-cache.json",
     ]:
         try:
             os.unlink(f)
@@ -280,7 +280,7 @@ def print_report(all_stats):
     total_reads = sum(s["read_count"] for s in all_stats)
 
     print(f"\n{'=' * 65}")
-    print("  MEMENTO VAULT PERFORMANCE REPORT — REAL SESSION REPLAY")
+    print("  ALMANAC VAULT PERFORMANCE REPORT — REAL SESSION REPLAY")
     print(f"{'=' * 65}")
     print(f"  Sessions replayed:  {n}")
     print(f"  Total prompts:      {total_prompts}")
@@ -373,12 +373,12 @@ def print_report(all_stats):
 def run_inception_benchmark(quiet=False):
     """Run Inception pipeline in dry-run mode and report timing.
 
-    Executes memento-inception.py --dry-run --full --verbose and parses
+    Executes almanac-inception.py --dry-run --full --verbose and parses
     stderr for phase timing and cluster information.
 
     Returns dict with timing and cluster stats, or None on failure.
     """
-    inception_script = HOOKS_DIR / "memento-inception.py"
+    inception_script = HOOKS_DIR / "almanac-inception.py"
     if not inception_script.exists():
         print("  Inception script not found, skipping")
         return None
@@ -471,7 +471,7 @@ def print_inception_report(stats):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Replay real sessions through memento hooks")
+    parser = argparse.ArgumentParser(description="Replay real sessions through almanac hooks")
     parser.add_argument("--max-sessions", type=int, default=30, help="Max total sessions to replay")
     parser.add_argument("--max-per-project", type=int, default=2, help="Max sessions per project")
     parser.add_argument("--quiet", action="store_true")

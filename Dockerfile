@@ -14,7 +14,6 @@ RUN useradd -m -s /bin/bash almanac
 WORKDIR /app
 
 # Copy project files
-COPY memento/ ./memento/
 COPY almanac/ ./almanac/
 COPY hooks/ ./hooks/
 COPY pyproject.toml ./
@@ -40,7 +39,7 @@ RUN mkdir -p /vault/notes /vault/fleeting /vault/projects /vault/archive /vault/
     && chown -R almanac:almanac /vault
 
 # Create config directory
-RUN mkdir -p /home/almanac/.config/almanac /home/almanac/.config/memento-vault \
+RUN mkdir -p /home/almanac/.config/almanac \
     && chown -R almanac:almanac /home/almanac/.config
 
 USER almanac
@@ -61,7 +60,7 @@ body = json.dumps({'jsonrpc':'2.0','id':1,'method':'tools/call','params':{'name'
 req = Request('http://localhost:8745/mcp', data=body, method='POST'); \
 req.add_header('Content-Type', 'application/json'); \
 req.add_header('Accept', 'application/json'); \
-key = os.environ.get('ALMANAC_API_KEY') or os.environ.get('MEMENTO_API_KEY', ''); \
+key = os.environ.get('ALMANAC_API_KEY', ''); \
 req.add_header('Authorization', f'Bearer {key}') if key else None; \
 urlopen(req, timeout=4)" || exit 1
 

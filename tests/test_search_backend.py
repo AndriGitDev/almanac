@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-from memento.search import is_literal_like_query, resolve_concrete_mode
-from memento.search_backend import (
+from almanac.search import is_literal_like_query, resolve_concrete_mode
+from almanac.search_backend import (
     GrepBackend,
     QMDBackend,
     SearchBackend,
@@ -59,10 +59,10 @@ def isolate_default_backend(monkeypatch, tmp_path):
     """Keep default backend selection isolated from developer environment state."""
     isolated_vault = tmp_path / "isolated-vault"
     monkeypatch.setattr(
-        "memento.config.get_config",
+        "almanac.config.get_config",
         lambda: {"vault_path": str(isolated_vault), "search_backend": "auto", "search_db_path": ".search/search.db"},
     )
-    monkeypatch.setattr("memento.config.get_vault", lambda: isolated_vault)
+    monkeypatch.setattr("almanac.config.get_vault", lambda: isolated_vault)
     yield
     reset_backend()
 
@@ -151,11 +151,11 @@ class TestConcreteDetection:
             '"exact phrase"',
             'find "exact phrase"',
             "notes about 'exact phrase'",
-            "MEMENTO_VAULT_PATH",
+            "ALMANAC_VAULT_PATH",
             "550e8400-e29b-41d4-a716-446655440000",
             "src/server/authMiddleware.ts",
             "some_process.name",
-            "memento_search",
+            "almanac_search",
         ],
     )
     def test_literal_like_queries_detected(self, query):
@@ -177,10 +177,10 @@ class TestConcreteDetection:
         ("value", "query", "expected_concrete", "expected_auto"),
         [
             (True, "cache", True, False),
-            (False, "MEMENTO_VAULT_PATH", False, False),
-            ("auto", "MEMENTO_VAULT_PATH", True, True),
+            (False, "ALMANAC_VAULT_PATH", False, False),
+            ("auto", "ALMANAC_VAULT_PATH", True, True),
             (None, "normal cache policy", False, False),
-            ("flase", "MEMENTO_VAULT_PATH", False, False),
+            ("flase", "ALMANAC_VAULT_PATH", False, False),
         ],
     )
     def test_resolve_concrete_mode(self, value, query, expected_concrete, expected_auto):
@@ -196,12 +196,12 @@ class TestConcreteDetection:
         assert prose == 0
 
     def test_literal_score_prefers_exact_content_identifier_over_substring(self):
-        exact = _literal_score("MEMENTO_VAULT_PATH", "notes/exact.md", "Exact", "Set MEMENTO_VAULT_PATH here")
+        exact = _literal_score("ALMANAC_VAULT_PATH", "notes/exact.md", "Exact", "Set ALMANAC_VAULT_PATH here")
         substring = _literal_score(
-            "MEMENTO_VAULT_PATH",
+            "ALMANAC_VAULT_PATH",
             "notes/substring.md",
             "Substring",
-            "Set MY_MEMENTO_VAULT_PATH_SUFFIX here",
+            "Set MY_ALMANAC_VAULT_PATH_SUFFIX here",
         )
 
         assert exact > substring
@@ -241,7 +241,7 @@ class TestQMDAvailabilityCache:
         monkeypatch.setattr(backend, "_probe_available", lambda: probes.__setitem__("n", probes["n"] + 1) or True)
 
         clock = {"t": 1000.0}
-        monkeypatch.setattr("memento.search_backend.time.monotonic", lambda: clock["t"])
+        monkeypatch.setattr("almanac.search_backend.time.monotonic", lambda: clock["t"])
 
         assert backend.is_available() is True
         assert backend.is_available() is True
@@ -268,8 +268,8 @@ class TestBackendIndexHook:
             backend, "reindex", lambda collection, embed=True: calls.append((collection, embed)) or True
         )
 
-        assert backend.index_note("notes/new.md", collection="memento") is True
-        assert calls == [("memento", False)]
+        assert backend.index_note("notes/new.md", collection="almanac") is True
+        assert calls == [("almanac", False)]
 
 
 class TestMockBackend:
@@ -282,31 +282,31 @@ class TestMockBackend:
         set_backend(mock)
 
         # Use the search.py wrapper
-        from memento.search import qmd_search
+        from almanac.search import qmd_search
 
-        found = qmd_search("test query", collection="memento", limit=5, concrete=True)
+        found = qmd_search("test query", collection="almanac", limit=5, concrete=True)
         assert len(found) == 2
         assert mock.search_calls[0]["query"] == "test query"
         assert mock.search_calls[0]["concrete"] is True
 
     def test_concrete_search_with_extras_skips_duplicate_fanout(self, monkeypatch):
         results = [
-            {"path": "notes/foo.md", "title": "Foo", "score": 0.9, "snippet": "MEMENTO_VAULT_PATH"},
+            {"path": "notes/foo.md", "title": "Foo", "score": 0.9, "snippet": "ALMANAC_VAULT_PATH"},
         ]
         mock = MockBackend(results=results)
         set_backend(mock)
         monkeypatch.setattr(
-            "memento.search.get_config",
-            lambda: {"qmd_collection": "memento", "extra_qmd_collections": ["archive"]},
+            "almanac.search.get_config",
+            lambda: {"qmd_collection": "almanac", "extra_qmd_collections": ["archive"]},
         )
 
-        from memento.search import qmd_search_with_extras
+        from almanac.search import qmd_search_with_extras
 
-        found = qmd_search_with_extras("MEMENTO_VAULT_PATH", concrete=True)
+        found = qmd_search_with_extras("ALMANAC_VAULT_PATH", concrete=True)
 
         assert found == results
         assert len(mock.search_calls) == 1
-        assert mock.search_calls[0]["collection"] == "memento"
+        assert mock.search_calls[0]["collection"] == "almanac"
 
     def test_search_respects_min_score(self):
         results = [
@@ -316,9 +316,9 @@ class TestMockBackend:
         mock = MockBackend(results=results)
         set_backend(mock)
 
-        from memento.search import qmd_search
+        from almanac.search import qmd_search
 
-        found = qmd_search("test", collection="memento", min_score=0.5)
+        found = qmd_search("test", collection="almanac", min_score=0.5)
         assert len(found) == 1
         assert found[0]["title"] == "Foo"
 
@@ -326,10 +326,10 @@ class TestMockBackend:
         mock = MockBackend(available=False)
         set_backend(mock)
 
-        from memento.search import qmd_search, has_qmd
+        from almanac.search import qmd_search, has_qmd
 
         assert not has_qmd()
-        assert qmd_search("test", collection="memento") == []
+        assert qmd_search("test", collection="almanac") == []
 
     def test_get_delegates_to_backend(self):
         results = [
@@ -338,7 +338,7 @@ class TestMockBackend:
         mock = MockBackend(results=results)
         set_backend(mock)
 
-        from memento.search import qmd_get
+        from almanac.search import qmd_get
 
         note = qmd_get("notes/foo.md")
         assert note is not None
@@ -348,14 +348,14 @@ class TestMockBackend:
     def test_default_index_note_uses_reindex_without_embeddings(self):
         mock = MockBackend()
 
-        assert mock.index_note("notes/new.md", collection="memento") is True
-        assert mock.reindex_calls == [{"collection": "memento", "embed": False}]
+        assert mock.index_note("notes/new.md", collection="almanac") is True
+        assert mock.reindex_calls == [{"collection": "almanac", "embed": False}]
 
     def test_get_returns_none_for_missing(self):
         mock = MockBackend(results=[])
         set_backend(mock)
 
-        from memento.search import qmd_get
+        from almanac.search import qmd_get
 
         assert qmd_get("notes/missing.md") is None
 
@@ -365,17 +365,17 @@ class TestEmbeddedBackendDetection:
 
     def test_embedded_used_when_qmd_unavailable(self, tmp_path):
         """When QMD is not available but vault exists, EmbeddedSearchBackend is used."""
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault = tmp_path / "vault"
         for d in ("notes", "fleeting", "projects"):
             (vault / d).mkdir(parents=True)
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.search_backend.QMDBackend.is_available", lambda self: False)
-            mp.setattr("memento.config.get_vault", lambda: vault)
+            mp.setattr("almanac.search_backend.QMDBackend.is_available", lambda self: False)
+            mp.setattr("almanac.config.get_vault", lambda: vault)
             mp.setattr(
-                "memento.config.get_config",
+                "almanac.config.get_config",
                 lambda: {"vault_path": str(vault), "search_backend": "auto", "search_db_path": ".search/search.db"},
             )
             reset_backend()
@@ -389,10 +389,10 @@ class TestEmbeddedBackendDetection:
             (vault / d).mkdir(parents=True)
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.search_backend.QMDBackend.is_available", lambda self: True)
-            mp.setattr("memento.config.get_vault", lambda: vault)
+            mp.setattr("almanac.search_backend.QMDBackend.is_available", lambda self: True)
+            mp.setattr("almanac.config.get_vault", lambda: vault)
             mp.setattr(
-                "memento.config.get_config",
+                "almanac.config.get_config",
                 lambda: {"vault_path": str(vault), "search_backend": "auto", "search_db_path": ".search/search.db"},
             )
             reset_backend()
@@ -401,17 +401,17 @@ class TestEmbeddedBackendDetection:
 
     def test_config_override_forces_embedded(self, tmp_path):
         """search_backend: embedded in config forces EmbeddedSearchBackend."""
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault = tmp_path / "vault"
         for d in ("notes", "fleeting", "projects"):
             (vault / d).mkdir(parents=True)
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.search_backend.QMDBackend.is_available", lambda self: True)
-            mp.setattr("memento.config.get_vault", lambda: vault)
+            mp.setattr("almanac.search_backend.QMDBackend.is_available", lambda self: True)
+            mp.setattr("almanac.config.get_vault", lambda: vault)
             mp.setattr(
-                "memento.config.get_config",
+                "almanac.config.get_config",
                 lambda: {"vault_path": str(vault), "search_backend": "embedded", "search_db_path": ".search/search.db"},
             )
             reset_backend()
@@ -425,9 +425,9 @@ class TestEmbeddedBackendDetection:
             (vault / d).mkdir(parents=True)
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.config.get_vault", lambda: vault)
+            mp.setattr("almanac.config.get_vault", lambda: vault)
             mp.setattr(
-                "memento.config.get_config",
+                "almanac.config.get_config",
                 lambda: {"vault_path": str(vault), "search_backend": "grep", "search_db_path": ".search/search.db"},
             )
             reset_backend()
@@ -438,10 +438,10 @@ class TestEmbeddedBackendDetection:
         """When vault doesn't exist, fall back to GrepBackend."""
         vault = tmp_path / "nonexistent"
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.search_backend.QMDBackend.is_available", lambda self: False)
-            mp.setattr("memento.config.get_vault", lambda: vault)
+            mp.setattr("almanac.search_backend.QMDBackend.is_available", lambda self: False)
+            mp.setattr("almanac.config.get_vault", lambda: vault)
             mp.setattr(
-                "memento.config.get_config",
+                "almanac.config.get_config",
                 lambda: {"vault_path": str(vault), "search_backend": "auto", "search_db_path": ".search/search.db"},
             )
             reset_backend()
@@ -454,7 +454,7 @@ class TestGrepBackendPathTraversal:
 
     def test_index_note_is_noop_success(self):
         backend = GrepBackend()
-        assert backend.index_note("notes/new.md", collection="memento") is True
+        assert backend.index_note("notes/new.md", collection="almanac") is True
 
     def test_traversal_rejected(self, tmp_path):
         vault = tmp_path / "vault"
@@ -465,7 +465,7 @@ class TestGrepBackendPathTraversal:
 
         backend = GrepBackend()
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.config.get_vault", lambda: vault)
+            mp.setattr("almanac.config.get_vault", lambda: vault)
             result = backend.get("../secret.txt")
         assert result is None
 
@@ -478,7 +478,7 @@ class TestGrepBackendPathTraversal:
 
         backend = GrepBackend()
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.config.get_vault", lambda: vault)
+            mp.setattr("almanac.config.get_vault", lambda: vault)
             result = backend.get("notes/test.md")
         assert result is not None
         assert result["title"] == "Test"
@@ -498,8 +498,8 @@ class TestBackendResultTagging:
         vault = self._make_vault(tmp_path)
         backend = GrepBackend()
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.config.get_vault", lambda: vault)
-            results = backend.search("Redis TTL", "memento")
+            mp.setattr("almanac.config.get_vault", lambda: vault)
+            results = backend.search("Redis TTL", "almanac")
         assert results
         assert all(r["backend"] == "grep" for r in results)
 
@@ -507,16 +507,16 @@ class TestBackendResultTagging:
         vault = self._make_vault(tmp_path)
         backend = GrepBackend()
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento.config.get_vault", lambda: vault)
-            results = backend.search("Redis TTL", "memento", concrete=True)
+            mp.setattr("almanac.config.get_vault", lambda: vault)
+            results = backend.search("Redis TTL", "almanac", concrete=True)
         assert results
         assert all(r["backend"] == "grep" for r in results)
 
     def test_qmd_concrete_search_tags_backend(self, tmp_path, monkeypatch):
         vault = self._make_vault(tmp_path)
-        monkeypatch.setattr("memento.config.get_vault", lambda: vault)
+        monkeypatch.setattr("almanac.config.get_vault", lambda: vault)
         backend = QMDBackend()
-        results = backend.search("Redis TTL", "memento", concrete=True)
+        results = backend.search("Redis TTL", "almanac", concrete=True)
         assert results
         assert all(r["backend"] == "qmd" for r in results)
 
@@ -525,7 +525,7 @@ class TestArchiveExclusion:
     """Archived notes are retired from active retrieval."""
 
     def test_qmd_search_filters_archive_paths(self):
-        from memento.search import qmd_search
+        from almanac.search import qmd_search
 
         backend = MockBackend(
             results=[
@@ -553,7 +553,7 @@ class TestArchiveExclusion:
         assert [r["path"] for r in results] == ["notes/good-note.md"]
 
     def test_qmd_search_keeps_notes_with_archive_in_name(self):
-        from memento.search import qmd_search
+        from almanac.search import qmd_search
 
         backend = MockBackend(
             results=[{"path": "notes/archive-export-design.md", "title": "Archive export", "score": 0.9, "snippet": ""}]

@@ -1696,7 +1696,7 @@ def almanac_synthesize_failures(
     """Synthesize lessons/actions from sanitized external run summaries.
 
     Dry-run is the default and performs no vault writes or external repo
-    mutations. The input must be compact Rondo/Beislið-style run summaries;
+    mutations. The input must be compact automated run summaries;
     raw run stores, logs, transcripts, stdout/stderr, proofs, and ledger dumps
     are rejected. Output groups memory, process, agent, harness, environment,
     and requirement failures and proposes concrete note/issue/gate/docs
@@ -1902,38 +1902,6 @@ def almanac_reindex() -> dict:
     except Exception as exc:
         log_retrieval("mcp", "reindex_error", error=str(exc))
         return {"error": f"reindex failed: {type(exc).__name__}: {exc}"}
-
-
-_PUBLIC_TOOL_NAMES = (
-    "search",
-    "related",
-    "query",
-    "contradictions",
-    "briefing",
-    "recall",
-    "tool_context",
-    "session_context",
-    "store",
-    "replace_note",
-    "store_smart",
-    "daily_snapshot",
-    "status",
-    "get",
-    "capture",
-    "capture_run_lesson",
-    "synthesize_failures",
-    "preserve",
-    "list",
-    "reindex",
-)
-
-# Python callers can keep importing the old function names. MCP clients see
-# only Almanac tools unless compatibility mode is explicitly requested.
-for _tool_suffix in _PUBLIC_TOOL_NAMES:
-    _tool_fn = globals()[f"almanac_{_tool_suffix}"]
-    globals()[f"memento_{_tool_suffix}"] = _tool_fn
-    if os.environ.get("ALMANAC_LEGACY_MCP_TOOLS") == "1":
-        mcp.add_tool(_tool_fn, name=f"memento_{_tool_suffix}")
 
 
 def main():

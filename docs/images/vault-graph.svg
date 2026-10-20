@@ -1,0 +1,323 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title description">
+<title id="title">Almanac populated demo vault graph</title>
+<desc id="description">41 fictional notes and project indexes connected by 117 wikilinks. API, web, infrastructure, and data projects connect through five shared pattern notes. This is an illustration rendered from the included demo vault, not an Obsidian screenshot.</desc>
+<defs><radialGradient id="background"><stop stop-color="#172332"/><stop offset="1" stop-color="#0c121c"/></radialGradient></defs>
+<rect width="1440" height="900" rx="24" fill="url(#background)"/>
+<g font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+<text x="64" y="61" fill="#7f95b0" font-size="14" letter-spacing="3">ALMANAC / EXAMPLE VAULT</text>
+<text x="64" y="112" fill="#f1f5fb" font-size="38" font-weight="650">Your work, connected.</text>
+<text x="1376" y="64" text-anchor="end" fill="#c4d0df" font-size="16">41 notes · 117 links · 4 projects</text>
+<text x="1376" y="94" text-anchor="end" fill="#8395ab" font-size="14">Fictional demo data</text>
+<circle cx="72" cy="155" r="4" fill="#75b9ff"/>
+<text x="87" y="160" fill="#bac8d9" font-size="15">API service</text>
+<circle cx="317" cy="155" r="4" fill="#bba1ff"/>
+<text x="332" y="160" fill="#bac8d9" font-size="15">Web application</text>
+<circle cx="562" cy="155" r="4" fill="#5edac6"/>
+<text x="577" y="160" fill="#bac8d9" font-size="15">Infrastructure</text>
+<circle cx="807" cy="155" r="4" fill="#f0c27b"/>
+<text x="822" y="160" fill="#bac8d9" font-size="15">Data pipeline</text>
+<circle cx="1052" cy="155" r="4" fill="#e4ebf5"/>
+<text x="1067" y="160" fill="#bac8d9" font-size="15">Shared patterns</text>
+<path d="M64 185H1376" stroke="#263344"/>
+<path d="M1106.2 242.9L1225.4 272.6" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1106.2 242.9L686.0 496.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M1106.2 242.9L1208.7 454.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1106.2 242.9L1099.3 480.4" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1106.2 242.9L999.6 437.4" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1106.2 242.9L1110.0 355.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M321.7 232.8L397.5 274.9" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M321.7 232.8L457.0 357.0" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M321.7 232.8L315.0 355.0" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M321.7 232.8L410.0 419.8" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M321.7 232.8L686.0 672.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M321.7 232.8L216.1 265.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M397.5 274.9L734.0 408.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M397.5 274.9L315.0 355.0" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M397.5 274.9L332.2 449.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M397.5 274.9L208.5 437.4" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M397.5 274.9L199.3 368.2" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 561.2L1199.8 583.8" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 561.2L1204.1 726.9" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 561.2L1112.0 779.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 561.2L983.3 672.8" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 561.2L1110.0 665.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 561.2L686.0 672.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M1199.8 583.8L1258.4 672.1" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1199.8 583.8L1036.3 743.3" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1199.8 583.8L1110.0 665.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1199.8 583.8L1011.2 578.1" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M686.0 320.0L1258.4 672.1" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M686.0 320.0L1036.3 743.3" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M686.0 320.0L457.0 357.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M686.0 320.0L199.3 368.2" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M1258.4 672.1L1204.1 726.9" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1258.4 672.1L1112.0 779.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1258.4 672.1L983.3 672.8" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1258.4 672.1L1110.0 665.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M734.0 408.0L1036.3 743.3" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M734.0 408.0L1208.7 454.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M734.0 408.0L391.0 586.2" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M1225.4 272.6L1255.0 359.3" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1225.4 272.6L950.7 337.7" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1225.4 272.6L1110.0 355.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1225.4 272.6L686.0 672.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M1225.4 272.6L1011.6 252.5" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1204.1 726.9L1036.3 743.3" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1204.1 726.9L734.0 584.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M1204.1 726.9L1110.0 665.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1204.1 726.9L1011.2 578.1" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1112.0 779.0L1036.3 743.3" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1112.0 779.0L1110.0 665.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1112.0 779.0L1011.2 578.1" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M323.9 541.0L391.0 586.2" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M323.9 541.0L433.8 653.2" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M323.9 541.0L413.4 767.1" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M323.9 541.0L315.0 665.0" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M323.9 541.0L197.9 747.3" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1255.0 359.3L1208.7 454.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1255.0 359.3L1099.3 480.4" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1255.0 359.3L999.6 437.4" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1255.0 359.3L1110.0 355.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M686.0 496.0L983.3 672.8" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M686.0 496.0L208.5 437.4" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M686.0 496.0L1011.2 578.1" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M1036.3 743.3L983.3 672.8" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1036.3 743.3L1110.0 665.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1208.7 454.0L734.0 584.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M1208.7 454.0L950.7 337.7" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1208.7 454.0L1110.0 355.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1208.7 454.0L1011.6 252.5" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M457.0 357.0L315.0 355.0" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M457.0 357.0L332.2 449.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M457.0 357.0L208.5 437.4" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M457.0 357.0L199.3 368.2" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M391.0 586.2L315.0 665.0" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M391.0 586.2L307.7 787.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M391.0 586.2L183.9 670.3" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M391.0 586.2L217.3 588.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 480.4L950.7 337.7" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 480.4L1110.0 355.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1099.3 480.4L1011.6 252.5" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M433.8 653.2L315.0 665.0" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M433.8 653.2L307.7 787.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M433.8 653.2L183.9 670.3" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M433.8 653.2L217.3 588.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M734.0 584.0L332.2 449.1" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M734.0 584.0L217.3 588.7" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M999.6 437.4L950.7 337.7" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M999.6 437.4L1110.0 355.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M999.6 437.4L1011.6 252.5" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M950.7 337.7L1110.0 355.0" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M983.3 672.8L1110.0 665.0" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M983.3 672.8L1011.2 578.1" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M413.4 767.1L315.0 665.0" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M413.4 767.1L307.7 787.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M413.4 767.1L686.0 672.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M413.4 767.1L183.9 670.3" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M413.4 767.1L217.3 588.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 355.0L410.0 419.8" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 355.0L332.2 449.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 355.0L208.5 437.4" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 355.0L199.3 368.2" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 355.0L216.1 265.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1110.0 665.0L1011.2 578.1" fill="none" stroke="#f0c27b" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 665.0L307.7 787.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 665.0L197.9 747.3" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 665.0L183.9 670.3" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M315.0 665.0L217.3 588.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M1110.0 355.0L1011.6 252.5" fill="none" stroke="#bba1ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M410.0 419.8L332.2 449.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M410.0 419.8L208.5 437.4" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M410.0 419.8L199.3 368.2" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M307.7 787.7L197.9 747.3" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M332.2 449.1L216.1 265.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M208.5 437.4L216.1 265.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M199.3 368.2L216.1 265.1" fill="none" stroke="#75b9ff" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M197.9 747.3L686.0 672.0" fill="none" stroke="#8ea3be" stroke-opacity="0.14" stroke-width="1.2"/>
+<path d="M197.9 747.3L183.9 670.3" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<path d="M197.9 747.3L217.3 588.7" fill="none" stroke="#5edac6" stroke-opacity="0.23" stroke-width="1.2"/>
+<g><title>Keep forms usable with a keyboard — 6 connections</title>
+<circle cx="1106.2" cy="242.9" r="10.799999999999999" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="1106.2" cy="242.9" r="4.5" fill="#bba1ff"/>
+<text x="1106.2" y="226.9" text-anchor="middle" fill="#a1b1c6" font-size="13" >Keep forms usable with a keyboard</text>
+</g>
+<g><title>Test the public API contract — 6 connections</title>
+<circle cx="321.7" cy="232.8" r="10.799999999999999" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="321.7" cy="232.8" r="4.5" fill="#75b9ff"/>
+<text x="321.7" y="216.8" text-anchor="middle" fill="#a1b1c6" font-size="13" >Test the public API contract</text>
+</g>
+<g><title>Keep API errors predictable — 6 connections</title>
+<circle cx="397.5" cy="274.9" r="10.799999999999999" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="397.5" cy="274.9" r="4.5" fill="#75b9ff"/>
+</g>
+<g><title>Rehearse backfills on a small sample — 6 connections</title>
+<circle cx="1099.3" cy="561.2" r="10.799999999999999" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="1099.3" cy="561.2" r="4.5" fill="#f0c27b"/>
+<text x="1099.3" y="545.2" text-anchor="middle" fill="#a1b1c6" font-size="13" >Rehearse backfills on a small sample</text>
+</g>
+<g><title>Choose batch sizes from measurements — 5 connections</title>
+<circle cx="1199.8" cy="583.8" r="10.799999999999999" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="1199.8" cy="583.8" r="4.5" fill="#f0c27b"/>
+</g>
+<g><title>Put a budget around repeated work — 4 connections</title>
+<circle cx="686.0" cy="320.0" r="14.399999999999999" fill="#e4ebf5" fill-opacity="0.055"/>
+<circle cx="686.0" cy="320.0" r="6" fill="#e4ebf5"/>
+<text x="703.0" y="325.0" fill="#d6e0ef" font-size="14" >Budget repeated work</text>
+</g>
+<g><title>Checkpoint long-running imports — 6 connections</title>
+<circle cx="1258.4" cy="672.1" r="10.799999999999999" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="1258.4" cy="672.1" r="4.5" fill="#f0c27b"/>
+</g>
+<g><title>Make failure states actionable — 4 connections</title>
+<circle cx="734.0" cy="408.0" r="14.399999999999999" fill="#e4ebf5" fill-opacity="0.055"/>
+<circle cx="734.0" cy="408.0" r="6" fill="#e4ebf5"/>
+<text x="751.0" y="413.0" fill="#d6e0ef" font-size="14" >Actionable failures</text>
+</g>
+<g><title>Test user-visible component behavior — 6 connections</title>
+<circle cx="1225.4" cy="272.6" r="10.799999999999999" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="1225.4" cy="272.6" r="4.5" fill="#bba1ff"/>
+</g>
+<g><title>Monitor when data was last refreshed — 6 connections</title>
+<circle cx="1204.1" cy="726.9" r="10.799999999999999" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="1204.1" cy="726.9" r="4.5" fill="#f0c27b"/>
+</g>
+<g><title>Deduplicate events by a stable key — 5 connections</title>
+<circle cx="1112.0" cy="779.0" r="10.799999999999999" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="1112.0" cy="779.0" r="4.5" fill="#f0c27b"/>
+<text x="1112.0" y="806.0" text-anchor="middle" fill="#a1b1c6" font-size="13" >Deduplicate events by a stable key</text>
+</g>
+<g><title>Use a repeatable deployment checklist — 5 connections</title>
+<circle cx="323.9" cy="541.0" r="10.799999999999999" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="323.9" cy="541.0" r="4.5" fill="#5edac6"/>
+<text x="323.9" y="525.0" text-anchor="middle" fill="#a1b1c6" font-size="13" >Use a repeatable deployment checklist</text>
+</g>
+<g><title>Share spacing and color tokens — 5 connections</title>
+<circle cx="1255.0" cy="359.3" r="10.799999999999999" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="1255.0" cy="359.3" r="4.5" fill="#bba1ff"/>
+</g>
+<g><title>Write down the assumptions at boundaries — 4 connections</title>
+<circle cx="686.0" cy="496.0" r="14.399999999999999" fill="#e4ebf5" fill-opacity="0.055"/>
+<circle cx="686.0" cy="496.0" r="6" fill="#e4ebf5"/>
+<text x="703.0" y="501.0" fill="#d6e0ef" font-size="14" >Explicit contracts</text>
+</g>
+<g><title>Keep failed records available for review — 7 connections</title>
+<circle cx="1036.3" cy="743.3" r="10.799999999999999" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="1036.3" cy="743.3" r="4.5" fill="#f0c27b"/>
+</g>
+<g><title>Show a recovery path after UI errors — 7 connections</title>
+<circle cx="1208.7" cy="454.0" r="10.799999999999999" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="1208.7" cy="454.0" r="4.5" fill="#bba1ff"/>
+</g>
+<g><title>Use idempotency keys for retryable writes — 6 connections</title>
+<circle cx="457.0" cy="357.0" r="10.799999999999999" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="457.0" cy="357.0" r="4.5" fill="#75b9ff"/>
+</g>
+<g><title>Turn incidents into concrete follow-ups — 6 connections</title>
+<circle cx="391.0" cy="586.2" r="10.799999999999999" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="391.0" cy="586.2" r="4.5" fill="#5edac6"/>
+</g>
+<g><title>Design loading and empty states — 5 connections</title>
+<circle cx="1099.3" cy="480.4" r="10.799999999999999" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="1099.3" cy="480.4" r="4.5" fill="#bba1ff"/>
+<text x="1099.3" y="507.4" text-anchor="middle" fill="#a1b1c6" font-size="13" >Design loading and empty states</text>
+</g>
+<g><title>Run migrations before application rollout — 5 connections</title>
+<circle cx="433.8" cy="653.2" r="10.799999999999999" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="433.8" cy="653.2" r="4.5" fill="#5edac6"/>
+</g>
+<g><title>Make work traceable across boundaries — 4 connections</title>
+<circle cx="734.0" cy="584.0" r="14.399999999999999" fill="#e4ebf5" fill-opacity="0.055"/>
+<circle cx="734.0" cy="584.0" r="6" fill="#e4ebf5"/>
+<text x="751.0" y="589.0" fill="#d6e0ef" font-size="14" >Traceable work</text>
+</g>
+<g><title>Recover failed optimistic updates — 5 connections</title>
+<circle cx="999.6" cy="437.4" r="10.799999999999999" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="999.6" cy="437.4" r="4.5" fill="#bba1ff"/>
+</g>
+<g><title>Reset pagination when filters change — 5 connections</title>
+<circle cx="950.7" cy="337.7" r="10.799999999999999" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="950.7" cy="337.7" r="4.5" fill="#bba1ff"/>
+</g>
+<g><title>Test producer and consumer assumptions — 6 connections</title>
+<circle cx="983.3" cy="672.8" r="10.799999999999999" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="983.3" cy="672.8" r="4.5" fill="#f0c27b"/>
+</g>
+<g><title>Give changes isolated preview environments — 6 connections</title>
+<circle cx="413.4" cy="767.1" r="10.799999999999999" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="413.4" cy="767.1" r="4.5" fill="#5edac6"/>
+</g>
+<g><title>Make rate limits visible to clients — 5 connections</title>
+<circle cx="410.0" cy="419.8" r="10.799999999999999" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="410.0" cy="419.8" r="4.5" fill="#75b9ff"/>
+</g>
+<g><title>Separate readiness from process health — 5 connections</title>
+<circle cx="307.7" cy="787.7" r="10.799999999999999" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="307.7" cy="787.7" r="4.5" fill="#5edac6"/>
+<text x="307.7" y="814.7" text-anchor="middle" fill="#a1b1c6" font-size="13" >Separate readiness from process he…</text>
+</g>
+<g><title>Carry a request ID across services — 6 connections</title>
+<circle cx="332.2" cy="449.1" r="10.799999999999999" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="332.2" cy="449.1" r="4.5" fill="#75b9ff"/>
+<text x="332.2" y="476.1" text-anchor="middle" fill="#a1b1c6" font-size="13" >Carry a request ID across services</text>
+</g>
+<g><title>Validate requests at the API boundary — 6 connections</title>
+<circle cx="208.5" cy="437.4" r="10.799999999999999" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="208.5" cy="437.4" r="4.5" fill="#75b9ff"/>
+</g>
+<g><title>Give outbound requests a retry budget — 6 connections</title>
+<circle cx="199.3" cy="368.2" r="10.799999999999999" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="199.3" cy="368.2" r="4.5" fill="#75b9ff"/>
+</g>
+<g><title>Write the rollback plan before release — 6 connections</title>
+<circle cx="197.9" cy="747.3" r="10.799999999999999" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="197.9" cy="747.3" r="4.5" fill="#5edac6"/>
+</g>
+<g><title>Make changes small and recoverable — 5 connections</title>
+<circle cx="686.0" cy="672.0" r="14.399999999999999" fill="#e4ebf5" fill-opacity="0.055"/>
+<circle cx="686.0" cy="672.0" r="6" fill="#e4ebf5"/>
+<text x="703.0" y="677.0" fill="#d6e0ef" font-size="14" >Recoverable changes</text>
+</g>
+<g><title>Version changes to event schemas — 6 connections</title>
+<circle cx="1011.2" cy="578.1" r="10.799999999999999" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="1011.2" cy="578.1" r="4.5" fill="#f0c27b"/>
+</g>
+<g><title>Make secret rotation a routine operation — 5 connections</title>
+<circle cx="183.9" cy="670.3" r="10.799999999999999" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="183.9" cy="670.3" r="4.5" fill="#5edac6"/>
+</g>
+<g><title>Log events as structured records — 6 connections</title>
+<circle cx="217.3" cy="588.7" r="10.799999999999999" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="217.3" cy="588.7" r="4.5" fill="#5edac6"/>
+</g>
+<g><title>Cover upstream timeouts in tests — 5 connections</title>
+<circle cx="216.1" cy="265.1" r="10.799999999999999" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="216.1" cy="265.1" r="4.5" fill="#75b9ff"/>
+</g>
+<g><title>Store shareable filters in the URL — 5 connections</title>
+<circle cx="1011.6" cy="252.5" r="10.799999999999999" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="1011.6" cy="252.5" r="4.5" fill="#bba1ff"/>
+</g>
+<g><title>API service — 8 connections</title>
+<circle cx="315.0" cy="355.0" r="21.599999999999998" fill="#75b9ff" fill-opacity="0.055"/>
+<circle cx="315.0" cy="355.0" r="9" fill="#75b9ff"/>
+<text x="315.0" y="387.0" text-anchor="middle" fill="#75b9ff" font-size="19" font-weight="600" >API service</text>
+</g>
+<g><title>Data pipeline — 8 connections</title>
+<circle cx="1110.0" cy="665.0" r="21.599999999999998" fill="#f0c27b" fill-opacity="0.055"/>
+<circle cx="1110.0" cy="665.0" r="9" fill="#f0c27b"/>
+<text x="1110.0" y="697.0" text-anchor="middle" fill="#f0c27b" font-size="19" font-weight="600" >Data pipeline</text>
+</g>
+<g><title>Infrastructure — 8 connections</title>
+<circle cx="315.0" cy="665.0" r="21.599999999999998" fill="#5edac6" fill-opacity="0.055"/>
+<circle cx="315.0" cy="665.0" r="9" fill="#5edac6"/>
+<text x="315.0" y="697.0" text-anchor="middle" fill="#5edac6" font-size="19" font-weight="600" >Infrastructure</text>
+</g>
+<g><title>Web application — 8 connections</title>
+<circle cx="1110.0" cy="355.0" r="21.599999999999998" fill="#bba1ff" fill-opacity="0.055"/>
+<circle cx="1110.0" cy="355.0" r="9" fill="#bba1ff"/>
+<text x="1110.0" y="387.0" text-anchor="middle" fill="#bba1ff" font-size="19" font-weight="600" >Web application</text>
+</g>
+<path d="M64 823H1376" stroke="#263344"/>
+<text x="64" y="860" fill="#a9b9cd" font-size="15">Every dot is a note. Every line is a [[wikilink]].</text>
+<text x="1376" y="860" text-anchor="end" fill="#8395ab" font-size="14">Rendered from examples/demo-vault · Open the vault in Obsidian to explore</text>
+</g></svg>

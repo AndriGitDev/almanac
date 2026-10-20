@@ -273,8 +273,8 @@ def confidence_margin(results: list[dict]) -> float:
     perfect match to single_strong_hit's absolute check (this function
     can't establish a margin from a single result at all, see below), and
     the deep pipeline never got a chance to run on it. See
-    memento.embedded_search.normalize_fts5_score /
-    normalize_vec_cosine_distance and memento.search_backend.
+    almanac.embedded_search.normalize_fts5_score /
+    normalize_vec_cosine_distance and almanac.search_backend.
     normalize_qmd_score / normalize_grep_term_coverage for the fix, and
     every backend.search() result now also carries a `backend` field
     (qmd | embedded-fts | embedded-vec | grep) for downstream diagnostics.
@@ -487,7 +487,7 @@ def drop_invalidated_recall_results(vault: Path, results: list[dict]) -> tuple[l
 
     Runs at the same site as :func:`filter_recall_results_by_explicit_project`
     in :class:`PromptRecallRuntime` -- automatic recall has no
-    ``include_invalidated`` opt-in (unlike ``memento_search``/``memento_query``),
+    ``include_invalidated`` opt-in (unlike ``almanac_search``/``almanac_query``),
     it always excludes invalidated notes. Fails open: a result whose backing
     file cannot be read is kept rather than dropped, since this is a
     default-safety exclusion, not a user-requested constraint. Returns
@@ -553,7 +553,7 @@ def _format_result(result: dict) -> str:
 #
 # Notes assert facts about code that keeps changing; nothing checked those
 # facts still held. Citations (`{file, anchor[, commit]}` frontmatter, written
-# once at capture time by hooks/memento-triage.py) are verified here, cheaply,
+# once at capture time by hooks/almanac-triage.py) are verified here, cheaply,
 # for notes actually selected for injection -- post-ranking, top-k only,
 # never a full-vault scan. A stale citation is injected WITH an explicit
 # marker (never silently skipped) and the note is queued for supersession

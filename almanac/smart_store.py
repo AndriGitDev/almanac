@@ -289,7 +289,7 @@ def suggest_store_action(
     to decide whether to append to an existing note or explicitly supersede it.
 
     ``citations`` (MEM-162) is threaded through to the ``write`` payload
-    verbatim from :func:`memento.store.normalize_note_contract`, which
+    verbatim from :func:`almanac.store.normalize_note_contract`, which
     defensively drops malformed entries -- never blocks a decision here.
     """
     if not title or not str(title).strip():

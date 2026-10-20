@@ -88,7 +88,7 @@ def run(context) -> list[CheckResult]:
                 threshold=f"warn < {warn}, fail < {fail}",
                 details=[f"FAILED: {c['id']}: {c['details']}" for c in core if not c["ok"]]
                 or [f"{len(core_passed)}/{len(core)} checks passed"],
-                remediation="A regression in memento/search.py ranking policies; the failing "
+                remediation="A regression in almanac/search.py ranking policies; the failing "
                 "check id names the behavior that broke.",
             )
         )

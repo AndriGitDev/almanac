@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from memento_inception import (
+from almanac_inception import (
     NoteRecord,
     pre_reason,
     _predict_queries,

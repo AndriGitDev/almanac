@@ -21,7 +21,7 @@ _spec.loader.exec_module(backfill)
 @pytest.fixture(autouse=True)
 def _default_config(monkeypatch):
     """Pin tag_aliases/config so the developer's real config never leaks in."""
-    monkeypatch.setattr("memento.store.get_config", lambda: {"tag_aliases": {}})
+    monkeypatch.setattr("almanac.store.get_config", lambda: {"tag_aliases": {}})
 
 
 def _write_note_file(vault: Path, name: str, frontmatter_lines: list[str], body: str = "Body.\n") -> Path:
@@ -34,14 +34,14 @@ def _write_note_file(vault: Path, name: str, frontmatter_lines: list[str], body:
 
 class TestClassifyProjectValue:
     def test_absolute_home_path_maps_to_repo_name_slug(self):
-        category, slug = backfill.classify_project_value("/home/vic/Projects/Memento-Vault")
+        category, slug = backfill.classify_project_value("/home/vic/Projects/Almanac")
         assert category == "path"
-        assert slug == "memento-vault"
+        assert slug == "almanac"
 
     def test_absolute_users_path_maps_to_repo_name_slug(self):
-        category, slug = backfill.classify_project_value("/Users/vic/Personal/memento-vault")
+        category, slug = backfill.classify_project_value("/Users/vic/Personal/almanac")
         assert category == "path"
-        assert slug == "memento-vault"
+        assert slug == "almanac"
 
     def test_worktree_path_collapses_to_main_repo_name(self, tmp_path):
         repo = tmp_path / "my-repo"
@@ -76,7 +76,7 @@ class TestClassifyProjectValue:
         assert slug == "my-project"
 
     def test_clean_slug_is_unchanged(self):
-        category, slug = backfill.classify_project_value("memento-vault")
+        category, slug = backfill.classify_project_value("almanac")
         assert category == "unchanged"
         assert slug is None
 
@@ -88,7 +88,7 @@ class TestProcessNote:
             "title: Legacy note\n"
             "type: discovery\n"
             'tags: ["sync"]\n'
-            "project: /home/vic/Projects/memento-vault\n"
+            "project: /home/vic/Projects/almanac\n"
             "date: 2026-01-01T10:00\n"
             "---\n\nBody.\n"
         )
@@ -96,8 +96,8 @@ class TestProcessNote:
         outcome = backfill.process_note(text)
 
         assert outcome["changed"] is True
-        assert "project: memento-vault\n" in outcome["new_text"]
-        assert "project_path: /home/vic/Projects/memento-vault\n" in outcome["new_text"]
+        assert "project: almanac\n" in outcome["new_text"]
+        assert "project_path: /home/vic/Projects/almanac\n" in outcome["new_text"]
         # Everything else round-trips verbatim.
         assert "date: 2026-01-01T10:00" in outcome["new_text"]
         assert outcome["new_text"].endswith("\n---\n\nBody.\n")
@@ -153,7 +153,7 @@ class TestProcessNote:
         assert 'tags: ["foo-bar", "sync"]' in outcome["new_text"]
 
     def test_tags_respect_config_alias_map(self, monkeypatch):
-        monkeypatch.setattr("memento.store.get_config", lambda: {"tag_aliases": {"bugs": "bug"}})
+        monkeypatch.setattr("almanac.store.get_config", lambda: {"tag_aliases": {"bugs": "bug"}})
         text = '---\ntitle: Note\ntags: ["Bugs", "bug"]\n---\n\nBody.\n'
 
         outcome = backfill.process_note(text)
@@ -168,7 +168,7 @@ class TestRun:
         note = _write_note_file(
             vault,
             "legacy",
-            ["title: Legacy", 'tags: ["Foo Bar"]', "project: /home/vic/Projects/memento-vault"],
+            ["title: Legacy", 'tags: ["Foo Bar"]', "project: /home/vic/Projects/almanac"],
         )
         original = note.read_text()
 
@@ -178,8 +178,8 @@ class TestRun:
         assert note.read_text() == original
         out = capsys.readouterr().out
         assert "DRY-RUN" in out
-        assert "/home/vic/Projects/memento-vault" in out
-        assert "memento-vault" in out
+        assert "/home/vic/Projects/almanac" in out
+        assert "almanac" in out
         assert "notes needing rewrite: 1" in out
 
     def test_apply_rewrites_notes_atomically(self, tmp_path, capsys):
@@ -213,7 +213,7 @@ class TestRun:
         note = _write_note_file(
             vault,
             "legacy",
-            ["title: Legacy", 'tags: ["Foo Bar"]', "project: /home/vic/Projects/memento-vault"],
+            ["title: Legacy", 'tags: ["Foo Bar"]', "project: /home/vic/Projects/almanac"],
         )
 
         assert backfill.run(vault, apply=True) == 0
@@ -251,6 +251,6 @@ def test_project_rules_take_precedence_over_repo_heuristic(monkeypatch):
 
 def test_no_matching_rule_falls_back_to_repo_slug(monkeypatch):
     monkeypatch.setattr(backfill, "get_config", lambda: {"project_rules": []})
-    category, slug = backfill.classify_project_value("/home/vic/Projects/memento-vault")
+    category, slug = backfill.classify_project_value("/home/vic/Projects/almanac")
     assert category == "path"
-    assert slug == "memento-vault"
+    assert slug == "almanac"

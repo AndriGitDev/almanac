@@ -1,10 +1,10 @@
 """Capture-queue storage for queued Almanac captures.
 
 Single owner of the capture-queue boundary: Pi state-home resolution
-(MEMENTO_PI_STATE_HOME, then XDG_STATE_HOME, then ~/.local/state),
+(ALMANAC_PI_STATE_HOME, then XDG_STATE_HOME, then ~/.local/state),
 queue-file and legacy-queue-file path resolution, the JSONL
 read/write/lock/migration machinery, and the ``PiQueueStore``
-implementation of the ``memento.capture_runtime.QueueStore`` protocol.
+implementation of the ``almanac.capture_runtime.QueueStore`` protocol.
 
 Consumers (pi_bridge, lifecycle, health) delegate here instead of
 carrying private copies of the resolution logic.
@@ -34,9 +34,7 @@ def state_root() -> Path:
         return Path(raw).expanduser()
     xdg = os.environ.get("XDG_STATE_HOME")
     base = Path(xdg).expanduser() if xdg else Path.home() / ".local" / "state"
-    current = base / "almanac" / "pi"
-    legacy = base / "memento" / "pi"
-    return legacy if legacy.exists() and not current.exists() else current
+    return base / "almanac" / "pi"
 
 
 def queue_path_source() -> str:
@@ -90,7 +88,7 @@ class QueueLockUnavailable(OSError):
     (MEM-123):
 
     - Enqueue/capture paths: retry a bounded number of times with backoff,
-      then durably dead-letter the capture (via ``memento.sync_ledger``)
+      then durably dead-letter the capture (via ``almanac.sync_ledger``)
       so it is never silently dropped.
     - Read-only and cleanup paths (sweeps, listings, processing): skip the
       operation for the current cycle with a structured

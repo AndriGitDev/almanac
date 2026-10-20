@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from memento_inception import NoteRecord, build_synthesis_prompt
+from almanac_inception import NoteRecord, build_synthesis_prompt
 
 
 def _make_note(

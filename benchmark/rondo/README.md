@@ -11,7 +11,9 @@ The fixture is intentionally data-only: it does not run Rondo, create worktrees,
 
 ## Schema
 
-`tasks.json` has `schema_version: 2` and a `tasks` array. Each task includes:
+`tasks.json` has `schema_version: 3` and a `tasks` array. Version 3 replaces
+`memento_queries` with `almanac_queries`; original upstream issue snapshots stay
+unchanged. Each task includes:
 
 - `id`: stable benchmark task id, prefixed with `mv-`.
 - `issue`: issue number, title, URL, labels, and body snapshot captured when the fixture was authored.
@@ -22,14 +24,14 @@ The fixture is intentionally data-only: it does not run Rondo, create worktrees,
   - `docs/process`
   - `sync/security/release`
 - `difficulty`: coarse size signal for evaluators (`small`, `medium`, or `large`).
-- `requires_vault_knowledge`: whether the task is expected to benefit from Memento Vault recall.
+- `requires_vault_knowledge`: whether the task is expected to benefit from Almanac recall.
 - `expected_touched_areas`: likely files/modules; not a required implementation path.
 - `acceptance_criteria`: task-specific completion outcomes.
 - `required_gates`: recommended verification commands or gate families.
 - `known_risks`: issues an evaluator should watch for.
 - `retrieval_context`:
   - `docs`: repo docs or source files worth reading.
-  - `memento_queries`: recall prompts to run when vault knowledge is part of the task.
+  - `almanac_queries`: recall prompts to run when vault knowledge is part of the task.
   - `expected_query_intent`: stable natural-language memory intent to score against without requiring exact note IDs.
   - `useful_note_refs`: stable note/doc refs when available; optional evaluation evidence, not the only success path.
   - `memory_token_budget`: benchmark memory budget in approximate tokens (`0` when vault memory is not expected).

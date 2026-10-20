@@ -1,4 +1,4 @@
-"""Tests for memento.sync_ledger — the append-only remote-sync ledger."""
+"""Tests for almanac.sync_ledger — the append-only remote-sync ledger."""
 
 import json
 import sys
@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from memento import sync_ledger  # noqa: E402
+from almanac import sync_ledger  # noqa: E402
 
 
 # ---------------------------------------------------------------------------

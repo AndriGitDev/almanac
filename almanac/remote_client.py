@@ -71,12 +71,6 @@ def _call_tool(tool_name: str, arguments: dict, timeout: int = 30) -> dict:
     except (URLError, HTTPError, OSError, json.JSONDecodeError) as exc:
         return {"error": f"Remote vault request failed: {exc}"}
 
-    # An older Memento server exposes only the legacy tool names. A retry is
-    # safe only when the server explicitly reports that the Almanac tool did
-    # not exist, so a write cannot be issued twice after an ambiguous failure.
-    if tool_name.startswith("almanac_") and f"Unknown tool: {tool_name}" in json.dumps(body):
-        return _call_tool("memento_" + tool_name.removeprefix("almanac_"), arguments, timeout=timeout)
-
     # Parse JSON-RPC response
     if "error" in body:
         return {"error": body["error"].get("message", str(body["error"]))}

@@ -230,7 +230,7 @@ class SearchBackend(ABC):
         relevance ordering (MEM-127) - callers may compare scores across
         backends as a coarse signal, though the normalization is per-backend
         and not guaranteed to carry identical meaning at every point in the
-        range (see memento.search_backend / memento.embedded_search
+        range (see almanac.search_backend / almanac.embedded_search
         normalize_* functions for each backend's mapping). ``backend`` is one
         of "qmd", "embedded-fts", "embedded-vec", or "grep".
         """

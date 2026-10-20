@@ -8,11 +8,11 @@ from unittest.mock import patch
 
 import pytest
 
-from memento.adapters import detect_agent, parse_transcript, render_transcript_text, truncate_transcript
-from memento.adapters.claude import parse_transcript as parse_claude
-from memento.adapters.opencode import parse_transcript as parse_opencode
-from memento.adapters.pi import parse_transcript as parse_pi
-from memento.adapters.pi import render_transcript_text as render_pi
+from almanac.adapters import detect_agent, parse_transcript, render_transcript_text, truncate_transcript
+from almanac.adapters.claude import parse_transcript as parse_claude
+from almanac.adapters.opencode import parse_transcript as parse_opencode
+from almanac.adapters.pi import parse_transcript as parse_pi
+from almanac.adapters.pi import render_transcript_text as render_pi
 
 
 @pytest.fixture
@@ -82,11 +82,11 @@ def unknown_transcript(tmp_path):
 
 class TestDetectAgent:
     def test_env_var_override(self, claude_transcript):
-        with patch.dict(os.environ, {"MEMENTO_AGENT": "codex"}):
+        with patch.dict(os.environ, {"ALMANAC_AGENT": "codex"}):
             assert detect_agent(str(claude_transcript)) == "codex"
 
     def test_env_var_case_insensitive(self, claude_transcript):
-        with patch.dict(os.environ, {"MEMENTO_AGENT": "CURSOR"}):
+        with patch.dict(os.environ, {"ALMANAC_AGENT": "CURSOR"}):
             assert detect_agent(str(claude_transcript)) == "cursor"
 
     def test_detects_claude_from_transcript(self, claude_transcript):
@@ -185,7 +185,7 @@ class TestParseTranscript:
             parse_transcript(str(unknown_transcript))
 
     def test_env_var_agent_raises_for_unimplemented(self, claude_transcript):
-        with patch.dict(os.environ, {"MEMENTO_AGENT": "windsurf"}):
+        with patch.dict(os.environ, {"ALMANAC_AGENT": "windsurf"}):
             with pytest.raises(ValueError, match="not yet implemented"):
                 parse_transcript(str(claude_transcript))
 
@@ -194,7 +194,7 @@ class TestParseTranscript:
         meta = parse_transcript(str(transcript))
         assert meta["agent"] == "pi"
         assert meta["first_prompt"] == "Fix the Pi transcript adapter"
-        assert "memento/adapters/pi.py" in meta["files_edited"]
+        assert "almanac/adapters/pi.py" in meta["files_edited"]
 
 
 # --- Claude adapter ---
@@ -255,7 +255,7 @@ class TestClaudeAdapter:
             json.dumps(
                 {
                     "type": "user",
-                    "cwd": "/repo/memento",
+                    "cwd": "/repo/almanac",
                     "gitBranch": "mem-56",
                     "message": {"content": "Investigate the failing test"},
                 }
@@ -269,7 +269,7 @@ class TestClaudeAdapter:
                             {
                                 "type": "tool_use",
                                 "name": "Read",
-                                "input": {"file_path": "/repo/memento/tests/test_a.py"},
+                                "input": {"file_path": "/repo/almanac/tests/test_a.py"},
                             },
                         ]
                     },
@@ -290,7 +290,7 @@ class TestClaudeAdapter:
                     "type": "assistant",
                     "message": {
                         "content": [
-                            {"type": "tool_use", "name": "Read", "input": {"file_path": "/repo/memento/memento/a.py"}},
+                            {"type": "tool_use", "name": "Read", "input": {"file_path": "/repo/almanac/almanac/a.py"}},
                         ]
                     },
                 }
@@ -319,7 +319,7 @@ class TestClaudeAdapter:
         assert meta["exchange_count"] == 1
         assert meta["user_messages"] == 1
         assert meta["first_prompt"] == "Investigate the failing test"
-        assert meta["files_read"] == ["/repo/memento/memento/a.py", "/repo/memento/tests/test_a.py"]
+        assert meta["files_read"] == ["/repo/almanac/almanac/a.py", "/repo/almanac/tests/test_a.py"]
 
 
 # --- OpenCode adapter ---
@@ -452,7 +452,7 @@ class TestDetectAgentOpencode:
         assert detect_agent(str(opencode_db)) == "opencode"
 
     def test_env_var_override(self, opencode_db):
-        with patch.dict(os.environ, {"MEMENTO_AGENT": "opencode"}):
+        with patch.dict(os.environ, {"ALMANAC_AGENT": "opencode"}):
             assert detect_agent("/nonexistent/path") == "opencode"
 
     def test_unrelated_sqlite_not_opencode(self, tmp_path):
@@ -617,7 +617,7 @@ class TestOpencodeAdapter:
         # Explicit argument wins when env var is unset
         assert parse_opencode(str(db), session_id="ses_old")["first_prompt"] == "old prompt"
         # Env var overrides explicit argument
-        with patch.dict(os.environ, {"MEMENTO_OPENCODE_SESSION_ID": "ses_new"}):
+        with patch.dict(os.environ, {"ALMANAC_OPENCODE_SESSION_ID": "ses_new"}):
             assert parse_opencode(str(db), session_id="ses_old")["first_prompt"] == "new prompt"
 
     def test_unknown_session_id_raises(self, opencode_db):
@@ -654,13 +654,13 @@ def _write_pi_transcript(tmp_path, records=None):
         {
             "type": "session",
             "session_id": "pi-s1",
-            "cwd": "/repo/memento-vault",
+            "cwd": "/repo/almanac",
             "gitBranch": "vic/mem-41",
         },
         {
             "type": "message",
             "timestamp": "2026-06-14T00:00:00Z",
-            "cwd": "/repo/memento-vault",
+            "cwd": "/repo/almanac",
             "gitBranch": "vic/mem-41",
             "message": {
                 "role": "user",
@@ -675,8 +675,8 @@ def _write_pi_transcript(tmp_path, records=None):
                 "content": [
                     {"type": "thinking", "thinking": "hidden chain of thought", "encrypted_content": "opaque"},
                     {"type": "text", "text": "I'll add the adapter."},
-                    {"type": "toolCall", "name": "read", "arguments": {"file_path": "memento/adapters/__init__.py"}},
-                    {"type": "toolCall", "name": "edit", "arguments": {"file_path": "memento/adapters/pi.py"}},
+                    {"type": "toolCall", "name": "read", "arguments": {"file_path": "almanac/adapters/__init__.py"}},
+                    {"type": "toolCall", "name": "edit", "arguments": {"file_path": "almanac/adapters/pi.py"}},
                 ],
             },
         },
@@ -702,12 +702,12 @@ class TestPiAdapter:
     def test_parses_metadata_and_files(self, tmp_path):
         transcript = _write_pi_transcript(tmp_path)
         meta = parse_pi(str(transcript))
-        assert meta["cwd"] == "/repo/memento-vault"
+        assert meta["cwd"] == "/repo/almanac"
         assert meta["git_branch"] == "vic/mem-41"
         assert meta["exchange_count"] == 2
         assert meta["user_messages"] == 2
-        assert meta["files_read"] == ["memento/adapters/__init__.py"]
-        assert meta["files_edited"] == ["memento/adapters/pi.py"]
+        assert meta["files_read"] == ["almanac/adapters/__init__.py"]
+        assert meta["files_edited"] == ["almanac/adapters/pi.py"]
         assert meta["first_prompt"] == "Fix the Pi transcript adapter"
         assert meta["last_outcome"] == "Done."
         assert meta["session_id"] == "pi-s1"
@@ -716,7 +716,7 @@ class TestPiAdapter:
         transcript = _write_pi_transcript(
             tmp_path,
             [
-                {"type": "session", "version": 3, "id": "pi-s1", "cwd": "/repo/memento-vault"},
+                {"type": "session", "version": 3, "id": "pi-s1", "cwd": "/repo/almanac"},
                 {
                     "type": "message_start",
                     "message": {
@@ -741,12 +741,12 @@ class TestPiAdapter:
                 {
                     "type": "tool_execution_start",
                     "toolName": "read",
-                    "args": {"path": "memento/adapters/__init__.py"},
+                    "args": {"path": "almanac/adapters/__init__.py"},
                 },
                 {
                     "type": "tool_execution_start",
                     "toolName": "write",
-                    "args": {"path": "memento/adapters/pi.py"},
+                    "args": {"path": "almanac/adapters/pi.py"},
                 },
                 {
                     "type": "tool_execution_end",
@@ -769,17 +769,17 @@ class TestPiAdapter:
         meta = parse_pi(str(transcript))
         rendered = render_pi(str(transcript), per_tool_cap=5)
 
-        assert meta["cwd"] == "/repo/memento-vault"
+        assert meta["cwd"] == "/repo/almanac"
         assert meta["session_id"] == "pi-s1"
         assert meta["exchange_count"] == 1
         assert meta["user_messages"] == 1
-        assert meta["files_read"] == ["memento/adapters/__init__.py"]
-        assert meta["files_edited"] == ["memento/adapters/pi.py"]
+        assert meta["files_read"] == ["almanac/adapters/__init__.py"]
+        assert meta["files_edited"] == ["almanac/adapters/pi.py"]
         assert meta["first_prompt"] == "Fix the adapter"
         assert meta["last_outcome"] == "Done."
         assert "User: <file" in rendered
-        assert "Assistant tool read: memento/adapters/__init__.py" in rendered
-        assert "Assistant tool write: memento/adapters/pi.py" in rendered
+        assert "Assistant tool read: almanac/adapters/__init__.py" in rendered
+        assert "Assistant tool write: almanac/adapters/pi.py" in rendered
         assert "Tool result read: xxxxx" in rendered
         assert "[tool result truncated]" in rendered
         assert "private reasoning" not in rendered
@@ -799,7 +799,7 @@ class TestPiAdapter:
                                 "type": "toolCall",
                                 "id": tool_call_id,
                                 "name": "read",
-                                "arguments": {"path": "memento/adapters/pi.py"},
+                                "arguments": {"path": "almanac/adapters/pi.py"},
                             }
                         ],
                     },
@@ -808,7 +808,7 @@ class TestPiAdapter:
                     "type": "tool_execution_start",
                     "toolName": "read",
                     "toolCallId": tool_call_id,
-                    "args": {"path": "memento/adapters/pi.py"},
+                    "args": {"path": "almanac/adapters/pi.py"},
                 },
                 {
                     "type": "tool_execution_end",
@@ -830,7 +830,7 @@ class TestPiAdapter:
 
         rendered = render_pi(str(transcript), per_tool_cap=5)
 
-        assert rendered.count("Assistant tool read: memento/adapters/pi.py") == 1
+        assert rendered.count("Assistant tool read: almanac/adapters/pi.py") == 1
         assert rendered.count("Tool result read: xxxxx") == 1
         assert "xxxxxxxxxx" not in rendered
         assert "[tool result truncated]" in rendered
@@ -850,7 +850,7 @@ class TestPiAdapter:
                         "content": [
                             {"type": "reasoning", "text": "private reasoning"},
                             {"type": "thinking", "thinking": "secret reasoning", "thinkingSignature": "sig"},
-                            {"type": "toolCall", "name": "memento_capture", "arguments": {"title": "Decision"}},
+                            {"type": "toolCall", "name": "almanac_capture", "arguments": {"title": "Decision"}},
                         ],
                     },
                 },
@@ -866,7 +866,7 @@ class TestPiAdapter:
         )
         rendered = render_pi(str(transcript), per_tool_cap=5)
         assert "User: Capture durable signal" in rendered
-        assert "Assistant tool memento_capture" in rendered
+        assert "Assistant tool almanac_capture" in rendered
         assert "Tool: xxxxx" in rendered
         assert "Tool: yyyyy" in rendered
         assert "yyyyyyyyyy" not in rendered
@@ -993,24 +993,24 @@ class TestLazyAdapterLoading:
     """
 
     def test_load_adapter_returns_none_on_import_error(self):
-        import memento.adapters as adapters_mod
+        import almanac.adapters as adapters_mod
 
         with patch.object(adapters_mod.importlib, "import_module", side_effect=ImportError("absent")):
             assert adapters_mod._load_adapter("opencode") is None
             assert adapters_mod._load_adapter("pi") is None
 
     def test_detect_falls_back_to_claude_when_adapters_absent(self, claude_transcript):
-        with patch("memento.adapters._load_adapter", return_value=None):
+        with patch("almanac.adapters._load_adapter", return_value=None):
             assert detect_agent(str(claude_transcript)) == "claude"
 
     @pytest.mark.parametrize("agent", ["opencode", "pi"])
     def test_parse_missing_adapter_raises_clear_error(self, claude_transcript, agent):
-        with patch("memento.adapters._load_adapter", return_value=None):
+        with patch("almanac.adapters._load_adapter", return_value=None):
             with pytest.raises(ValueError, match=f"{agent} adapter is not installed"):
                 parse_transcript(str(claude_transcript), agent=agent)
 
     @pytest.mark.parametrize("agent", ["opencode", "pi"])
     def test_render_missing_adapter_raises_clear_error(self, claude_transcript, agent):
-        with patch("memento.adapters._load_adapter", return_value=None):
+        with patch("almanac.adapters._load_adapter", return_value=None):
             with pytest.raises(ValueError, match=f"{agent} adapter is not installed"):
                 render_transcript_text(str(claude_transcript), agent=agent)

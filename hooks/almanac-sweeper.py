@@ -36,7 +36,7 @@ ORPHAN_GRACE_SECONDS = int(os.environ.get("ALMANAC_SWEEPER_ORPHAN_GRACE_SECONDS"
 
 
 def resolve_vault():
-    """Resolve the configured vault, including existing Memento vaults."""
+    """Resolve the configured vault, including existing Almanac vaults."""
     return get_vault()
 
 

@@ -1,7 +1,7 @@
 """Tests for the authentication middleware."""
 
 import pytest
-from memento.auth import (
+from almanac.auth import (
     BearerTokenAuth,
     Identity,
     NoAuth,
@@ -70,13 +70,13 @@ class TestCreateAuthProvider:
         assert isinstance(provider, BearerTokenAuth)
 
     def test_env_key_overrides(self, monkeypatch):
-        monkeypatch.setenv("MEMENTO_API_KEY", "env-key")
+        monkeypatch.setenv("ALMANAC_API_KEY", "env-key")
         provider = create_auth_provider(config={})
         assert isinstance(provider, BearerTokenAuth)
         assert provider.authenticate("env-key") is not None
 
     def test_env_key_takes_precedence(self, monkeypatch):
-        monkeypatch.setenv("MEMENTO_API_KEY", "env-key")
+        monkeypatch.setenv("ALMANAC_API_KEY", "env-key")
         provider = create_auth_provider(config={"api_key": "config-key"})
         assert provider.authenticate("env-key") is not None
         assert provider.authenticate("config-key") is None

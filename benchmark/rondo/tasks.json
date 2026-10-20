@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "description": "Static memento-vault benchmark task set for future Rondo clean evaluators and agent-development experiments.",
   "tasks": [
     {
@@ -42,10 +42,10 @@
       "retrieval_context": {
         "docs": [
           "benchmark/README.md",
-          ".beislid/workflow.md",
+          "CONTRIBUTING.md",
           "AGENTS.md"
         ],
-        "memento_queries": [
+        "almanac_queries": [
           "memento-vault Rondo Beislið harness research benchmark task set",
           "checkpoint memento-vault rondo beisli harness research"
         ],
@@ -83,11 +83,11 @@
       "expected_touched_areas": [
         ".github/workflows/ci.yml",
         "README.md",
-        ".beislid/workflow.md"
+        "CONTRIBUTING.md"
       ],
       "acceptance_criteria": [
         "CI runs on PRs and pushes to main",
-        "CI mirrors local Beislið gates where practical",
+        "CI mirrors documented local validation commands where practical",
         "Optional heavy dependencies are not required by default",
         "Workflow behavior is documented"
       ],
@@ -98,16 +98,16 @@
       ],
       "known_risks": [
         "Full pytest may need optional dependencies absent from CI",
-        "Duplicating Beislið gates can drift",
+        "Duplicating local validation commands can drift",
         "CI matrix choices can be too slow for agent loops"
       ],
       "retrieval_context": {
         "docs": [
-          ".beislid/workflow.md",
+          "CONTRIBUTING.md",
           "README.md",
           "pyproject.toml"
         ],
-        "memento_queries": [],
+        "almanac_queries": [],
         "expected_query_intent": "No vault memory required; use repository CI and Beislið gate documentation only.",
         "useful_note_refs": [],
         "memory_token_budget": 0
@@ -166,7 +166,7 @@
           "package.json",
           "VERSION"
         ],
-        "memento_queries": [],
+        "almanac_queries": [],
         "expected_query_intent": "No vault memory required; use repository release, install, and packaging surfaces only.",
         "useful_note_refs": [],
         "memory_token_budget": 0
@@ -221,7 +221,7 @@
           "memento/store.py",
           "tests/test_store.py"
         ],
-        "memento_queries": [],
+        "almanac_queries": [],
         "expected_query_intent": "No vault memory required; use current frontmatter docs and writer implementations only.",
         "useful_note_refs": [],
         "memory_token_budget": 0
@@ -276,7 +276,7 @@
           "docs/configuration.md",
           "memento/mcp_server.py"
         ],
-        "memento_queries": [],
+        "almanac_queries": [],
         "expected_query_intent": "No vault memory required; use current MCP server and documentation surfaces only.",
         "useful_note_refs": [],
         "memory_token_budget": 0
@@ -330,7 +330,7 @@
           "tests/test_health.py",
           "docs/configuration.md"
         ],
-        "memento_queries": [
+        "almanac_queries": [
           "recall search failures health diagnostics no-results backend unavailable low-signal",
           "issue 36 memento-vault health report semantics"
         ],
@@ -390,7 +390,7 @@
           "memento/search.py",
           "README.md"
         ],
-        "memento_queries": [],
+        "almanac_queries": [],
         "expected_query_intent": "No vault memory required; use current MCP search response contract and docs only.",
         "useful_note_refs": [],
         "memory_token_budget": 0
@@ -448,7 +448,7 @@
           "memento/pi_bridge.py",
           "memento/lifecycle.py"
         ],
-        "memento_queries": [
+        "almanac_queries": [
           "Pi auto-capture parity Claude triage SessionEnd queued captures"
         ],
         "expected_query_intent": "Recall Pi auto-capture parity decisions so SessionEnd queued-capture behavior matches Claude triage semantics without duplicating run evidence.",
@@ -508,7 +508,7 @@
           "hooks/vault-recall.py",
           "docs/configuration.md"
         ],
-        "memento_queries": [],
+        "almanac_queries": [],
         "expected_query_intent": "No vault memory required; use current hook and wrapper behavior only.",
         "useful_note_refs": [],
         "memory_token_budget": 0
@@ -563,7 +563,7 @@
           "hooks/memento-triage.py",
           "memento/pi_bridge.py"
         ],
-        "memento_queries": [
+        "almanac_queries": [
           "Pi auto-capture parity with Claude triage provenance source pi session note"
         ],
         "expected_query_intent": "Recall Pi and Claude triage provenance decisions so source, session, and note metadata remain comparable across agents.",

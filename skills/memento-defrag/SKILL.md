@@ -1,18 +1,18 @@
 ---
-name: memento-defrag
-description: Archive stale memento notes. Moves low-certainty, unaccessed notes to archive/. No merging, no deletion. Run periodically to keep the vault tight.
+name: almanac-defrag
+description: Archive stale almanac notes. Moves low-certainty, unaccessed notes to archive/. No merging, no deletion. Run periodically to keep the vault tight.
 ---
 
-# Memento defrag — vault maintenance
+# Almanac defrag — vault maintenance
 
 Move stale notes to the vault's `archive/` directory to keep the active vault focused. No merging, no deletion. Git history preserves everything.
 
-The vault location is configured in `memento.yml` (default: `~/memento`). Check `~/.config/memento-vault/memento.yml` or `~/memento/memento.yml` for the active config.
+The vault location is configured in `almanac.yml` (default: `~/almanac`). Check `~/.config/almanac/almanac.yml` or `~/almanac/almanac.yml` for the active config.
 
 ## When to use
 
 - Periodically (monthly or when note count feels high)
-- User invokes `/memento-defrag`
+- User invokes `/almanac-defrag`
 - Before a major project shift to clean up accumulated noise
 
 ## Process
@@ -63,7 +63,7 @@ The vault location is configured in `memento.yml` (default: `~/memento`). Check 
 
 9. **Reindex QMD** (if installed):
    ```bash
-   qmd update -c memento && qmd embed
+   qmd update -c almanac && qmd embed
    ```
 
 10. **Report** what was archived and what stayed.

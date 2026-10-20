@@ -1,4 +1,4 @@
-"""Shared helpers for the memento quality evals.
+"""Shared helpers for the almanac quality evals.
 
 Design goals, in priority order:
 1. Deterministic and dependency-free: stdlib only, no LLM, no network.
@@ -78,7 +78,7 @@ def set_now(value) -> None:
     """Freeze the eval clock returned by now().
 
     Accepts an aware datetime, an ISO-8601 string, or None. None clears the
-    override, so a subsequent now() falls back to MEMENTO_EVAL_NOW or the
+    override, so a subsequent now() falls back to ALMANAC_EVAL_NOW or the
     real UTC clock.
     """
     global _NOW_OVERRIDE
@@ -96,7 +96,7 @@ def now() -> datetime:
     """The eval suite's notion of 'now'.
 
     Resolution order: the clock frozen via set_now()/--now, then the
-    MEMENTO_EVAL_NOW environment variable, then the real UTC clock. Every
+    ALMANAC_EVAL_NOW environment variable, then the real UTC clock. Every
     eval suite must call this instead of datetime.now()/date.today() so a
     frozen clock makes two runs of the same suite byte-for-byte
     reproducible regardless of calendar drift. Always returns an
@@ -104,7 +104,7 @@ def now() -> datetime:
     """
     if _NOW_OVERRIDE is not None:
         return _NOW_OVERRIDE
-    env = os.environ.get("MEMENTO_EVAL_NOW")
+    env = os.environ.get("ALMANAC_EVAL_NOW")
     if env:
         return parse_iso_utc(env)
     return datetime.now(timezone.utc)
@@ -220,19 +220,19 @@ def threshold(suite: str, metric: str, kind: str, default):
 
 
 def find_vault() -> Path | None:
-    env = os.environ.get("MEMENTO_VAULT_PATH")
+    env = os.environ.get("ALMANAC_VAULT_PATH")
     if env and Path(env).expanduser().is_dir():
         return Path(env).expanduser()
     try:
         sys.path.insert(0, str(REPO_ROOT))
-        from memento.config import get_vault  # type: ignore
+        from almanac.config import get_vault  # type: ignore
 
         vault = Path(get_vault())
         if vault.is_dir():
             return vault
     except Exception:
         pass
-    fallback = Path.home() / "memento"
+    fallback = Path.home() / "almanac"
     if fallback.is_dir():
         return fallback
     return None
@@ -286,7 +286,7 @@ def parse_note_date(fm: dict):
 def config_dir() -> Path:
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = Path(xdg).expanduser() if xdg else Path.home() / ".config"
-    return base / "memento-vault"
+    return base / "almanac"
 
 
 def iter_jsonl(path: Path, since: datetime | None = None):

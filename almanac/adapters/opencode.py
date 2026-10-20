@@ -5,7 +5,7 @@ database with three relevant tables: ``session`` (one row per session),
 ``message`` (one row per turn, role in JSON ``data``), and ``part`` (content
 blocks within a message: text, tool calls, reasoning, lifecycle markers).
 
-Selects which session to parse via the ``ALMANAC_OPENCODE_SESSION_ID`` (or legacy ``MEMENTO_OPENCODE_SESSION_ID``)
+Selects which session to parse via the ``ALMANAC_OPENCODE_SESSION_ID``
 environment variable, then an explicit ``session_id`` argument; falls back to
 the most recently created session.
 """
@@ -120,7 +120,7 @@ def parse_transcript(transcript_path, session_id=None):
         transcript_path: Path to ``opencode.db`` (typically under
             ``$XDG_DATA_HOME/opencode/``).
         session_id: Specific OpenCode session id (``ses_...``). Overridden by
-            ``ALMANAC_OPENCODE_SESSION_ID`` (or legacy ``MEMENTO_OPENCODE_SESSION_ID``) when set; otherwise falls back to
+            ``ALMANAC_OPENCODE_SESSION_ID`` when set; otherwise falls back to
             the most recently created session.
 
     Returns:
@@ -243,7 +243,7 @@ def render_transcript_text(transcript_path, session_id=None):
 def looks_like_opencode_db(path):
     """Return True if ``path`` is an SQLite file with OpenCode's session schema.
 
-    Used by :func:`memento.adapters.detect_agent` to sniff SQLite stores without
+    Used by :func:`almanac.adapters.detect_agent` to sniff SQLite stores without
     importing this module unless needed.
     """
     try:

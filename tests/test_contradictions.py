@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from memento.config import DEFAULT_CONFIG
-from memento.contradictions import (
+from almanac.config import DEFAULT_CONFIG
+from almanac.contradictions import (
     _scan_notes_for_validity,
     apply_invalidation,
     apply_supersession_backlinks,
@@ -18,9 +18,9 @@ from memento.contradictions import (
 @pytest.fixture(autouse=True)
 def _isolate_vault_write_lock(tmp_path, monkeypatch):
     """apply_supersession_backlinks acquires the vault write lock -- keep it
-    off the real ~/.cache/memento-vault so this never races other worktrees'
+    off the real ~/.cache/almanac so this never races other worktrees'
     concurrent sweeps/tests (same isolation pattern as test_fleeting.py)."""
-    monkeypatch.setattr("memento.store.VAULT_WRITE_LOCK_PATH", str(tmp_path / "vault-write.lock"))
+    monkeypatch.setattr("almanac.store.VAULT_WRITE_LOCK_PATH", str(tmp_path / "vault-write.lock"))
 
 
 def _write_note(
@@ -125,10 +125,10 @@ def test_inspect_contradictions_marks_supersession_and_opposite_language(tmp_pat
     )
 
     with (
-        patch("memento.contradictions.get_vault", return_value=vault),
-        patch("memento.contradictions.get_config", return_value=_lexical_config()),
-        patch("memento.contradictions.has_qmd", return_value=False),
-        patch("memento.graph.get_vault", return_value=vault),
+        patch("almanac.contradictions.get_vault", return_value=vault),
+        patch("almanac.contradictions.get_config", return_value=_lexical_config()),
+        patch("almanac.contradictions.has_qmd", return_value=False),
+        patch("almanac.graph.get_vault", return_value=vault),
     ):
         payload = inspect_contradictions("redis cache")
 
@@ -182,8 +182,8 @@ def test_inspect_contradictions_defaults_to_validity_chains(tmp_path):
     )
 
     with (
-        patch("memento.contradictions.get_vault", return_value=vault),
-        patch("memento.contradictions.get_config", return_value=dict(DEFAULT_CONFIG)),
+        patch("almanac.contradictions.get_vault", return_value=vault),
+        patch("almanac.contradictions.get_config", return_value=dict(DEFAULT_CONFIG)),
     ):
         payload = inspect_contradictions("redis cache")
 
@@ -213,8 +213,8 @@ def test_inspect_contradictions_empty_topic_is_a_miss(tmp_path):
     vault = tmp_path / "vault"
     (vault / "notes").mkdir(parents=True)
     with (
-        patch("memento.contradictions.get_vault", return_value=vault),
-        patch("memento.contradictions.get_config", return_value=dict(DEFAULT_CONFIG)),
+        patch("almanac.contradictions.get_vault", return_value=vault),
+        patch("almanac.contradictions.get_config", return_value=dict(DEFAULT_CONFIG)),
     ):
         payload = inspect_contradictions("   ")
     assert "miss" in payload
