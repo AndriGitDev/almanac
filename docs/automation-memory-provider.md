@@ -1,6 +1,6 @@
 # Automation MemoryProvider Contract
 
-How automated runners (Rondo, Beislið, or any orchestrator) consume Almanac as automation memory. This is a contract: the normative sections below use MUST / MUST NOT / SHOULD / MAY in the RFC 2119 sense, and downstream adapters are expected to hold to them.
+How automated runners (Rondo or any orchestrator) consume Almanac as automation memory. This is a contract: the normative sections below use MUST / MUST NOT / SHOULD / MAY in the RFC 2119 sense, and downstream adapters are expected to hold to them.
 
 If you remember one thing: **the vault is never a run ledger.** Almanac owns curated memory and learning. Run state belongs elsewhere.
 
@@ -8,7 +8,6 @@ If you remember one thing: **the vault is never a run ledger.** Almanac owns cur
 
 | System | Owns |
 |--------|------|
-| Beislið | Work-contract, autonomy, and proof semantics |
 | Rondo | Execution, run evidence, run ledger, coordination |
 | Almanac | Curated memory and learning — nothing else |
 
@@ -90,7 +89,7 @@ After a run, a runner SHOULD capture what was learned — as a typed sanitized l
 
 | Field | Required | Meaning |
 |-------|----------|---------|
-| `external_system` | yes | Runner/orchestrator producing the lesson (for example `rondo` or `beislid`) |
+| `external_system` | yes | Runner/orchestrator producing the lesson (for example `rondo`) |
 | `run_id` | yes | External run identifier for provenance; stored as the note `session_id` when a write is approved |
 | `artifact_refs` | no | References/URLs/IDs for external artifacts; references only, not artifact bodies |
 | `repo`, `project`, `branch`, `ticket`, `slice` | no | Source context for the run/work slice |
@@ -228,7 +227,7 @@ Each prohibited item has a home; it just isn't here:
 | Locks, queues, coordination state | Runner infrastructure |
 | Patches, diffs | git branches / PRs |
 | Full transcripts | Host transcript storage (local) |
-| Work-contract / proof semantics | Beislið |
+| Work-contract / proof semantics | Runner policy and configuration |
 
 ## A run, end to end
 
@@ -303,7 +302,7 @@ To remove any doubt about scope, Almanac as an automation MemoryProvider is **no
 - a proof or evidence store
 - a lock service, queue, or coordination database
 - a transcript archive
-- a Beislið work-contract or proof-semantics store
+- a work-contract or proof-semantics store
 
 It is curated memory: lessons in, context packets out, sanitized everywhere.
 

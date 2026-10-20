@@ -1,7 +1,7 @@
-"""Tests for memento/search.py retrieval enhancements.
+"""Tests for almanac/search.py retrieval enhancements.
 
 MEM-150: apply_temporal_decay() now derives decay immunity from the derived
-durability tier (memento.store.durability_tier), not certainty. This file
+durability tier (almanac.store.durability_tier), not certainty. This file
 covers the decay-immunity matrix (pinned/hot immune; warm/cold decay
 normally, including a certainty-5 cold note) and the hot-window config knob.
 """
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from memento.search import apply_temporal_decay
+from almanac.search import apply_temporal_decay
 
 
 def _iso_days_ago(days):
@@ -38,12 +38,12 @@ def _patch_vault_config(monkeypatch, tmp_vault):
 
     apply_temporal_decay() calls get_vault() (and, via graph.read_note_metadata,
     the same function) unconditionally -- both resolve through
-    memento.config.get_config() at call time, so patching that one binding is
+    almanac.config.get_config() at call time, so patching that one binding is
     enough regardless of the `config` dict passed explicitly to
     apply_temporal_decay itself.
     """
     cfg = {"vault_path": str(tmp_vault)}
-    monkeypatch.setattr("memento.config.get_config", lambda: cfg, raising=False)
+    monkeypatch.setattr("almanac.config.get_config", lambda: cfg, raising=False)
     return cfg
 
 

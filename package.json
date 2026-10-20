@@ -9,7 +9,6 @@
     "extensions/**/*.mjs",
     "hooks/vault-briefing.py",
     "hooks/vault-recall.py",
-    "memento/**/*.py",
     "almanac/**/*.py",
     "README.md",
     "LICENSE"

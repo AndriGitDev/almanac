@@ -1,4 +1,4 @@
-# Memento quality evals
+# Almanac quality evals
 
 One command that grades the whole memory system: what gets recorded (input quality), what gets found (retrieval accuracy), what the pipeline costs (model use and token spend), and whether the machinery is healthy.
 
@@ -8,7 +8,7 @@ python3 evals/run_evals.py --llm        # adds LLM extraction checks (exactly 2 
 python3 evals/run_evals.py --json       # machine-readable scorecard
 python3 evals/run_evals.py --strict     # warnings also fail the exit code
 python3 evals/run_evals.py --suite vault_content   # one suite only (repeatable flag)
-python3 evals/run_evals.py --now 2026-06-15T00:00:00Z   # freeze the clock (env fallback: MEMENTO_EVAL_NOW)
+python3 evals/run_evals.py --now 2026-06-15T00:00:00Z   # freeze the clock (env fallback: ALMANAC_EVAL_NOW)
 python3 evals/run_evals.py --baseline-out evals/baselines/   # also write a small dated scorecard for weekly diffing
 python3 evals/diff_baselines.py old.json new.json       # compare two baselines (see "Weekly routine" below)
 ```
@@ -41,7 +41,7 @@ This is the input-quality suite: if capture writes junk, it shows up here first.
 
 ### capture_health - the write path
 
-Parses `~/.config/memento-vault/triage-health.jsonl` over a 30-day window (tunable in `thresholds.yml`).
+Parses `~/.config/almanac/triage-health.jsonl` over a 30-day window (tunable in `thresholds.yml`).
 Grades LLM failure rate, parse-empty rate, missing transcripts, transcript truncation, notes-per-attempt yield, spawn storms, and pi-bridge failures.
 Also prints an informational spend report: LLM calls, prompt/output bytes, token totals where available, average duration, and backend/model mix.
 Token counts are only recorded for API backends; CLI backends (claude, codex) report bytes and duration only.
@@ -50,18 +50,18 @@ Token counts are only recorded for API backends; CLI backends (claude, codex) re
 
 Two layers:
 
-1. Hermetic policy checks run the real ranking functions from `memento/search.py` against a rendered fixture vault (`golden/fixtures/vault/`) with the grep backend forced, in a subprocess so nothing leaks.
+1. Hermetic policy checks run the real ranking functions from `almanac/search.py` against a rendered fixture vault (`golden/fixtures/vault/`) with the grep backend forced, in a subprocess so nothing leaks.
 They verify temporal decay, certainty immunity, session-type and low-certainty penalties, fleeting-path dropping, project scoping, and archive exclusion.
 This layer also includes a golden **ranked-order** regression (`ranked_order_checks()` in `retrieval_probe.py`, MEM-133): for a fixed set of queries it runs the real FTS5/BM25 + PRF + RRF fusion + policy path (embedded backend, no embedding provider, so no vector index and no ONNX/network dependency) and asserts the exact top-5 note-path order against `golden/ranked_order.json`.
 Where the pairwise checks above only prove a signal moves scores in the right *direction*, this proves a real query's *order* has not silently shifted -- the gap a fusion or reranker weight change can slip through.
-When the `embedded` extra's dependencies are installed AND the local ONNX embedding model is already cached AND `MEMENTO_EVAL_VECTOR_ADVISORY=1` is set, the same queries also run through the embedded backend with a real embedding provider (FTS5 + vector, RRF-fused) and the resulting order is printed under the `vector_advisory` JSON key for information only; it is opt-in (ONNX CPU inference is not bit-reproducible run to run) and never gates anything.
-2. Live golden queries run natural-language questions from `golden/retrieval_queries.json` through the real production recall entry point (`memento.lifecycle.build_recall()` / `PromptRecallRuntime.run()`, the same gated PRF/RRF/deep-recall pipeline session-prompt injection uses), grading recall@5, MRR, and negative-query leakage against what a user actually sees (MEM-140; before this, the metric called `memento.search.qmd_search()` directly and never exercised the gate).
+When the `embedded` extra's dependencies are installed AND the local ONNX embedding model is already cached AND `ALMANAC_EVAL_VECTOR_ADVISORY=1` is set, the same queries also run through the embedded backend with a real embedding provider (FTS5 + vector, RRF-fused) and the resulting order is printed under the `vector_advisory` JSON key for information only; it is opt-in (ONNX CPU inference is not bit-reproducible run to run) and never gates anything.
+2. Live golden queries run natural-language questions from `golden/retrieval_queries.json` through the real production recall entry point (`almanac.lifecycle.build_recall()` / `PromptRecallRuntime.run()`, the same gated PRF/RRF/deep-recall pipeline session-prompt injection uses), grading recall@5, MRR, and negative-query leakage against what a user actually sees (MEM-140; before this, the metric called `almanac.search.qmd_search()` directly and never exercised the gate).
 Each positive query is also run through a raw semantic `qmd_search()` call, kept separate and purely informational, so the scorecard shows when vector search alone would have rescued a miss.
 
 Layer 1 is a blocking CI gate: `python3 evals/retrieval_probe.py --mode fixture --strict` exits non-zero if any core (non-known-gap) check fails -- this includes the ranked-order checks.
 Layer 2 never runs in CI; it needs the real vault.
 Run it locally with `python3 evals/retrieval_probe.py --mode live`.
-This is a trend instrument for watching recall drift against your real vault, never a gate -- do not wire `--mode live` into a CI job or a pre-PR gate (see `.beislid/workflow.md`'s "Never run --mode live in gates" hint).
+This is a trend instrument for watching recall drift against your real vault, never a gate -- do not wire `--mode live` into a CI job or a pre-PR gate.
 
 ### capture_e2e - the triage gate and extraction
 
@@ -73,7 +73,7 @@ The hermetic layer is a blocking CI gate: `python3 evals/run_evals.py --suite ca
 
 ### retrieval_surface - can users actually reach retrieval?
 
-Grades the day-to-day recall surfaces that sit around the retrieval engine: concierge trigger wording, non-MCP local CLI fallback (`memento-vault search` / `python3 -m memento search`, plus `recall`), natural-language query normalization for lexical backends, and backend/index metadata on explicit search envelopes. This suite catches the product failure mode where the engine is healthy but users or hookless agents do not route through it.
+Grades the day-to-day recall surfaces that sit around the retrieval engine: concierge trigger wording, non-MCP local CLI fallback (`almanac search` / `python3 -m almanac search`, plus `recall`), natural-language query normalization for lexical backends, and backend/index metadata on explicit search envelopes. This suite catches the product failure mode where the engine is healthy but users or hookless agents do not route through it.
 
 ### capture_retrieve_loop - does a captured note become retrievable?
 
@@ -83,7 +83,7 @@ This suite drives the real pipeline end to end -- store, index, search -- agains
 
 Two layers:
 
-1. Blocking, non-LLM: three pre-authored structured note payloads (fixture shapes mirroring what triage extraction produces) pushed through the real `memento_store`/`memento_store_smart` MCP entry points into a temp vault, a real `EmbeddedSearchBackend` (FTS5, no embedding provider) index build, then the real `memento.search.qmd_search()` entry point.
+1. Blocking, non-LLM: three pre-authored structured note payloads (fixture shapes mirroring what triage extraction produces) pushed through the real `almanac_store`/`almanac_store_smart` MCP entry points into a temp vault, a real `EmbeddedSearchBackend` (FTS5, no embedding provider) index build, then the real `almanac.search.qmd_search()` entry point.
 Each case asserts its golden query returns the stored note in the top 5: a typed note carrying a project slug, a note carrying session metadata, and a note whose title shares no vocabulary with its query (forcing a content match, not a title match).
 2. Manual, `--llm` tier: the same loop starting from capture_e2e's insight fixture transcript through real triage extraction (max 2 LLM calls, graded by capture_e2e's existing deterministic rubric), then store, then retrieve.
 Skips cleanly when no LLM backend is configured.
@@ -127,17 +127,17 @@ Fix the cause, never the threshold.
 This is a LOCAL routine, not a CI job: it needs the real vault and the real telemetry log, neither of
 which exist in CI.
 Run it by hand, or wire the two commands above into a `launchd`/`cron` job that runs weekly and leaves
-its output somewhere you'll actually read it (a log file, a memento capture, a calendar reminder --
+its output somewhere you'll actually read it (a log file, a almanac capture, a calendar reminder --
 whatever habit sticks). `evals/diff_baselines.py`'s exit code is designed for exactly that: a cron
 wrapper can alert only when it's non-zero.
 
 ### When a golden query starts missing
 
-First check whether the expected note was renamed, archived, or superseded: `rg <slug> ~/memento/notes ~/memento/archive`.
+First check whether the expected note was renamed, archived, or superseded: `rg <slug> ~/almanac/notes ~/almanac/archive`.
 
 - Renamed or superseded: update `expect_any` in `golden/retrieval_queries.json` to the new path substring.
 - Still exists but not found: retrieval regressed.
-Do not touch the golden file; investigate the search pipeline (start with `memento-vault retrieval-report`).
+Do not touch the golden file; investigate the search pipeline (start with `almanac retrieval-report`).
 
 ### When a ranked-order golden check starts failing
 
@@ -146,11 +146,11 @@ Treat that as a real signal, not noise: something in FTS5/BM25 relevance, PRF ex
 
 1. Run `python3 evals/retrieval_probe.py --mode fixture` directly and read the failing check's `details` (`expected` vs `got`).
 2. Decide whether the new order is *better*, *worse*, or *neutral* given the fixture scenario the query was engineered for (each query's comment in `RANKED_ORDER_QUERIES` names the scenario).
-3. If the change was intentional (you changed a ranking parameter or fixed a bug), regenerate: `MEMENTO_REGEN_GOLDEN=1 python3 evals/retrieval_probe.py --mode fixture`.
+3. If the change was intentional (you changed a ranking parameter or fixed a bug), regenerate: `ALMANAC_REGEN_GOLDEN=1 python3 evals/retrieval_probe.py --mode fixture`.
 This rewrites `golden/ranked_order.json` in place.
 4. **Review the diff like a code review, never auto-accept it.** `git diff evals/golden/ranked_order.json` and confirm every path that moved makes sense.
 If you cannot explain a change, do not commit it -- investigate the pipeline instead.
-5. If the change was NOT intentional, do not regenerate: investigate `memento/search.py` (or, for the deep pipeline, `memento/retrieval_policy.py`) for the regression.
+5. If the change was NOT intentional, do not regenerate: investigate `almanac/search.py` (or, for the deep pipeline, `almanac/retrieval_policy.py`) for the regression.
 
 SQLite/FTS5 version changes are a known regen trigger: if a golden fails right after an environment upgrade (new Python, new OS image, new SQLite), suspect the scorer version before the ranking code -- and still review the regen diff.
 See "SQLite/FTS5 slim-container hazard" below for why this happens and how to verify a change before pushing it.
@@ -172,7 +172,7 @@ docker run --rm -v "$PWD:/app" -w /app python:3.12.11-slim bash -c "pip install 
 
 If this fails while the same command passes on your host machine, suspect the SQLite/FTS5 version difference first, per the rule of thumb above, and still review any regen diff like a code review before committing it.
 
-Runtime defense: `memento/embedded_search.py::_is_rebuildable_sqlite_error()` treats `"no such module: fts5"` as a rebuildable error and triggers an index rebuild instead of crashing.
+Runtime defense: `almanac/embedded_search.py::_is_rebuildable_sqlite_error()` treats `"no such module: fts5"` as a rebuildable error and triggers an index rebuild instead of crashing.
 That only covers outright missing capability (an old SQLite build with no FTS5 module at all); it does not paper over a scoring/ordering divergence between two SQLite builds that both support FTS5, which is what the goldens above exist to catch.
 
 ### Adding golden queries (do this ~2 per month)
@@ -248,12 +248,12 @@ If a new note changes what a `RANKED_ORDER_QUERIES` query in `retrieval_probe.py
 ### Things this suite deliberately does not do
 
 - No LLM-as-judge: judge models drift and are not reproducible; every grading rule here is a string or schema check.
-- No writes to the configured vault: safe to run from any session, including CI. `capture_retrieve_loop` writes notes, but only into its own throwaway temp vaults, never the vault `MEMENTO_VAULT_PATH`/config points at.
+- No writes to the configured vault: safe to run from any session, including CI. `capture_retrieve_loop` writes notes, but only into its own throwaway temp vaults, never the vault `ALMANAC_VAULT_PATH`/config points at.
 - No network calls (except the optional `--llm` extraction, which uses the locally configured backend).
 - Latency/scale benchmarking stays in `benchmark/` (LongMemEval, optuna sweeps, scale lifecycle); this suite is about quality, not speed.
 
 ## Relationship to other tooling
 
-- `memento-vault health` checks install/runtime wiring; this suite checks knowledge quality.
-- `memento-vault retrieval-report` aggregates live retrieval telemetry (needs `retrieval_log: true`); this suite actively probes with known-answer queries.
+- `almanac health` checks install/runtime wiring; this suite checks knowledge quality.
+- `almanac retrieval-report` aggregates live retrieval telemetry (needs `retrieval_log: true`); this suite actively probes with known-answer queries.
 - `benchmark/` measures performance and parameter tuning against external datasets; this suite measures YOUR vault and YOUR pipeline behavior.

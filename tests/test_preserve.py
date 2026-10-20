@@ -3,7 +3,7 @@
 import json
 from unittest.mock import patch
 
-from memento.mcp_server import memento_preserve
+from almanac.mcp_server import almanac_preserve
 
 
 class TestPreserveTool:
@@ -11,8 +11,8 @@ class TestPreserveTool:
         source = tmp_path / "artifact.txt"
         source.write_text("artifact body")
 
-        with patch("memento.mcp_server.get_vault", return_value=tmp_vault):
-            result = memento_preserve(str(source), title="Artifact bundle", link_project_index=False)
+        with patch("almanac.mcp_server.get_vault", return_value=tmp_vault):
+            result = almanac_preserve(str(source), title="Artifact bundle", link_project_index=False)
 
         assert result["created"] is True
         assert result["moved"] is False
@@ -34,8 +34,8 @@ class TestPreserveTool:
         (source / "nested" / "deeper").mkdir(parents=True)
         (source / "nested" / "deeper" / "file.md").write_text("hello")
 
-        with patch("memento.mcp_server.get_vault", return_value=tmp_vault):
-            result = memento_preserve(str(source), title="Bundle", link_project_index=False)
+        with patch("almanac.mcp_server.get_vault", return_value=tmp_vault):
+            result = almanac_preserve(str(source), title="Bundle", link_project_index=False)
 
         archive_root = tmp_vault / result["archive_path"]
         assert (archive_root / source.name / "nested" / "deeper" / "file.md").read_text() == "hello"
@@ -49,9 +49,9 @@ class TestPreserveTool:
         first.write_text("one")
         second.write_text("two")
 
-        with patch("memento.mcp_server.get_vault", return_value=tmp_vault):
-            first_result = memento_preserve(str(first), title="Same bundle", link_project_index=False)
-            second_result = memento_preserve(str(second), title="Same bundle", link_project_index=False)
+        with patch("almanac.mcp_server.get_vault", return_value=tmp_vault):
+            first_result = almanac_preserve(str(first), title="Same bundle", link_project_index=False)
+            second_result = almanac_preserve(str(second), title="Same bundle", link_project_index=False)
 
         assert first_result["archive_path"] != second_result["archive_path"]
         assert second_result["archive_path"].endswith("-2")
@@ -61,8 +61,8 @@ class TestPreserveTool:
         source = tmp_path / "move-me.txt"
         source.write_text("move me")
 
-        with patch("memento.mcp_server.get_vault", return_value=tmp_vault):
-            result = memento_preserve(str(source), title="Move bundle", move=True, link_project_index=False)
+        with patch("almanac.mcp_server.get_vault", return_value=tmp_vault):
+            result = almanac_preserve(str(source), title="Move bundle", move=True, link_project_index=False)
 
         assert result["moved"] is True
         assert not source.exists()
@@ -72,8 +72,8 @@ class TestPreserveTool:
         source = tmp_path / "bundle.txt"
         source.write_text("content")
 
-        with patch("memento.mcp_server.get_vault", return_value=tmp_vault):
-            result = memento_preserve(
+        with patch("almanac.mcp_server.get_vault", return_value=tmp_vault):
+            result = almanac_preserve(
                 str(source),
                 title="Project bundle",
                 project="api-service",
@@ -92,8 +92,8 @@ class TestPreserveTool:
         source = tmp_path / "credentials.env"
         source.write_text("AWS_SECRET_ACCESS_KEY=abc123")
 
-        with patch("memento.mcp_server.get_vault", return_value=tmp_vault):
-            result = memento_preserve(str(source), title="Sensitive bundle", link_project_index=False)
+        with patch("almanac.mcp_server.get_vault", return_value=tmp_vault):
+            result = almanac_preserve(str(source), title="Sensitive bundle", link_project_index=False)
 
         assert result["warnings"]
         assert any("secrets" in warning for warning in result["warnings"])
@@ -105,10 +105,10 @@ class TestPreserveTool:
         source.write_text("content")
 
         with (
-            patch("memento.mcp_server.get_vault", return_value=tmp_vault),
-            patch("memento.mcp_server._active_transport", "streamable-http"),
+            patch("almanac.mcp_server.get_vault", return_value=tmp_vault),
+            patch("almanac.mcp_server._active_transport", "streamable-http"),
         ):
-            result = memento_preserve(str(source), title="Remote bundle", link_project_index=False)
+            result = almanac_preserve(str(source), title="Remote bundle", link_project_index=False)
 
         assert result["reason"] == "remote_path_rejected"
         assert "remote" in result["error"]

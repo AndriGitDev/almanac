@@ -109,7 +109,7 @@ case "$cmd" in
             exit 0
         fi
 
-        nohup "$qmd_path" vsearch "warmup" -c "${ALMANAC_QMD_COLLECTION:-${MEMENTO_QMD_COLLECTION:-almanac}}" -n 1 </dev/null >/dev/null 2>&1 &
+        nohup "$qmd_path" vsearch "warmup" -c "${ALMANAC_QMD_COLLECTION:-almanac}" -n 1 </dev/null >/dev/null 2>&1 &
         exit 0
         ;;
     search|recall|reindex|tools|archive|health|doctor|retrieval-report|retrieval-dashboard)

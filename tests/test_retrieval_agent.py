@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from memento.llm import LLMResult
-from memento.retrieval_agent import (
+from almanac.llm import LLMResult
+from almanac.retrieval_agent import (
     AgenticRetrievalDeps,
     _dispatch_tool,
     _extract_json_object,
@@ -91,26 +91,26 @@ class TestToolGet:
     def test_reads_existing_note_by_bare_name(self, tmp_vault):
         _write_note(tmp_vault, "redis-cache-ttl", title="Redis cache TTL", body="Set an explicit TTL.")
 
-        with patch("memento.retrieval_agent.get_vault", return_value=tmp_vault):
+        with patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault):
             result = _tool_get({"path": "redis-cache-ttl"})
 
         assert result["path"] == "notes/redis-cache-ttl.md"
         assert "Set an explicit TTL." in result["content"]
 
     def test_missing_path_arg_is_an_error(self, tmp_vault):
-        with patch("memento.retrieval_agent.get_vault", return_value=tmp_vault):
+        with patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault):
             result = _tool_get({})
         assert "error" in result
 
     def test_traversal_attempt_is_an_error(self, tmp_vault):
-        with patch("memento.retrieval_agent.get_vault", return_value=tmp_vault):
+        with patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault):
             result = _tool_get({"path": "../../etc/passwd"})
         assert "error" in result
 
     def test_missing_note_falls_back_to_qmd_get_then_errors(self, tmp_vault):
         with (
-            patch("memento.retrieval_agent.get_vault", return_value=tmp_vault),
-            patch("memento.retrieval_agent.qmd_get", return_value=None),
+            patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault),
+            patch("almanac.retrieval_agent.qmd_get", return_value=None),
         ):
             result = _tool_get({"path": "does-not-exist"})
         assert "error" in result
@@ -119,8 +119,8 @@ class TestToolGet:
     def test_missing_note_uses_qmd_get_fallback_when_available(self, tmp_vault):
         fallback = {"path": "notes/remote.md", "title": "Remote", "content": "remote content"}
         with (
-            patch("memento.retrieval_agent.get_vault", return_value=tmp_vault),
-            patch("memento.retrieval_agent.qmd_get", return_value=fallback),
+            patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault),
+            patch("almanac.retrieval_agent.qmd_get", return_value=fallback),
         ):
             result = _tool_get({"path": "remote"})
         assert result == fallback
@@ -131,7 +131,7 @@ class TestToolQuery:
         _write_note(tmp_vault, "a", title="A", note_type="decision")
         _write_note(tmp_vault, "b", title="B", note_type="bugfix")
 
-        with patch("memento.retrieval_agent.get_vault", return_value=tmp_vault):
+        with patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault):
             result = _tool_query({"note_type": "decision"})
 
         paths = [entry["path"] for entry in result["results"]]
@@ -139,7 +139,7 @@ class TestToolQuery:
         assert "notes/b.md" not in paths
 
     def test_invalid_certainty_range_surfaces_error_metadata(self, tmp_vault):
-        with patch("memento.retrieval_agent.get_vault", return_value=tmp_vault):
+        with patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault):
             result = _tool_query({"certainty_min": 5, "certainty_max": 1})
         assert "error" in result
 
@@ -149,7 +149,7 @@ class TestToolRelated:
         assert "error" in _tool_related({})
 
     def test_unresolved_note_returns_structured_error(self, tmp_vault):
-        with patch("memento.retrieval_agent.get_vault", return_value=tmp_vault):
+        with patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault):
             result = _tool_related({"note": "nonexistent-note"})
         assert "error" in result
 
@@ -160,7 +160,7 @@ class TestToolSearch:
 
     def test_delegates_to_explicit_search_runtime(self, tmp_vault):
         fake_result = {"results": [{"path": "notes/a.md", "title": "A", "score": 0.9}], "metadata": {}}
-        with patch("memento.retrieval_agent.ExplicitSearchRuntime") as mock_runtime_cls:
+        with patch("almanac.retrieval_agent.ExplicitSearchRuntime") as mock_runtime_cls:
             mock_runtime_cls.return_value.search.return_value = dict(fake_result)
             result = _tool_search({"query": "caching"})
         assert result["results"][0]["path"] == "notes/a.md"
@@ -172,8 +172,8 @@ class TestToolSearch:
             "metadata": {},
         }
         with (
-            patch("memento.retrieval_agent.get_vault", return_value=tmp_vault),
-            patch("memento.retrieval_agent.ExplicitSearchRuntime") as mock_runtime_cls,
+            patch("almanac.retrieval_agent.get_vault", return_value=tmp_vault),
+            patch("almanac.retrieval_agent.ExplicitSearchRuntime") as mock_runtime_cls,
         ):
             mock_runtime_cls.return_value.search.return_value = dict(fake_result)
             result = _tool_search({"query": "caching", "type": "bugfix"})
@@ -181,7 +181,7 @@ class TestToolSearch:
 
     def test_invalid_filter_surfaces_error(self, tmp_vault):
         fake_result = {"results": [{"path": "notes/a.md", "title": "A", "score": 0.9}], "metadata": {}}
-        with patch("memento.retrieval_agent.ExplicitSearchRuntime") as mock_runtime_cls:
+        with patch("almanac.retrieval_agent.ExplicitSearchRuntime") as mock_runtime_cls:
             mock_runtime_cls.return_value.search.return_value = dict(fake_result)
             result = _tool_search({"query": "caching", "certainty_min": 5, "certainty_max": 1})
         assert "error" in result
@@ -447,7 +447,7 @@ class TestAgenticRetrieveLoop:
 
 class TestAgenticRetrieveDefaultDeps:
     def test_default_deps_use_real_llm_complete(self):
-        from memento.llm import llm_complete as real_llm_complete
+        from almanac.llm import llm_complete as real_llm_complete
 
         deps = AgenticRetrievalDeps()
 
@@ -463,6 +463,6 @@ class TestAgenticRetrieveDefaultDeps:
         rather than raising, since this *is* the fallback contract's last
         line of defense.
         """
-        with patch("memento.llm.subprocess.run", side_effect=FileNotFoundError("claude not found")):
+        with patch("almanac.llm.subprocess.run", side_effect=FileNotFoundError("claude not found")):
             result = agentic_retrieve("some query", config={"llm_backend": "claude"})
         assert result == []

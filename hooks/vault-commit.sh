@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # vault-commit.sh — auto-commit all changes in the Almanac vault.
-# Called by memento-triage.py, memento-sweeper.py, /memento, /memento-defrag.
+# Called by almanac-triage.py, almanac-sweeper.py, /almanac, /almanac-defrag.
 # Idempotent: exits cleanly if nothing to commit.
 #
 # Usage: vault-commit.sh [commit message]
@@ -8,17 +8,15 @@
 
 set -euo pipefail
 
-# Resolve the configured vault, including legacy Memento installs.
+# Resolve the configured vault, using Almanac configuration.
 resolve_vault() {
-    if [ -n "${ALMANAC_VAULT_PATH:-${MEMENTO_VAULT_PATH:-}}" ]; then
-        echo "${ALMANAC_VAULT_PATH:-$MEMENTO_VAULT_PATH}"
+    if [ -n "${ALMANAC_VAULT_PATH:-}" ]; then
+        echo "$ALMANAC_VAULT_PATH"
         return
     fi
     local config_files=(
         "$HOME/.config/almanac/almanac.yml"
         "$HOME/.almanac.yml"
-        "$HOME/.config/memento-vault/memento.yml"
-        "$HOME/.memento-vault.yml"
     )
     for cfg in "${config_files[@]}"; do
         if [ -f "$cfg" ]; then
@@ -30,11 +28,7 @@ resolve_vault() {
             fi
         fi
     done
-    if [ -d "$HOME/memento" ] && [ ! -d "$HOME/almanac" ]; then
-        echo "$HOME/memento"
-    else
-        echo "$HOME/almanac"
-    fi
+    echo "$HOME/almanac"
 }
 
 VAULT="$(resolve_vault)"
@@ -46,7 +40,7 @@ cd "$VAULT"
 if [ ! -d .git ]; then
     git init
     git add -A
-    git commit -m "init: bootstrap memento vault"
+    git commit -m "init: bootstrap almanac vault"
     exit 0
 fi
 
@@ -56,7 +50,7 @@ record_deleted_note_tombstones() {
     fi
 
     local deleted_file
-    deleted_file="$(mktemp "${TMPDIR:-/tmp}/memento-deleted-notes.XXXXXX")"
+    deleted_file="$(mktemp "${TMPDIR:-/tmp}/almanac-deleted-notes.XXXXXX")"
     git diff --name-only -z --diff-filter=D HEAD -- 'notes/*.md' > "$deleted_file"
     if [ ! -s "$deleted_file" ]; then
         rm -f "$deleted_file"
@@ -74,14 +68,7 @@ from pathlib import Path
 paths_file = Path(sys.argv[1])
 vault = Path.cwd()
 raw_paths = [p for p in paths_file.read_bytes().split(b"\0") if p]
-legacy_metadata = vault / ".memento"
-current_metadata = vault / ".almanac"
-if legacy_metadata.exists() and not current_metadata.exists():
-    metadata_dir = legacy_metadata
-elif vault == Path.home() / "memento" and not current_metadata.exists():
-    metadata_dir = legacy_metadata
-else:
-    metadata_dir = current_metadata
+metadata_dir = vault / ".almanac"
 tombstone_path = metadata_dir / "tombstones.jsonl"
 latest_by_path = {}
 if tombstone_path.exists():

@@ -1,6 +1,6 @@
 """Tests for the reversible note archive sweep (MEM-152).
 
-Covers memento.archive.archive_note/restore_note (the reusable move+tombstone
+Covers almanac.archive.archive_note/restore_note (the reusable move+tombstone
 primitives) and sweep_archive_candidates (the criteria matrix, gating knobs,
 and reporting shape). test_archive_portable.py covers the pre-existing
 portable export/import machinery these primitives build on -- this file only
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from memento.archive import (
+from almanac.archive import (
     ARCHIVE_SWEEP_CERTAINTY_CEILING,
     ArchiveError,
     archive_note,

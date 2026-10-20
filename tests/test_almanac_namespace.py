@@ -1,27 +1,17 @@
-"""The new import path must preserve the legacy module's shared state."""
+"""Public Almanac entry points and naming."""
 
-import importlib
-import os
 import subprocess
 import sys
 
-
-def test_almanac_and_memento_import_the_same_modules():
-    import almanac
-    import memento
-
-    assert almanac.__version__ == memento.__version__
-    for name in ("config", "embedding", "adapters.claude", "adapters.opencode"):
-        assert importlib.import_module(f"almanac.{name}") is importlib.import_module(f"memento.{name}")
+from almanac.mcp_inventory import registered_tool_names
 
 
-def test_both_module_entry_points_remain_available():
-    for module in ("almanac", "memento"):
-        result = subprocess.run([sys.executable, "-m", module, "--help"], text=True, capture_output=True, check=True)
-        assert f"Usage: python -m {module}" in result.stdout
+def test_almanac_module_entry_point():
+    result = subprocess.run([sys.executable, "-m", "almanac", "--help"], text=True, capture_output=True, check=True)
+    assert "Usage: python -m almanac" in result.stdout
 
 
-def test_almanac_module_dispatches_existing_cli_tools():
+def test_almanac_module_dispatches_cli_tools():
     result = subprocess.run(
         [sys.executable, "-m", "almanac", "tools", "--markdown"],
         text=True,
@@ -31,17 +21,17 @@ def test_almanac_module_dispatches_existing_cli_tools():
     assert "<!-- almanac-mcp-tools:start -->" in result.stdout
 
 
-def test_mcp_tool_names_default_to_almanac_and_legacy_mode_adds_aliases():
-    script = "from almanac.mcp_server import mcp; print(' '.join(sorted(mcp._tool_manager._tools)))"
-    clean_env = {**os.environ, "ALMANAC_LEGACY_MCP_TOOLS": "0"}
-    default = subprocess.run([sys.executable, "-c", script], env=clean_env, text=True, capture_output=True, check=True)
-    names = set(default.stdout.split())
+def test_mcp_tools_use_almanac_names():
+    names = registered_tool_names()
     assert len(names) == 20
     assert all(name.startswith("almanac_") for name in names)
 
-    clean_env["ALMANAC_LEGACY_MCP_TOOLS"] = "1"
-    legacy = subprocess.run([sys.executable, "-c", script], env=clean_env, text=True, capture_output=True, check=True)
-    legacy_names = set(legacy.stdout.split())
-    assert len(legacy_names) == 40
-    assert names <= legacy_names
-    assert {name.replace("almanac_", "memento_", 1) for name in names} <= legacy_names
+
+def test_legacy_environment_variables_do_not_configure_almanac(monkeypatch):
+    from almanac.env import get_env
+
+    monkeypatch.delenv("ALMANAC_VAULT_PATH", raising=False)
+    monkeypatch.setenv("MEMENTO_VAULT_PATH", "/legacy/vault")
+    assert get_env("VAULT_PATH", "/default/vault") == "/default/vault"
+    monkeypatch.setenv("ALMANAC_VAULT_PATH", "/almanac/vault")
+    assert get_env("VAULT_PATH") == "/almanac/vault"

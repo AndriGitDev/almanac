@@ -19,7 +19,7 @@ from almanac.utils import sanitize_secrets
 _SENSITIVE_NAME_RE = re.compile(
     r"(?i)(?:^|[._-])(?:env|secret|token|key|credential|passwd|password|pem|p12|pfx)(?:$|[._-])"
 )
-_METADATA_DIRS = {".almanac", ".memento"}
+_METADATA_DIRS = {".almanac"}
 _MANIFEST_NAME = "manifest.json"
 _INDEX_NAME = "index.md"
 

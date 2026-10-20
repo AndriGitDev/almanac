@@ -43,9 +43,9 @@ gates:
   - name: ruff-format-check
     command: .venv/bin/python -m ruff format --check .
   - name: python-compileall
-    command: .venv/bin/python -m compileall -q almanac memento hooks scripts
+    command: .venv/bin/python -m compileall -q almanac hooks scripts
   - name: targeted-tests
-    command: .venv/bin/python -m pytest tests/test_llm_backends.py tests/test_lifecycle.py tests/test_triage.py tests/test_store.py tests/test_frontmatter_schema.py tests/test_script_harnesses.py tests/test_beislid_workflow_gates.py
+    command: .venv/bin/python -m pytest tests/test_llm_backends.py tests/test_lifecycle.py tests/test_triage.py tests/test_store.py tests/test_frontmatter_schema.py tests/test_script_harnesses.py
     timeout_ms: 600000
 agent:
   adapter: pi
@@ -86,14 +86,6 @@ model_routing:
     frontier:
       - adapter: pi
         model: openai-codex/gpt-5.5
-action_policy:
-  command: beislid
-  run_mode: unattended-auto
-  policy_file: .beislid/action-policy.json
-process_provider:
-  kind: beislid
-  required: true
-  artifact_path: .beislid/rondo-process-artifact.json
 ---
 
 You are working on Linear ticket `{{ issue.identifier }}` in the Almanac
@@ -121,12 +113,11 @@ Instructions:
    for progress; bring it up to date before new implementation work.
 4. Treat any ticket-authored Validation/Test Plan section as non-negotiable
    acceptance input; execute it before considering the work complete.
-5. Project conventions live in `.beislid/workflow.md` (gates, action policy,
-   ticket/PR conventions). Run the configured gates before any push.
+5. Project conventions and validation commands live in `AGENTS.md` and
+   `CONTRIBUTING.md`. Run the configured gates before any push.
 6. After gates pass, unattended handoff may push the non-default feature branch,
    create/update a draft PR, mark a green draft PR ready for review, and post
-   bounded review-trigger/handoff PR comments when permitted by
-   `.beislid/action-policy.json`; never merge automatically.
+   a handoff PR comment. Never merge automatically.
 7. Out-of-scope discoveries become new Linear issues in the same project,
    linked `related`, never scope expansion.
 8. Final response must be only a valid `rondo.final_report/v0` JSON object with required fields `schema`, `summary`, `changed_files`, `gates_run`, `failures`, `risks`, and `next_state`. Use `schema: "rondo.final_report/v0"`; do not use legacy keys such as `version`, `ticket`, `completed_actions`, or `blockers` instead of the required fields.

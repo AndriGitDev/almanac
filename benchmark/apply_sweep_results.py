@@ -4,7 +4,7 @@ Apply Optuna sweep results to the Tenet retrieval config.
 
 Reads the best config from a sweep results JSON and patches both:
 1. benchmark/longmemeval_adapter.py get_default_config()
-2. hooks/memento_utils.py DEFAULT_CONFIG
+2. hooks/almanac_utils.py DEFAULT_CONFIG
 
 Usage:
     python benchmark/apply_sweep_results.py sweep_results.json
@@ -23,14 +23,14 @@ ROOT = Path(__file__).parent.parent
 # Maps sweep param names → (file, config key, format)
 # format: "int", "float", "bool", "str"
 PARAM_MAP = {
-    # Params that exist in both adapter and memento_utils
+    # Params that exist in both adapter and almanac_utils
     "recall_high_confidence": ("both", "recall_high_confidence", "float"),
     "prf_enabled": ("both", "prf_enabled", "bool"),
     "prf_max_terms": ("both", "prf_max_terms", "int"),
     "prf_top_docs": ("both", "prf_top_docs", "int"),
     "reranker_top_k": ("both", "reranker_top_k", "int"),
     "reranker_min_score": ("both", "reranker_min_score", "float"),
-    # Params only in memento_utils
+    # Params only in almanac_utils
     "recall_min_score": ("utils", "recall_min_score", "float"),
     "rrf_k": ("utils", "rrf_k", "int"),
     "pagerank_boost_weight": ("utils", "pagerank_boost_weight", "float"),
@@ -42,7 +42,7 @@ PARAM_MAP = {
     "retrieval_limit": ("adapter", "retrieval_limit", "int"),
 }
 
-UTILS_PATH = ROOT / "hooks" / "memento_utils.py"
+UTILS_PATH = ROOT / "hooks" / "almanac_utils.py"
 ADAPTER_PATH = ROOT / "benchmark" / "longmemeval_adapter.py"
 
 
@@ -106,7 +106,7 @@ def apply_config(best_params, dry_run=False):
 
         if target in ("both", "utils"):
             ok, msg = patch_file(UTILS_PATH, config_key, value, fmt, dry_run)
-            changes.append(f"  {'[DRY] ' if dry_run else ''}memento_utils.py: {msg}")
+            changes.append(f"  {'[DRY] ' if dry_run else ''}almanac_utils.py: {msg}")
 
         if target in ("both", "adapter"):
             ok, msg = patch_file(ADAPTER_PATH, config_key, value, fmt, dry_run)

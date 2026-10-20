@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from memento_inception import (
+from almanac_inception import (
     load_active_backend_embeddings,
     load_embedded_vectors,
     load_embeddings,
@@ -88,7 +88,7 @@ class TestLoadEmbeddingsMeanPooling:
         doc_hash = "hash_test"
         conn.execute(
             "INSERT INTO documents (collection, path, title, hash, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
-            ("memento", "notes/pooling-test.md", "pooling-test", doc_hash, "2026-03-22", "2026-03-22"),
+            ("almanac", "notes/pooling-test.md", "pooling-test", doc_hash, "2026-03-22", "2026-03-22"),
         )
 
         chunk_0 = np.ones(768, dtype=np.float32) * 2.0
@@ -227,7 +227,7 @@ class TestQmdVectorDimDetection:
         doc_hash = "hash_custom"
         conn.execute(
             "INSERT INTO documents (collection, path, title, hash, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)",
-            ("memento", "notes/custom-dim-note.md", "custom-dim-note", doc_hash, "2026-03-22", "2026-03-22"),
+            ("almanac", "notes/custom-dim-note.md", "custom-dim-note", doc_hash, "2026-03-22", "2026-03-22"),
         )
         conn.execute(
             "INSERT INTO content_vectors (hash, seq, model, embedded_at) VALUES (?, ?, ?, ?)",
@@ -269,7 +269,7 @@ class TestLoadEmbeddedVectors:
     def _make_backend(self, tmp_path, dims=8, stems=("alpha-note", "beta-note")):
         if not _sqlite_vec_available():
             pytest.skip("sqlite-vec extension loading is unavailable")
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault = tmp_path / "vault"
         (vault / "notes").mkdir(parents=True)
@@ -300,7 +300,7 @@ class TestLoadEmbeddedVectors:
 
         db_path = vault / ".search" / "search.db"
         backend = EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=_FixedDimsProvider(dims))
-        backend.reindex("memento")
+        backend.reindex("almanac")
         return backend
 
     def test_load_embedded_vectors_uses_backend_dim(self, tmp_path):
@@ -334,13 +334,13 @@ class TestLoadEmbeddedVectors:
     def test_load_embedded_vectors_no_provider_returns_empty(self, tmp_path):
         """A backend with no embedding provider (FTS5-only) has no vectors
         to offer -- must return {} rather than error."""
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault = tmp_path / "vault"
         (vault / "notes").mkdir(parents=True)
         (vault / "notes" / "solo-note.md").write_text("---\ntitle: solo-note\n---\n\nBody.\n")
         backend = EmbeddedSearchBackend(vault_path=vault, db_path=vault / ".search" / "search.db")
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
         result = load_embedded_vectors(["solo-note"], backend)
         assert result == {}
@@ -369,7 +369,7 @@ class TestLoadActiveBackendEmbeddings:
         from it instead of silently finding nothing."""
         if not _sqlite_vec_available():
             pytest.skip("sqlite-vec extension loading is unavailable")
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault = tmp_vault
         (vault / "notes" / "alpha-note.md").write_text("---\ntitle: alpha-note\n---\n\nBody.\n")
@@ -390,10 +390,10 @@ class TestLoadActiveBackendEmbeddings:
         backend = EmbeddedSearchBackend(
             vault_path=vault, db_path=vault / ".search" / "search.db", embedding_provider=_Provider()
         )
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento_inception.get_backend", lambda: backend)
+            mp.setattr("almanac_inception.get_backend", lambda: backend)
             embeddings, source, reason = load_active_backend_embeddings(["alpha-note"], mock_config, db_path=None)
 
         assert source == "embedded"
@@ -407,7 +407,7 @@ class TestLoadActiveBackendEmbeddings:
         grep_like.is_available.return_value = True
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento_inception.get_backend", lambda: grep_like)
+            mp.setattr("almanac_inception.get_backend", lambda: grep_like)
             embeddings, source, reason = load_active_backend_embeddings(["alpha-note"], mock_config, db_path=None)
 
         assert embeddings == {}
@@ -421,13 +421,13 @@ class TestLoadActiveBackendEmbeddings:
         Path.home() is patched to an empty tmp dir so this never touches a
         real ~/.cache/qmd/index.sqlite on the machine running the tests.
         """
-        from memento.search_backend import QMDBackend
+        from almanac.search_backend import QMDBackend
 
         qmd_like = MagicMock(spec=QMDBackend)
         qmd_like.is_available.return_value = True
 
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr("memento_inception.get_backend", lambda: qmd_like)
+            mp.setattr("almanac_inception.get_backend", lambda: qmd_like)
             mp.setattr(Path, "home", lambda: tmp_path)
             embeddings, source, reason = load_active_backend_embeddings(["nonexistent-note"], mock_config, db_path=None)
 

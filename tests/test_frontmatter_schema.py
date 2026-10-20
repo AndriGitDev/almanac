@@ -6,7 +6,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-import memento.frontmatter as fm
+import almanac.frontmatter as fm
 
 
 def _load_checker():
@@ -27,9 +27,9 @@ def test_frontmatter_schema_docs_match_implemented_writers():
 
 def test_frontmatter_known_fields_matches_checker_schema():
     """MEM-166: the checker's MANAGED_FIELD_TYPES is the single source of truth
-    for field semantics; memento.frontmatter.KNOWN_FIELDS is a literal copy
+    for field semantics; almanac.frontmatter.KNOWN_FIELDS is a literal copy
     (not a live import -- scripts/ is a CLI entry point, not something
-    memento/ should import from at runtime) that this test locks against it
+    almanac/ should import from at runtime) that this test locks against it
     so the two tables cannot silently drift apart.
     """
     checker = _load_checker()

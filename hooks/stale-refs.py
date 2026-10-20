@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stale reference detector for memento vault notes.
+Stale reference detector for almanac vault notes.
 
 Scans notes for file path references and checks whether those files
 still exist in the referenced project directories. Annotates notes
@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent))
-from memento.config import get_vault
+from almanac.config import get_vault
 
 
 # Patterns that look like repo-relative file paths

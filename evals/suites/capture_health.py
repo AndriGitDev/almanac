@@ -1,6 +1,6 @@
 """Capture pipeline health: is the WRITE path working, and what does it cost?
 
-Reads the always-on triage-health telemetry (~/.config/memento-vault/
+Reads the always-on triage-health telemetry (~/.config/almanac/
 triage-health.jsonl) over a configurable window and grades failure rates,
 throughput, spend, and anomalies. Deterministic and read-only.
 """
@@ -251,8 +251,8 @@ def run(context) -> list[CheckResult]:
             value=len(recent_retrieval),
             unit="events",
             remediation="Injection value cannot be measured without retrieval telemetry; "
-            "set retrieval_log: true in memento.yml (or MEMENTO_DEBUG=1) and re-run "
-            "memento-vault retrieval-report after a few days.",
+            "set retrieval_log: true in almanac.yml (or ALMANAC_DEBUG=1) and re-run "
+            "almanac retrieval-report after a few days.",
         )
     )
 

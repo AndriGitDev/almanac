@@ -3,7 +3,7 @@
 One-shot top-k injection is the retrieval pipeline's ceiling: a single
 qmd_search + enhance_results pass either finds the right notes or it doesn't.
 This module upgrades that with a small ReAct-style loop driven through
-``memento.llm.llm_complete`` (any configured backend, including cheaper
+``almanac.llm.llm_complete`` (any configured backend, including cheaper
 routed models via the ``pi`` provider): the model calls search/query/related/
 get tools in-process, sees the observation, and repeats until it signals
 ``done`` with a list of note paths -- or a hard bound is hit.
@@ -13,7 +13,7 @@ protocol or provider failure (malformed JSON after one retry, timeout,
 provider error, tool-call cap exceeded, or empty results) it returns ``[]``
 so the caller falls back to the existing one-shot pipeline unchanged.
 
-Wired into memento.lifecycle.run_deferred_briefing_search, gated by the
+Wired into almanac.lifecycle.run_deferred_briefing_search, gated by the
 ``agentic_retrieval_enabled`` config flag (default False).
 """
 
@@ -80,7 +80,7 @@ def _truncate(text: str, limit: int = OBSERVATION_TRUNCATE_BYTES) -> str:
 def _extract_json_object(raw: str) -> dict[str, Any] | None:
     """Leniently extract a single JSON object from an LLM turn.
 
-    Mirrors memento.lifecycle._parse_deep_recall_response's lenient
+    Mirrors almanac.lifecycle._parse_deep_recall_response's lenient
     extraction (direct parse, then markdown code fence, then bare pattern) --
     small/cheap routed models are not always disciplined about staying
     inside the requested response shape.
@@ -216,9 +216,9 @@ def _tool_related(args: dict[str, Any]) -> dict[str, Any]:
 def _tool_get(args: dict[str, Any]) -> dict[str, Any]:
     """get: read the full content of one known note path/name.
 
-    Reimplements memento.mcp_server.memento_get's normalization/traversal-
+    Reimplements almanac.mcp_server.almanac_get's normalization/traversal-
     guard/fallback logic rather than importing it -- mcp_server imports
-    memento.lifecycle at module load, and lifecycle is what wires this
+    almanac.lifecycle at module load, and lifecycle is what wires this
     module in, so importing mcp_server here would be circular.
     """
     raw_path = str(args.get("path") or "").strip()

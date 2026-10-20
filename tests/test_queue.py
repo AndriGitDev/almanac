@@ -1,6 +1,6 @@
 """Tests for the fail-closed capture-queue lock (MEM-123).
 
-memento/queue.py owns the capture-queue flock (``queue_lock``). MEM-129
+almanac/queue.py owns the capture-queue flock (``queue_lock``). MEM-129
 moved this machinery here verbatim from pi_bridge.py, carrying along a
 fail-open bug: on failure to open or acquire the lock, it used to swallow
 the OSError and ``yield`` unlocked, letting a concurrent hook and sweeper
@@ -19,12 +19,12 @@ import threading
 
 import pytest
 
-from memento import queue as capture_queue
-from memento.queue import QueueLockUnavailable, queue_lock
+from almanac import queue as capture_queue
+from almanac.queue import QueueLockUnavailable, queue_lock
 
 
 def test_queue_lock_raises_when_lock_file_cannot_be_opened(tmp_path, monkeypatch):
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
     entered = {"value": False}
     original_open = os.open
 
@@ -43,7 +43,7 @@ def test_queue_lock_raises_when_lock_file_cannot_be_opened(tmp_path, monkeypatch
 
 
 def test_queue_lock_raises_when_flock_cannot_be_acquired(tmp_path, monkeypatch):
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
     entered = {"value": False}
     original_flock = fcntl.flock
 
@@ -63,7 +63,7 @@ def test_queue_lock_raises_when_flock_cannot_be_acquired(tmp_path, monkeypatch):
 
 def test_queue_lock_never_leaks_the_file_descriptor_when_flock_fails(tmp_path, monkeypatch):
     """A failed flock() must still close the fd opened just before it."""
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
     closed = {"count": 0}
     original_close = os.close
     original_flock = fcntl.flock
@@ -89,7 +89,7 @@ def test_queue_lock_never_leaks_the_file_descriptor_when_flock_fails(tmp_path, m
 
 def test_queue_lock_is_reentrant_within_the_same_thread(tmp_path, monkeypatch):
     """Nested queue_lock() calls in the same thread must not reopen/reflock."""
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
     open_calls = {"count": 0}
     original_open = os.open
 
@@ -116,7 +116,7 @@ def test_queue_lock_is_reentrant_within_the_same_thread(tmp_path, monkeypatch):
 
 
 def test_queue_lock_reentrant_body_failure_still_restores_depth(tmp_path, monkeypatch):
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
     with pytest.raises(RuntimeError):
         with queue_lock():
             with queue_lock():
@@ -126,7 +126,7 @@ def test_queue_lock_reentrant_body_failure_still_restores_depth(tmp_path, monkey
 
 def test_queue_lock_blocks_a_second_thread_until_the_first_releases(tmp_path, monkeypatch):
     """Real flock contention: the second acquirer blocks, it does not fail closed spuriously."""
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(tmp_path / "state"))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
     first_holds = threading.Event()
     release_first = threading.Event()
     second_acquired = threading.Event()

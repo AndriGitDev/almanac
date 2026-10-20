@@ -2,22 +2,22 @@
 # Legacy structural vault checker.
 #
 # Usage: bash vault-health-check.sh [path-to-vault]
-# Default: ~/memento
+# Default: ~/almanac
 #
 # This script is intentionally kept for low-level content checks that are not
-# covered by `memento-vault health` (frontmatter, wikilinks, file naming). Use
-# `memento-vault health` or `memento-vault doctor` for operational diagnostics.
+# covered by `almanac health` (frontmatter, wikilinks, file naming). Use
+# `almanac health` or `almanac doctor` for operational diagnostics.
 
 set -euo pipefail
 
-VAULT="${1:-$HOME/memento}"
+VAULT="${1:-$HOME/almanac}"
 ERRFILE=$(mktemp)
 echo 0 > "$ERRFILE"
 
 cat <<'EOF'
 Legacy structural vault check: kept for direct callers and low-level vault
 content validation. For operational/install diagnostics, use:
-  memento-vault health
+  almanac health
 EOF
 
 echo ""

@@ -9,8 +9,8 @@ store, index, search -- against a hermetic temp vault.
 
 Run as a subprocess by evals/suites/capture_retrieve_loop.py, exactly like
 evals/retrieval_probe.py is run by evals/suites/retrieval_accuracy.py: this
-script mutates the MEMENTO_VAULT_PATH env var, memento.config's process-wide
-config cache, and the memento.search_backend singleton, so it must never run
+script mutates the ALMANAC_VAULT_PATH env var, almanac.config's process-wide
+config cache, and the almanac.search_backend singleton, so it must never run
 inside the shared run_evals.py process (see retrieval_probe.py's module
 docstring for the same rationale, MEM-133).
 
@@ -20,11 +20,11 @@ Modes
     Blocking, non-LLM layer: three pre-authored structured note payloads
     (fixture shapes mirroring what triage extraction produces -- see
     evals.suites.capture_e2e._validate_notes) pushed through the REAL
-    smart_store/store MCP entry points (memento.mcp_server.memento_store /
-    memento_store_smart) into a fresh temp vault, then a real
+    smart_store/store MCP entry points (almanac.mcp_server.almanac_store /
+    almanac_store_smart) into a fresh temp vault, then a real
     EmbeddedSearchBackend (FTS5, no embedding provider, matching MEM-133's
     ranked-order probe) index build, then the real
-    memento.search.qmd_search() entry point. Each case asserts its golden
+    almanac.search.qmd_search() entry point. Each case asserts its golden
     natural-language query returns the stored note in the top 5. This is
     the blocking CI gate: `python3 evals/capture_retrieve_probe.py --mode
     fixture` (wrapped by `python3 evals/run_evals.py --suite
@@ -37,7 +37,7 @@ Modes
     without telling the search index about it. Proves this probe actually
     detects a broken handoff instead of always finding notes through
     EmbeddedSearchBackend's empty-index auto-heal (see
-    `_ensure_indexed()`'s `count == 0` branch in memento/embedded_search.py,
+    `_ensure_indexed()`'s `count == 0` branch in almanac/embedded_search.py,
     and the module docstring on `run_case()` below for why a seed note is
     required to make the demonstration real). Never used by the blocking
     gate.
@@ -51,7 +51,7 @@ Modes
     (`_validate_notes`), then pushes the insight transcript's first
     extracted note through the same store -> index -> search pipeline as
     `--mode fixture`. Skips cleanly (`{"skipped": true, "reason": ...}`)
-    when memento.llm.preflight_check() reports no configured LLM backend --
+    when almanac.llm.preflight_check() reports no configured LLM backend --
     never a subprocess timeout or a stack trace.
 """
 
@@ -149,13 +149,13 @@ def _make_temp_vault(root: Path) -> Path:
 
 
 def _activate_vault(vault: Path) -> None:
-    """Point memento.config at the temp vault and drop cached config/vault
+    """Point almanac.config at the temp vault and drop cached config/vault
     state, mirroring retrieval_probe.render_fixture_vault's isolation."""
-    from memento.config import reset_config
+    from almanac.config import reset_config
 
-    os.environ["MEMENTO_VAULT_PATH"] = str(vault)
-    os.environ["MEMENTO_SEARCH_BACKEND"] = "grep"
-    os.environ.pop("MEMENTO_DEBUG", None)
+    os.environ["ALMANAC_VAULT_PATH"] = str(vault)
+    os.environ["ALMANAC_SEARCH_BACKEND"] = "grep"
+    os.environ.pop("ALMANAC_DEBUG", None)
     reset_config()
 
 
@@ -164,7 +164,7 @@ def _fts5_backend(vault: Path, db_path: Path):
     vector table and no onnxruntime/sqlite-vec dependency at all -- same
     choice MEM-133 made for the ranked-order probe, for the same reason
     (determinism, no network/model dependency in a hermetic gate)."""
-    from memento.embedded_search import EmbeddedSearchBackend
+    from almanac.embedded_search import EmbeddedSearchBackend
 
     return EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=None)
 
@@ -184,7 +184,7 @@ def _seed_note(vault: Path) -> None:
     the target note produces a genuine miss -- exactly the class of bug
     (index not rebuilt after a capture) this suite exists to catch.
     """
-    from memento.store import write_note
+    from almanac.store import write_note
 
     write_note(
         vault,
@@ -201,12 +201,12 @@ def _store_note(payload: dict, entry_point: str) -> dict:
     """Push a note through a REAL public MCP store entry point -- not a
     lower-level helper -- so this suite exercises exactly what an agent's
     write path calls."""
-    from memento import mcp_server
+    from almanac import mcp_server
 
     if entry_point == "store":
-        return mcp_server.memento_store(**payload)
+        return mcp_server.almanac_store(**payload)
     if entry_point == "smart_store":
-        return mcp_server.memento_store_smart(**payload)
+        return mcp_server.almanac_store_smart(**payload)
     raise ValueError(f"unknown entry_point {entry_point!r}")
 
 
@@ -214,13 +214,13 @@ def run_case(case: dict, root: Path, *, skip_index_build: bool = False) -> dict:
     """Run one store -> index -> search case in its own temp vault.
 
     Stages, each using the real code path named:
-      1. store   -- memento.mcp_server.memento_store / memento_store_smart
-      2. index   -- memento.embedded_search.EmbeddedSearchBackend.reindex()
+      1. store   -- almanac.mcp_server.almanac_store / almanac_store_smart
+      2. index   -- almanac.embedded_search.EmbeddedSearchBackend.reindex()
                     (skipped when skip_index_build=True)
-      3. search  -- memento.search.qmd_search()
+      3. search  -- almanac.search.qmd_search()
     """
-    from memento import search, search_backend
-    from memento.search_backend import GrepBackend
+    from almanac import search, search_backend
+    from almanac.search_backend import GrepBackend
 
     vault = _make_temp_vault(root)
     _activate_vault(vault)
@@ -235,7 +235,7 @@ def run_case(case: dict, root: Path, *, skip_index_build: bool = False) -> dict:
     _seed_note(vault)
 
     embedded = _fts5_backend(vault, root / ".search" / "search.db")
-    embedded.reindex("memento")  # index build: seed note only, so far
+    embedded.reindex("almanac")  # index build: seed note only, so far
 
     store_result = _store_note(case["payload"], case["entry_point"])
     if store_result.get("error"):
@@ -253,7 +253,7 @@ def run_case(case: dict, root: Path, *, skip_index_build: bool = False) -> dict:
         }
 
     if not skip_index_build:
-        embedded.reindex("memento")  # index build: now includes the just-stored note
+        embedded.reindex("almanac")  # index build: now includes the just-stored note
 
     search_backend.set_backend(embedded)
     hits = search.qmd_search(case["query"], limit=5)
@@ -271,7 +271,7 @@ def run_case(case: dict, root: Path, *, skip_index_build: bool = False) -> dict:
 
 
 def run_fixture_mode(break_handoff: bool) -> list[dict]:
-    tmp = Path(tempfile.mkdtemp(prefix="memento-eval-capture-retrieve-"))
+    tmp = Path(tempfile.mkdtemp(prefix="almanac-eval-capture-retrieve-"))
     try:
         if break_handoff:
             return [run_case(BROKEN_HANDOFF_CASE, tmp / BROKEN_HANDOFF_CASE["id"], skip_index_build=True)]
@@ -286,21 +286,21 @@ LLM_QUERY = "why does the exporter deadlock during the nightly vacuum"
 
 
 def run_llm_mode(effective_now: str) -> dict:
-    from memento.llm import preflight_check
+    from almanac.llm import preflight_check
 
-    # Test-only override (mirrors MEMENTO_REGEN_GOLDEN / MEMENTO_EVAL_VECTOR_ADVISORY
+    # Test-only override (mirrors ALMANAC_REGEN_GOLDEN / ALMANAC_EVAL_VECTOR_ADVISORY
     # in retrieval_probe.py): forces preflight_check() to report an unconfigured
     # backend deterministically, regardless of what CLI binaries happen to be
     # installed on the host machine. Never set by the blocking gate or run_evals.py.
-    forced_backend = os.environ.get("MEMENTO_EVAL_FORCE_LLM_BACKEND")
+    forced_backend = os.environ.get("ALMANAC_EVAL_FORCE_LLM_BACKEND")
     preflight_config = {"llm_backend": forced_backend} if forced_backend else None
     ok, message = preflight_check(preflight_config)
     if not ok:
         return {"effective_now": effective_now, "skipped": True, "reason": message}
 
     from evals.suites.capture_e2e import TRANSCRIPTS, _load_triage, _validate_notes
-    from memento.adapters import render_transcript_text
-    from memento.llm import llm_complete
+    from almanac.adapters import render_transcript_text
+    from almanac.llm import llm_complete
 
     try:
         triage = _load_triage()
@@ -347,7 +347,7 @@ def run_llm_mode(effective_now: str) -> dict:
         return payload
 
     note = insight_notes[0]
-    root = Path(tempfile.mkdtemp(prefix="memento-eval-capture-retrieve-llm-"))
+    root = Path(tempfile.mkdtemp(prefix="almanac-eval-capture-retrieve-llm-"))
     try:
         case = {
             "id": "llm_insight_note",
@@ -379,7 +379,7 @@ def main():
     )
     parser.add_argument(
         "--now",
-        help="ISO-8601 UTC timestamp to freeze the eval clock (env fallback: MEMENTO_EVAL_NOW)",
+        help="ISO-8601 UTC timestamp to freeze the eval clock (env fallback: ALMANAC_EVAL_NOW)",
     )
     args = parser.parse_args()
 

@@ -86,4 +86,4 @@ The processor prompt receives deterministic existing-note deduplication context 
 
 ## Release smoke checklist
 
-Before cutting a pi bridge release, the interactive smoke checklist has moved to [docs/history/releasing.md](history/releasing.md#pi-bridge-release-smoke-checklist).
+Before cutting a pi bridge release, the interactive smoke checklist has moved to [Releasing Almanac](releasing.md#pi-bridge-release-smoke-checklist).

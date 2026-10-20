@@ -9,15 +9,15 @@ from pathlib import Path
 
 import pytest
 
-from memento.smart_store import _split_note_text, suggest_store_action, write_smart_store_note
-from memento.store import acquire_vault_write_lock, release_vault_write_lock, write_note
+from almanac.smart_store import _split_note_text, suggest_store_action, write_smart_store_note
+from almanac.store import acquire_vault_write_lock, release_vault_write_lock, write_note
 
 
 @pytest.fixture(autouse=True)
 def isolated_vault_write_lock(monkeypatch, tmp_path):
     """Point the vault write lock at a per-test file so tests never touch the real runtime dir."""
     lock_file = tmp_path / "locks" / "vault-write.lock"
-    monkeypatch.setattr("memento.store.VAULT_WRITE_LOCK_PATH", str(lock_file))
+    monkeypatch.setattr("almanac.store.VAULT_WRITE_LOCK_PATH", str(lock_file))
     return lock_file
 
 
@@ -30,16 +30,16 @@ def _seed_note(vault: Path, *, title: str, body: str, tags: list[str] | None = N
         tags=tags or ["sync"],
         certainty=4,
         source="mcp",
-        project="/home/vic/Projects/memento-vault",
+        project="/home/vic/Projects/almanac",
         branch="main",
     )
     return str(result.relative_to(vault))
 
 
 def test_exact_duplicate_is_reported_as_already_covered(tmp_vault, monkeypatch):
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
 
     existing_path = _seed_note(tmp_vault, title="Duplicate safe note", body="Same body.")
 
@@ -48,7 +48,7 @@ def test_exact_duplicate_is_reported_as_already_covered(tmp_vault, monkeypatch):
         body="Same body.",
         tags=["sync"],
         certainty=4,
-        project="/home/vic/Projects/memento-vault",
+        project="/home/vic/Projects/almanac",
         branch="main",
     )
 
@@ -58,9 +58,9 @@ def test_exact_duplicate_is_reported_as_already_covered(tmp_vault, monkeypatch):
 
 
 def test_near_duplicate_is_reported_as_candidate_update(tmp_vault, monkeypatch):
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
 
     existing_path = _seed_note(tmp_vault, title="Redis cache guidance", body="Use the shared cache for shard reads.")
 
@@ -69,7 +69,7 @@ def test_near_duplicate_is_reported_as_candidate_update(tmp_vault, monkeypatch):
         body="Use the shared cache for shard reads. Add the TTL defaults and rollout note.",
         tags=["sync"],
         certainty=4,
-        project="/home/vic/Projects/memento-vault",
+        project="/home/vic/Projects/almanac",
         branch="main",
     )
 
@@ -79,9 +79,9 @@ def test_near_duplicate_is_reported_as_candidate_update(tmp_vault, monkeypatch):
 
 
 def test_supersession_cue_is_reported(tmp_vault, monkeypatch):
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
 
     existing_path = _seed_note(tmp_vault, title="Redis cache guidance", body="Use the shared cache for all shards.")
 
@@ -90,7 +90,7 @@ def test_supersession_cue_is_reported(tmp_vault, monkeypatch):
         body="Replace the shared cache guidance: no longer use the shared cache; switch to shard-specific TTL.",
         tags=["sync"],
         certainty=4,
-        project="/home/vic/Projects/memento-vault",
+        project="/home/vic/Projects/almanac",
         branch="main",
     )
 
@@ -100,9 +100,9 @@ def test_supersession_cue_is_reported(tmp_vault, monkeypatch):
 
 
 def test_write_smart_store_note_creates_when_no_close_match(tmp_vault, monkeypatch):
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
 
     result = write_smart_store_note(
         title="Fresh note",
@@ -118,7 +118,7 @@ def test_write_smart_store_note_creates_when_no_close_match(tmp_vault, monkeypat
 
 def test_suggest_store_action_returns_merged_into_on_embed_match(tmp_vault, monkeypatch):
     """When find_merge_target finds a hit, suggest_store_action returns merged_into."""
-    from memento.store import write_note
+    from almanac.store import write_note
 
     # Seed a canonical note
     existing_path = write_note(
@@ -132,7 +132,7 @@ def test_suggest_store_action_returns_merged_into_on_embed_match(tmp_vault, monk
     )
     rel_path = str(existing_path.relative_to(tmp_vault))
 
-    from memento.dedup_merge import MergeTarget
+    from almanac.dedup_merge import MergeTarget
 
     mock_target = MergeTarget(
         path=rel_path,
@@ -141,10 +141,10 @@ def test_suggest_store_action_returns_merged_into_on_embed_match(tmp_vault, monk
         contract={"title": "Redis cache guidance", "tags": ["redis"], "certainty": 3},
     )
 
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
-    monkeypatch.setattr("memento.smart_store.find_merge_target", lambda *a, **kw: mock_target)
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+    monkeypatch.setattr("almanac.smart_store.find_merge_target", lambda *a, **kw: mock_target)
 
     # Note: merge_into_canonical is NOT mocked here because suggest_store_action
     # returns the merged_into decision directly without calling it.
@@ -161,7 +161,7 @@ def test_suggest_store_action_returns_merged_into_on_embed_match(tmp_vault, monk
 
 def test_write_smart_store_note_performs_merge_on_merged_into(tmp_vault, monkeypatch):
     """write_smart_store_note calls merge_into_canonical for merged_into decisions."""
-    from memento.store import write_note
+    from almanac.store import write_note
 
     existing_path = write_note(
         tmp_vault,
@@ -174,7 +174,7 @@ def test_write_smart_store_note_performs_merge_on_merged_into(tmp_vault, monkeyp
     )
     rel_path = str(existing_path.relative_to(tmp_vault))
 
-    from memento.dedup_merge import MergeTarget
+    from almanac.dedup_merge import MergeTarget
 
     mock_target = MergeTarget(
         path=rel_path,
@@ -183,12 +183,12 @@ def test_write_smart_store_note_performs_merge_on_merged_into(tmp_vault, monkeyp
         contract={"title": "Redis cache guidance", "tags": ["redis"], "certainty": 3},
     )
 
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
-    monkeypatch.setattr("memento.smart_store.find_merge_target", lambda *a, **kw: mock_target)
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+    monkeypatch.setattr("almanac.smart_store.find_merge_target", lambda *a, **kw: mock_target)
     monkeypatch.setattr(
-        "memento.smart_store.merge_into_canonical",
+        "almanac.smart_store.merge_into_canonical",
         lambda *a, **kw: {"canonical_path": rel_path, "merged": True, "reason": "ok"},
     )
 
@@ -207,40 +207,40 @@ def test_write_smart_store_note_performs_merge_on_merged_into(tmp_vault, monkeyp
 
 def test_write_smart_store_note_stores_project_slug_and_raw_path(tmp_vault, monkeypatch):
     """MEM-164: raw cwd paths become a stable slug; the raw path moves to project_path."""
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
 
     result = write_smart_store_note(
         title="Project scoped note",
         body="Slug normalization at the smart-store write path.",
         tags=["new"],
-        project="/home/vic/Projects/Memento-Vault",
+        project="/home/vic/Projects/Almanac",
     )
 
     assert result["created"] is True
     text = (tmp_vault / result["path"]).read_text()
-    assert "project: memento-vault\n" in text
-    assert "project_path: /home/vic/Projects/Memento-Vault\n" in text
+    assert "project: almanac\n" in text
+    assert "project_path: /home/vic/Projects/Almanac\n" in text
     # The project index is filed under the slug, not the path basename.
-    assert (tmp_vault / "projects" / "memento-vault.md").exists()
+    assert (tmp_vault / "projects" / "almanac.md").exists()
 
 
 def test_suggest_store_action_write_payload_carries_slug_and_project_path(tmp_vault, monkeypatch):
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
 
     result = suggest_store_action(
         title="Fresh scoped note",
         body="An entirely new idea.",
         tags=["new"],
-        project="/Users/vic/other-machine/memento-vault",
+        project="/Users/vic/other-machine/almanac",
     )
 
     assert result["decision"] == "created"
-    assert result["write"]["project"] == "memento-vault"
-    assert result["write"]["project_path"] == "/Users/vic/other-machine/memento-vault"
+    assert result["write"]["project"] == "almanac"
+    assert result["write"]["project_path"] == "/Users/vic/other-machine/almanac"
 
 
 class TestSplitNoteText:
@@ -283,9 +283,9 @@ class TestSplitNoteText:
 
     def test_exact_duplicate_detection_survives_body_dashes(self, tmp_vault, monkeypatch):
         """Dedup must compare the full body even when it contains '---' sections."""
-        monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-        monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-        monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+        monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+        monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
 
         body = "Setup section.\n\n---\n\nRollout section with the real detail."
         existing_path = _seed_note(tmp_vault, title="Dashed body note", body=body)
@@ -295,7 +295,7 @@ class TestSplitNoteText:
             body=body,
             tags=["sync"],
             certainty=4,
-            project="/home/vic/Projects/memento-vault",
+            project="/home/vic/Projects/almanac",
             branch="main",
         )
 
@@ -307,9 +307,9 @@ class TestWriteSmartStoreLock:
     """The dedup check plus write must be atomic under the vault write lock (audit M6)."""
 
     def _patch_vault(self, tmp_vault, monkeypatch):
-        monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-        monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-        monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
+        monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+        monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+        monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *args, **kwargs: {})
 
     def test_write_refused_while_another_process_holds_the_lock(
         self, tmp_vault, monkeypatch, isolated_vault_write_lock
@@ -317,7 +317,7 @@ class TestWriteSmartStoreLock:
         self._patch_vault(tmp_vault, monkeypatch)
         # Keep the test fast: the real acquire, just with a short timeout.
         monkeypatch.setattr(
-            "memento.smart_store.acquire_vault_write_lock",
+            "almanac.smart_store.acquire_vault_write_lock",
             lambda **kwargs: acquire_vault_write_lock(timeout=0.2, poll_interval=0.05),
             raising=False,
         )

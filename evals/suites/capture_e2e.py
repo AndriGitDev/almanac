@@ -4,7 +4,7 @@ write well-formed, durable notes?
 Two layers:
 
 1. Triage-gate checks (always run, no LLM): labeled session metadata through
-   the real is_substantial() from hooks/memento-triage.py. Guards against
+   the real is_substantial() from hooks/almanac-triage.py. Guards against
    threshold regressions that would flood or starve the vault.
 2. LLM extraction checks (only with --llm): fixture transcripts through the
    real structured-notes prompt and the configured LLM backend, with the
@@ -38,9 +38,9 @@ TRANSCRIPTS = EVALS_DIR / "golden" / "fixtures" / "transcripts"
 
 
 def _load_triage():
-    spec = importlib.util.spec_from_file_location("memento_triage_eval", str(REPO_ROOT / "hooks" / "memento-triage.py"))
+    spec = importlib.util.spec_from_file_location("almanac_triage_eval", str(REPO_ROOT / "hooks" / "almanac-triage.py"))
     module = importlib.util.module_from_spec(spec)
-    sys.modules["memento_triage_eval"] = module
+    sys.modules["almanac_triage_eval"] = module
     spec.loader.exec_module(module)
     return module
 
@@ -142,7 +142,7 @@ def run(context) -> list[CheckResult]:
                 title="Triage module imports",
                 status=FAIL,
                 details=[str(exc)[:300]],
-                remediation="hooks/memento-triage.py failed to import; capture is likely broken "
+                remediation="hooks/almanac-triage.py failed to import; capture is likely broken "
                 "everywhere, not just in the eval.",
             )
         ]
@@ -174,8 +174,8 @@ def run(context) -> list[CheckResult]:
             unit="rate",
             threshold="all labeled cases must classify correctly",
             details=failures or [f"{core_ok}/{core_total} cases correct"],
-            remediation="Thresholds in memento.yml (exchange_threshold, file_count_threshold) "
-            "or is_substantial() heuristics changed behavior; check hooks/memento-triage.py.",
+            remediation="Thresholds in almanac.yml (exchange_threshold, file_count_threshold) "
+            "or is_substantial() heuristics changed behavior; check hooks/almanac-triage.py.",
         )
     )
     results.append(
@@ -205,7 +205,7 @@ def run(context) -> list[CheckResult]:
         )
         return results
 
-    from memento.llm import llm_complete
+    from almanac.llm import llm_complete
 
     kinds = [("insight", "insight-session.jsonl"), ("status", "status-only-session.jsonl")]
     batch_ok = 0
@@ -213,7 +213,7 @@ def run(context) -> list[CheckResult]:
     for kind, filename in kinds:
         transcript_path = TRANSCRIPTS / filename
         try:
-            from memento.adapters import render_transcript_text
+            from almanac.adapters import render_transcript_text
 
             meta = triage.parse_transcript(str(transcript_path))
             transcript_text = render_transcript_text(str(transcript_path))
@@ -255,7 +255,7 @@ def run(context) -> list[CheckResult]:
             details=all_problems or ["both fixture transcripts extracted cleanly"],
             remediation="Failures name the exact rubric violation. Ephemeral language in the "
             "status fixture means the triage prompt does not distinguish durable knowledge "
-            "from run state; tighten the prompt in hooks/memento-triage.py.",
+            "from run state; tighten the prompt in hooks/almanac-triage.py.",
         )
     )
     return results

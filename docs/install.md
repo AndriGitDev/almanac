@@ -80,7 +80,7 @@ For agents that support MCP but not native hooks (Cursor, Windsurf, etc.):
 ```
 
 This installs the `almanac/` package, writes generic MCP server config, and registers the server with Claude Code and Codex when those CLIs are installed.
-The server runs over stdio via `python -m almanac`; older `python -m memento` registrations remain valid and expose legacy MCP tool aliases.
+The server runs over stdio via `python -m almanac` and exposes `almanac_*` MCP tools.
 The installer verifies the `mcp` Python package is available and installs it if needed.
 Claude Code gets Claude-specific skills and the concierge agent under `~/.claude`; Codex gets agent-agnostic skills under `~/.codex/skills`.
 

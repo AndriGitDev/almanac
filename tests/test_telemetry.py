@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from memento import telemetry
+from almanac import telemetry
 
 
 def test_parse_timestamp_utc_normalizes_naive_z_and_offsets():

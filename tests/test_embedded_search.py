@@ -5,9 +5,9 @@ import sqlite3
 
 import pytest
 
-from memento.config import reset_config
-from memento.embedded_search import normalize_fts5_score, normalize_vec_cosine_distance
-from memento.search_backend import SearchBackend, reset_backend
+from almanac.config import reset_config
+from almanac.embedded_search import normalize_fts5_score, normalize_vec_cosine_distance
+from almanac.search_backend import SearchBackend, reset_backend
 
 
 def _sqlite_vec_available() -> bool:
@@ -80,7 +80,7 @@ def _cleanup():
 @pytest.fixture
 def backend(embedded_vault):
     """Create an EmbeddedSearchBackend pointed at the test vault."""
-    from memento.embedded_search import EmbeddedSearchBackend
+    from almanac.embedded_search import EmbeddedSearchBackend
 
     vault, db_path = embedded_vault
     b = EmbeddedSearchBackend(vault_path=vault, db_path=db_path)
@@ -174,7 +174,7 @@ class TestEmbeddedSearchBackendSchema:
         assert backend.is_available()
 
     def test_creates_db_file(self, embedded_vault):
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault, db_path = embedded_vault
         assert not db_path.exists()
@@ -200,11 +200,11 @@ class TestEmbeddedSearchReindex:
     """Full reindex from markdown files."""
 
     def test_reindex_returns_true(self, backend):
-        assert backend.reindex("memento")
+        assert backend.reindex("almanac")
 
     def test_reindex_populates_notes(self, backend, embedded_vault):
         vault, db_path = embedded_vault
-        backend.reindex("memento")
+        backend.reindex("almanac")
         conn = sqlite3.connect(str(db_path))
         count = conn.execute("SELECT COUNT(*) FROM notes").fetchone()[0]
         conn.close()
@@ -213,8 +213,8 @@ class TestEmbeddedSearchReindex:
     def test_reindex_is_idempotent(self, backend, embedded_vault):
         """Running reindex twice doesn't duplicate notes."""
         vault, db_path = embedded_vault
-        backend.reindex("memento")
-        backend.reindex("memento")
+        backend.reindex("almanac")
+        backend.reindex("almanac")
         conn = sqlite3.connect(str(db_path))
         count = conn.execute("SELECT COUNT(*) FROM notes").fetchone()[0]
         conn.close()
@@ -222,14 +222,14 @@ class TestEmbeddedSearchReindex:
 
     def test_reindex_updates_changed_content(self, backend, embedded_vault):
         vault, db_path = embedded_vault
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
         # Modify a note
         note = vault / "notes" / "redis-cache-ttl.md"
         note.write_text(
             "---\ntitle: Redis cache requires explicit TTL\n---\n\nUpdated content about Redis TTL and expiration.\n"
         )
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
         conn = sqlite3.connect(str(db_path))
         row = conn.execute("SELECT content FROM notes WHERE path = ?", ("notes/redis-cache-ttl.md",)).fetchone()
@@ -241,15 +241,15 @@ class TestEmbeddedSearchFTS5:
     """FTS5 BM25 search."""
 
     def test_search_finds_matching_notes(self, backend):
-        backend.reindex("memento")
-        results = backend.search("Redis cache TTL", "memento")
+        backend.reindex("almanac")
+        results = backend.search("Redis cache TTL", "almanac")
         assert len(results) > 0
         paths = [r["path"] for r in results]
         assert "notes/redis-cache-ttl.md" in paths
 
     def test_search_returns_correct_shape(self, backend):
-        backend.reindex("memento")
-        results = backend.search("Redis", "memento")
+        backend.reindex("almanac")
+        results = backend.search("Redis", "almanac")
         assert len(results) > 0
         r = results[0]
         assert "path" in r
@@ -258,8 +258,8 @@ class TestEmbeddedSearchFTS5:
         assert "snippet" in r
 
     def test_search_tags_backend_embedded_fts(self, backend):
-        backend.reindex("memento")
-        results = backend.search("Redis cache TTL", "memento")
+        backend.reindex("almanac")
+        results = backend.search("Redis cache TTL", "almanac")
         assert results
         assert all(r["backend"] == "embedded-fts" for r in results)
 
@@ -268,45 +268,45 @@ class TestEmbeddedSearchFTS5:
         -batch result to score exactly 1.0 regardless of true relevance. A
         query matched only by common terms (present in most notes, so BM25
         IDF collapses toward zero) must not read as a perfect match."""
-        backend.reindex("memento")
-        results = backend.search("cache", "memento")
+        backend.reindex("almanac")
+        results = backend.search("cache", "almanac")
         assert results
         assert all(0.0 <= r["score"] <= 1.0 for r in results)
         assert results[0]["score"] < 1.0
 
     def test_search_respects_limit(self, backend):
-        backend.reindex("memento")
-        results = backend.search("Redis", "memento", limit=1)
+        backend.reindex("almanac")
+        results = backend.search("Redis", "almanac", limit=1)
         assert len(results) <= 1
 
     def test_search_empty_query_returns_empty(self, backend):
-        backend.reindex("memento")
-        assert backend.search("", "memento") == []
+        backend.reindex("almanac")
+        assert backend.search("", "almanac") == []
 
     def test_search_no_matches_returns_empty(self, backend):
-        backend.reindex("memento")
-        results = backend.search("xylophone quantum dinosaur", "memento")
+        backend.reindex("almanac")
+        results = backend.search("xylophone quantum dinosaur", "almanac")
         assert results == []
 
     def test_search_min_score_filters(self, backend):
-        backend.reindex("memento")
+        backend.reindex("almanac")
         # With min_score=0, should get results; with very high min_score, none
-        all_results = backend.search("Redis", "memento", min_score=0.0)
+        all_results = backend.search("Redis", "almanac", min_score=0.0)
         assert len(all_results) > 0
-        high_bar = backend.search("Redis", "memento", min_score=999.0)
+        high_bar = backend.search("Redis", "almanac", min_score=999.0)
         assert len(high_bar) == 0
 
     def test_search_finds_across_dirs(self, backend):
         """FTS5 should index notes/, fleeting/, and projects/."""
-        backend.reindex("memento")
-        results = backend.search("session Redis caching", "memento")
+        backend.reindex("almanac")
+        results = backend.search("session Redis caching", "almanac")
         paths = [r["path"] for r in results]
         # Should find the fleeting note too
         assert any("fleeting/" in p for p in paths)
 
     def test_search_ranks_relevant_higher(self, backend):
-        backend.reindex("memento")
-        results = backend.search("Redis cache TTL stale reads", "memento")
+        backend.reindex("almanac")
+        results = backend.search("Redis cache TTL stale reads", "almanac")
         assert len(results) >= 2
         # The note specifically about TTL should rank higher than general caching
         assert results[0]["path"] == "notes/redis-cache-ttl.md"
@@ -314,14 +314,14 @@ class TestEmbeddedSearchFTS5:
     def test_concrete_search_ranks_exact_identifier_first(self, backend, embedded_vault):
         vault, _ = embedded_vault
         (vault / "notes" / "aa-substring-env-var.md").write_text(
-            "---\ntitle: Configure suffix env var\n---\n\nSet MY_MEMENTO_VAULT_PATH_SUFFIX before launching the hook.\n"
+            "---\ntitle: Configure suffix env var\n---\n\nSet MY_ALMANAC_VAULT_PATH_SUFFIX before launching the hook.\n"
         )
         (vault / "notes" / "zz-exact-env-var.md").write_text(
-            "---\ntitle: Configure exact env var\n---\n\nSet MEMENTO_VAULT_PATH before launching the hook.\n"
+            "---\ntitle: Configure exact env var\n---\n\nSet ALMANAC_VAULT_PATH before launching the hook.\n"
         )
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
-        results = backend.search("MEMENTO_VAULT_PATH", "memento", concrete=True)
+        results = backend.search("ALMANAC_VAULT_PATH", "almanac", concrete=True)
 
         assert results
         assert results[0]["path"] == "notes/zz-exact-env-var.md"
@@ -331,9 +331,9 @@ class TestEmbeddedSearchFTS5:
         (vault / "notes" / "path-note.md").write_text(
             "---\ntitle: Auth middleware path\n---\n\nThe file lives at src/server/authMiddleware.ts.\n"
         )
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
-        results = backend.search("src/server/authMiddleware.ts", "memento", concrete=True)
+        results = backend.search("src/server/authMiddleware.ts", "almanac", concrete=True)
 
         assert any(r["path"] == "notes/path-note.md" for r in results)
 
@@ -343,9 +343,9 @@ class TestEmbeddedSearchFTS5:
         (vault / "notes" / "uuid-note.md").write_text(
             f"---\ntitle: Literal UUID\n---\n\nTrace id {uuid} identifies the failed sync.\n"
         )
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
-        results = backend.search(uuid, "memento", concrete=True)
+        results = backend.search(uuid, "almanac", concrete=True)
 
         assert results[0]["path"] == "notes/uuid-note.md"
 
@@ -354,9 +354,9 @@ class TestEmbeddedSearchFTS5:
         (vault / "notes" / "phrase-note.md").write_text(
             "---\ntitle: Literal phrase\n---\n\nRemember the exact words blue comet protocol for rollout.\n"
         )
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
-        results = backend.search('find "blue comet protocol"', "memento", concrete=True)
+        results = backend.search('find "blue comet protocol"', "almanac", concrete=True)
 
         assert results[0]["path"] == "notes/phrase-note.md"
 
@@ -365,7 +365,7 @@ class TestEmbeddedSearchGet:
     """Get single note by path."""
 
     def test_get_existing_note(self, backend):
-        backend.reindex("memento")
+        backend.reindex("almanac")
         result = backend.get("notes/redis-cache-ttl.md")
         assert result is not None
         assert result["title"] == "Redis cache requires explicit TTL"
@@ -373,16 +373,16 @@ class TestEmbeddedSearchGet:
         assert result["score"] == 0.0
 
     def test_get_missing_note_returns_none(self, backend):
-        backend.reindex("memento")
+        backend.reindex("almanac")
         assert backend.get("notes/nonexistent.md") is None
 
     def test_get_returns_full_content(self, backend):
-        backend.reindex("memento")
+        backend.reindex("almanac")
         result = backend.get("notes/redis-cache-ttl.md")
         assert "TTL" in result["content"]
 
     def test_get_rejects_path_traversal(self, backend):
-        backend.reindex("memento")
+        backend.reindex("almanac")
         assert backend.get("../../../etc/passwd") is None
 
 
@@ -398,14 +398,14 @@ class TestEmbeddedSearchIndexNote:
         )
         backend.index_note("notes/new-discovery.md")
 
-        results = backend.search("PostgreSQL JSONB", "memento")
+        results = backend.search("PostgreSQL JSONB", "almanac")
         assert len(results) > 0
         assert results[0]["path"] == "notes/new-discovery.md"
 
     def test_write_note_retrievable_without_manual_reindex(self, backend, embedded_vault):
         """Write via write_note → retrievable via backend.search() without
         calling reindex() manually. Acceptance criterion #3."""
-        from memento.store import write_note, _reset_debouncer
+        from almanac.store import write_note, _reset_debouncer
 
         # Reset the process-global debouncer so this write starts from a clean
         # counter and no timer from a prior test lingers.
@@ -419,13 +419,13 @@ class TestEmbeddedSearchIndexNote:
             tags=["linguistics", "regulatory"],
         )
         # Search for a unique term from the body
-        results = backend.search("FTC rulemaking TTS", "memento", limit=5)
+        results = backend.search("FTC rulemaking TTS", "almanac", limit=5)
         assert len(results) >= 1
         assert any("semantic" in r["path"] or "ftc" in r["path"] for r in results)
 
     def test_index_note_updates_existing(self, backend, embedded_vault):
         vault, _ = embedded_vault
-        backend.reindex("memento")
+        backend.reindex("almanac")
 
         # Update note content
         note = vault / "notes" / "redis-cache-ttl.md"
@@ -434,7 +434,7 @@ class TestEmbeddedSearchIndexNote:
         )
         backend.index_note("notes/redis-cache-ttl.md")
 
-        results = backend.search("memcached", "memento")
+        results = backend.search("memcached", "almanac")
         assert any(r["path"] == "notes/redis-cache-ttl.md" for r in results)
 
 
@@ -477,7 +477,7 @@ class MockEmbeddingProvider:
 @pytest.fixture
 def vec_backend(embedded_vault):
     """EmbeddedSearchBackend with mock embedding provider for vector tests."""
-    from memento.embedded_search import EmbeddedSearchBackend
+    from almanac.embedded_search import EmbeddedSearchBackend
 
     if not _sqlite_vec_available():
         pytest.skip("sqlite-vec extension loading is unavailable")
@@ -485,7 +485,7 @@ def vec_backend(embedded_vault):
     vault, db_path = embedded_vault
     provider = MockEmbeddingProvider()
     b = EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=provider)
-    b.reindex("memento")
+    b.reindex("almanac")
     return b
 
 
@@ -500,11 +500,11 @@ class TestVectorSearch:
         assert "notes_vec" in tables
 
     def test_semantic_search_returns_results(self, vec_backend):
-        results = vec_backend.search("Redis cache", "memento", semantic=True)
+        results = vec_backend.search("Redis cache", "almanac", semantic=True)
         assert len(results) > 0
 
     def test_semantic_search_returns_correct_shape(self, vec_backend):
-        results = vec_backend.search("Redis", "memento", semantic=True)
+        results = vec_backend.search("Redis", "almanac", semantic=True)
         assert len(results) > 0
         r = results[0]
         assert "path" in r
@@ -513,7 +513,7 @@ class TestVectorSearch:
         assert "snippet" in r
 
     def test_semantic_search_tags_backend_embedded_vec(self, vec_backend):
-        results = vec_backend.search("Redis", "memento", semantic=True)
+        results = vec_backend.search("Redis", "almanac", semantic=True)
         assert results
         assert all(r["backend"] == "embedded-vec" for r in results)
 
@@ -528,11 +528,11 @@ class TestVectorSearch:
         assert "cosine" in schema.lower()
 
     def test_semantic_respects_limit(self, vec_backend):
-        results = vec_backend.search("Redis", "memento", semantic=True, limit=1)
+        results = vec_backend.search("Redis", "almanac", semantic=True, limit=1)
         assert len(results) <= 1
 
     def test_semantic_empty_query(self, vec_backend):
-        assert vec_backend.search("", "memento", semantic=True) == []
+        assert vec_backend.search("", "almanac", semantic=True) == []
 
     def test_index_note_embeds_vector(self, vec_backend, embedded_vault):
         """index_note() should insert vector alongside FTS5."""
@@ -541,7 +541,7 @@ class TestVectorSearch:
         new_note.write_text("---\ntitle: Vector test note\n---\n\nPostgreSQL vector search.\n")
         vec_backend.index_note("notes/vector-test.md")
 
-        results = vec_backend.search("PostgreSQL vector", "memento", semantic=True)
+        results = vec_backend.search("PostgreSQL vector", "almanac", semantic=True)
         assert any(r["path"] == "notes/vector-test.md" for r in results)
 
     def test_reindex_embeds_all_notes(self, vec_backend):
@@ -562,15 +562,15 @@ class TestVectorSearch:
     def test_embedding_dimension_change_rebuilds_vector_index(self, embedded_vault):
         if not _sqlite_vec_available():
             pytest.skip("sqlite-vec extension loading is unavailable")
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault, db_path = embedded_vault
         first = EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=MockEmbeddingProvider(8))
-        first.reindex("memento")
+        first.reindex("almanac")
         first.close()
 
         second = EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=MockEmbeddingProvider(4))
-        results = second.search("Redis cache", "memento", semantic=True)
+        results = second.search("Redis cache", "almanac", semantic=True)
 
         assert results
         conn = second._get_conn()
@@ -593,7 +593,7 @@ class TestVectorSearch:
         conn = first._get_conn()
         raw = conn.execute("SELECT value FROM index_metadata WHERE key = ?", ("embedding_signature",)).fetchone()[0]
         legacy = json.loads(raw)
-        legacy["provider_class"] = legacy["provider_class"].replace("almanac.embedding.", "memento.embedding.", 1)
+        legacy["provider_class"] = legacy["provider_class"].replace("almanac.embedding.", "almanac.embedding.", 1)
         conn.execute(
             "UPDATE index_metadata SET value = ? WHERE key = ?",
             (json.dumps(legacy, sort_keys=True, separators=(",", ":")), "embedding_signature"),
@@ -618,11 +618,11 @@ class TestVectorSearch:
         path (see _init_vec) rather than a bespoke migration."""
         if not _sqlite_vec_available():
             pytest.skip("sqlite-vec extension loading is unavailable")
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault, db_path = embedded_vault
         first = EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=MockEmbeddingProvider(8))
-        first.reindex("memento")
+        first.reindex("almanac")
         # Simulate a pre-MEM-127 signature: strip the new "distance_metric"
         # key so it looks like an index built by the old code.
         conn = first._get_conn()
@@ -637,7 +637,7 @@ class TestVectorSearch:
         first.close()
 
         second = EmbeddedSearchBackend(vault_path=vault, db_path=db_path, embedding_provider=MockEmbeddingProvider(8))
-        results = second.search("Redis cache", "memento", semantic=True)
+        results = second.search("Redis cache", "almanac", semantic=True)
 
         assert results
         conn = second._get_conn()
@@ -649,13 +649,13 @@ class TestVectorSearch:
 
 class TestEmbeddedSearchSelfHealing:
     def test_search_repairs_corrupt_fts_index_after_first_search(self, backend):
-        backend.reindex("memento")
-        assert backend.search("Redis cache", "memento")
+        backend.reindex("almanac")
+        assert backend.search("Redis cache", "almanac")
         conn = backend._get_conn()
         conn.execute("DROP TABLE notes_fts")
         conn.commit()
 
-        results = backend.search("Redis cache", "memento")
+        results = backend.search("Redis cache", "almanac")
 
         assert results
         repaired_conn = backend._get_conn()
@@ -663,13 +663,13 @@ class TestEmbeddedSearchSelfHealing:
         assert "notes_fts" in tables
 
     def test_startup_repairs_non_sqlite_index_file(self, embedded_vault):
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         vault, db_path = embedded_vault
         db_path.write_bytes(b"not a sqlite database")
 
         backend = EmbeddedSearchBackend(vault_path=vault, db_path=db_path)
-        results = backend.search("Redis cache", "memento")
+        results = backend.search("Redis cache", "almanac")
 
         assert results
 
@@ -679,14 +679,14 @@ class TestFallbackWithoutVec:
 
     def test_fts5_still_works_without_provider(self, backend):
         """Backend without embedding provider still does FTS5 search."""
-        backend.reindex("memento")
-        results = backend.search("Redis cache", "memento")
+        backend.reindex("almanac")
+        results = backend.search("Redis cache", "almanac")
         assert len(results) > 0
 
     def test_semantic_falls_back_to_fts5(self, backend):
         """semantic=True without vectors should fall back to FTS5."""
-        backend.reindex("memento")
-        results = backend.search("Redis cache", "memento", semantic=True)
+        backend.reindex("almanac")
+        results = backend.search("Redis cache", "almanac", semantic=True)
         # Should return FTS5 results, not empty
         assert len(results) > 0
 
@@ -696,14 +696,14 @@ class TestRRFFusion:
 
     def test_hybrid_returns_results(self, vec_backend):
         """Default search should use hybrid when vectors are available."""
-        results = vec_backend.search("Redis cache TTL", "memento")
+        results = vec_backend.search("Redis cache TTL", "almanac")
         assert len(results) > 0
 
     def test_hybrid_combines_both_sources(self, vec_backend):
         """Hybrid should potentially find more results than either source alone."""
         fts_results = vec_backend._fts5_search("Redis", 10, 0.0)
         vec_results = vec_backend._vec_search("Redis", 10, 0.0)
-        hybrid_results = vec_backend.search("Redis", "memento", limit=10)
+        hybrid_results = vec_backend.search("Redis", "almanac", limit=10)
         # Hybrid should find at least as many unique paths as either source
         fts_paths = {r["path"] for r in fts_results}
         vec_paths = {r["path"] for r in vec_results}
@@ -711,7 +711,7 @@ class TestRRFFusion:
         assert hybrid_paths >= (fts_paths & vec_paths)  # at least the intersection
 
     def test_hybrid_scores_normalized(self, vec_backend):
-        results = vec_backend.search("Redis cache", "memento")
+        results = vec_backend.search("Redis cache", "almanac")
         for r in results:
             assert 0.0 <= r["score"] <= 1.0
 
@@ -722,13 +722,13 @@ class TestMCPEndToEnd:
     @pytest.fixture(autouse=True)
     def _setup_embedded_pipeline(self, embedded_vault, monkeypatch):
         """Wire up the full pipeline: config → backend → search.py."""
-        from memento import config
-        from memento.embedded_search import EmbeddedSearchBackend
-        from memento.search_backend import set_backend
+        from almanac import config
+        from almanac.embedded_search import EmbeddedSearchBackend
+        from almanac.search_backend import set_backend
 
         vault, db_path = embedded_vault
         b = EmbeddedSearchBackend(vault_path=vault, db_path=db_path)
-        b.reindex("memento")
+        b.reindex("almanac")
         set_backend(b)
 
         # Patch config._CONFIG directly so all importers see it
@@ -737,7 +737,7 @@ class TestMCPEndToEnd:
             "_CONFIG",
             {
                 "vault_path": str(vault),
-                "qmd_collection": "memento",
+                "qmd_collection": "almanac",
                 "extra_qmd_collections": [],
                 "search_backend": "embedded",
                 "search_db_path": str(db_path),
@@ -754,10 +754,10 @@ class TestMCPEndToEnd:
         )
 
     def test_mcp_search_uses_embedded_backend(self):
-        """Prove the full path: memento_search → qmd_search_with_extras → EmbeddedSearchBackend."""
-        from memento.embedded_search import EmbeddedSearchBackend
-        from memento.search import qmd_search_with_extras
-        from memento.search_backend import get_backend
+        """Prove the full path: almanac_search → qmd_search_with_extras → EmbeddedSearchBackend."""
+        from almanac.embedded_search import EmbeddedSearchBackend
+        from almanac.search import qmd_search_with_extras
+        from almanac.search_backend import get_backend
 
         results = qmd_search_with_extras("Redis cache TTL", limit=5)
         assert len(results) >= 1
@@ -766,7 +766,7 @@ class TestMCPEndToEnd:
 
     def test_mcp_search_returns_correct_fields(self):
         """MCP output shape: path, title, score, snippet."""
-        from memento.search import qmd_search_with_extras
+        from almanac.search import qmd_search_with_extras
 
         results = qmd_search_with_extras("Zustand testing", limit=3)
         assert len(results) >= 1
@@ -779,7 +779,7 @@ class TestMCPEndToEnd:
 
     def test_mcp_search_no_results_for_unrelated(self):
         """Search for something not in any note."""
-        from memento.search import qmd_search_with_extras
+        from almanac.search import qmd_search_with_extras
 
         results = qmd_search_with_extras("quantum xylophone dinosaur", limit=5)
         assert results == []

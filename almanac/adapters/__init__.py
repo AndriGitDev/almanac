@@ -44,7 +44,7 @@ def detect_agent(transcript_path):
     """Detect which agent produced a transcript file.
 
     Detection order:
-    1. MEMENTO_AGENT env var (explicit override)
+    1. ALMANAC_AGENT env var (explicit override)
     2. Sniff the file: SQLite header → OpenCode; JSONL first records → Pi/Claude
 
     Returns one of: "claude", "opencode", "pi", "codex", "cursor", "windsurf", "unknown"
@@ -197,7 +197,7 @@ def parse_transcript(transcript_path, agent=None, session_id=None):
             "Use almanac_capture with session_summary instead of transcript_path."
         )
     else:
-        raise ValueError(f"Unknown agent: {agent!r}. Set MEMENTO_AGENT env var or use a supported format.")
+        raise ValueError(f"Unknown agent: {agent!r}. Set ALMANAC_AGENT env var or use a supported format.")
 
     meta["agent"] = agent
     return meta

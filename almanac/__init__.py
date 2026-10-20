@@ -1,6 +1,3 @@
-"""Almanac — persistent knowledge capture for coding agents.
-
-The ``memento`` import remains for compatibility with existing installations.
-"""
+"""Almanac — persistent knowledge capture for coding agents."""
 
 __version__ = "5.1.2"

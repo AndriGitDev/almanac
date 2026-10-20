@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LongMemEval benchmark adapter for memento-vault.
+LongMemEval benchmark adapter for almanac.
 Runs the Tenet retrieval pipeline against the standard 500-question
 memory benchmark.
 
@@ -16,7 +16,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Add hooks to path for memento_utils imports
+# Add hooks to path for almanac_utils imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
 
@@ -207,7 +207,7 @@ def run_retrieval(question, config=None):
 
     # 4. Adaptive depth: PRF + re-search if low confidence
     if top_score < high_conf and config.get("prf_enabled", True):
-        from memento_utils import prf_expand_query as _prf
+        from almanac_utils import prf_expand_query as _prf
 
         expanded = _prf(query, config=config, initial_results=results)
         if expanded != query:
@@ -224,7 +224,7 @@ def run_retrieval(question, config=None):
     if config.get("ppr_enabled", True) or config.get("pagerank_boost_weight", 0) > 0:
         try:
             vault_path, _ = build_vault_notes(documents)
-            from memento_utils import (
+            from almanac_utils import (
                 apply_pagerank_boost,
                 apply_temporal_decay,
                 build_wikilink_graph,

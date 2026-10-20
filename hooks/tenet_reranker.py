@@ -15,7 +15,7 @@ import numpy as np
 MODEL_ID = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 MODEL_CACHE_DIR = os.path.join(
     os.environ.get("XDG_CACHE_HOME", os.path.join(str(Path.home()), ".cache")),
-    "memento-vault",
+    "almanac",
     "models",
     "minilm-l6-v2",
 )
@@ -144,7 +144,7 @@ def rerank(query, results, config=None):
     If deps missing or model unavailable, returns results unchanged.
     """
     if config is None:
-        from memento.config import get_config
+        from almanac.config import get_config
 
         config = get_config()
 

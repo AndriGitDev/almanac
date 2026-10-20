@@ -12,11 +12,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 CODEX_HOME_DIR="${CODEX_HOME:-$HOME/.codex}"
 CONFIG_DIR="$HOME/.config/almanac"
-if [ ! -f "$CONFIG_DIR/manifest.json" ] && [ -f "$HOME/.config/memento-vault/manifest.json" ]; then
-    CONFIG_DIR="$HOME/.config/memento-vault"
-fi
 HELPER="$SCRIPT_DIR/lib/install_helpers.py"
-VAULT_PATH="${ALMANAC_VAULT_PATH:-${MEMENTO_VAULT_PATH:-$HOME/almanac}}"
+VAULT_PATH="${ALMANAC_VAULT_PATH:-$HOME/almanac}"
 
 if [ -t 1 ]; then
     BOLD='\033[1m'
@@ -63,9 +60,6 @@ PY
     fi
 
     local config_file="$CONFIG_DIR/almanac.yml"
-    if [ ! -f "$config_file" ]; then
-        config_file="$CONFIG_DIR/memento.yml"
-    fi
     if [ -f "$config_file" ]; then
         local config_vault
         config_vault=$(awk -F: '/^vault_path:/ {sub(/^[[:space:]]+/, "", $2); print $2; exit}' "$config_file" 2>/dev/null || true)
@@ -82,36 +76,30 @@ load_vault_path
 # Remove Claude hooks installed by install.sh (stable + experimental).
 for file in \
     almanac-triage.py \
-    memento-triage.py \
     vault-commit.sh \
     almanac-sweeper.py \
-    memento-sweeper.py \
     wait-and-commit.py \
     _backfill_certainty.py \
     almanac-remote-sync.py \
-    memento-remote-sync.py \
     almanac_utils.py \
-    memento_utils.py \
     vault-briefing.py \
     vault-recall.py \
     vault-tool-context.py \
     almanac-inception.py \
-    memento-inception.py \
     tenet_reranker.py; do
     remove_file "$CLAUDE_DIR/hooks/$file"
 done
 
 # Remove the installed Python package copied under Claude hooks.
-remove_dir "$CLAUDE_DIR/hooks/memento"
 remove_dir "$CLAUDE_DIR/hooks/almanac"
 
 # Remove Claude skills installed by install.sh (stable + experimental).
-for skill in almanac almanac-defrag memento memento-defrag start-fresh continue-work inception orra-init; do
+for skill in almanac almanac-defrag start-fresh continue-work inception orra-init; do
     remove_dir "$CLAUDE_DIR/skills/$skill"
 done
 
 # Remove Codex/generic skills installed when Codex was present.
-for skill in almanac almanac-defrag memento memento-defrag start-fresh continue-work concierge inception; do
+for skill in almanac almanac-defrag start-fresh continue-work concierge inception; do
     remove_dir "$CODEX_HOME_DIR/skills/$skill"
 done
 
@@ -119,23 +107,10 @@ done
 remove_file "$CLAUDE_DIR/agents/concierge.md"
 
 # Remove installer-created remote environment file.
-remove_file "$CLAUDE_DIR/memento-remote.env"
 remove_file "$CLAUDE_DIR/almanac-remote.env"
 
 # Remove installer-created CLI symlink only when it points at this checkout.
-cli_dest="${MEMENTO_CLI_BIN_DIR:-$HOME/.local/bin}/memento-vault"
-if [ -L "$cli_dest" ]; then
-    cli_target=$(readlink "$cli_dest" || true)
-    if [ "$cli_target" = "$SCRIPT_DIR/bin/memento-vault" ]; then
-        remove_file "$cli_dest"
-    else
-        warn "Leaving CLI symlink at $cli_dest (points to $cli_target)"
-    fi
-elif [ -e "$cli_dest" ]; then
-    warn "Leaving CLI at $cli_dest (not an installer-created symlink)"
-fi
-
-almanac_cli_dest="${ALMANAC_CLI_BIN_DIR:-${MEMENTO_CLI_BIN_DIR:-$HOME/.local/bin}}/almanac"
+almanac_cli_dest="${ALMANAC_CLI_BIN_DIR:-$HOME/.local/bin}/almanac"
 if [ -L "$almanac_cli_dest" ]; then
     cli_target=$(readlink "$almanac_cli_dest" || true)
     if [ "$cli_target" = "$SCRIPT_DIR/bin/almanac" ]; then
@@ -154,7 +129,7 @@ if command -v python3 >/dev/null 2>&1; then
 from pathlib import Path
 import sys
 
-markers = ("qmd vsearch", "python3 -c", "memento-vault warmup", "almanac warmup")
+markers = ("qmd vsearch", "python3 -c", "almanac warmup")
 for arg in sys.argv[1:]:
     path = Path(arg)
     if not path.exists():
@@ -184,11 +159,9 @@ fi
 step "Removing MCP registrations..."
 if command -v claude >/dev/null 2>&1; then
     claude mcp remove almanac -s user >/dev/null 2>&1 && info "Removed Claude Almanac MCP registration" || true
-    claude mcp remove memento-vault -s user >/dev/null 2>&1 && info "Removed Claude MCP registration" || true
 fi
 if command -v codex >/dev/null 2>&1; then
     codex mcp remove almanac >/dev/null 2>&1 && info "Removed Codex Almanac MCP registration" || true
-    codex mcp remove memento-vault >/dev/null 2>&1 && info "Removed Codex MCP registration" || true
 fi
 if command -v python3 >/dev/null 2>&1 && [ -f "$HELPER" ]; then
     python3 "$HELPER" uninstall-mcp-config "$CLAUDE_DIR" || warn "Could not update $CLAUDE_DIR/mcp-servers.json"
@@ -208,7 +181,7 @@ step "Done!"
 echo ""
 warn "Your vault and config are untouched:"
 echo "  - Vault: $VAULT_PATH"
-echo "  - Config: $CONFIG_DIR/almanac.yml (or legacy memento.yml)"
+echo "  - Config: $CONFIG_DIR/almanac.yml"
 echo "  - Install manifest/state: $CONFIG_DIR/manifest.json and $CONFIG_DIR/base/"
 echo "  - QMD config: ~/.config/qmd/index.yml"
 echo ""

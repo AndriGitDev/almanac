@@ -546,7 +546,7 @@ def _inspect_contradictions_lexical(topic: str, limit: int = 20, min_certainty: 
 def _scan_notes_for_validity(vault: Path) -> dict[str, dict]:
     """Scan ``notes/*.md`` into a validity-chain-ready record per stem.
 
-    Reads frontmatter directly via :mod:`memento.store`'s helpers (title,
+    Reads frontmatter directly via :mod:`almanac.store`'s helpers (title,
     date, certainty, ``valid_from``, ``supersedes``, ``invalidated_by``) plus
     a lightweight topic-overlap token set computed by the caller. Returns an
     empty dict when ``notes/`` does not exist.
@@ -755,10 +755,10 @@ def apply_invalidation(vault, rel_path, invalidated_by: str) -> bool:
     """Set ``invalidated_by`` on one note via a surgical single-field frontmatter rewrite.
 
     Preserves every other frontmatter line -- managed or not -- untouched,
-    the same round-trip contract :func:`memento.store._fold_note_frontmatter`
+    the same round-trip contract :func:`almanac.store._fold_note_frontmatter`
     uses for the resurfacing fields. Idempotent: returns ``False`` (no write)
     when the note already carries this exact ``invalidated_by`` value or has
-    no frontmatter block to rewrite. Uses :func:`memento.store._write_text_atomic`.
+    no frontmatter block to rewrite. Uses :func:`almanac.store._write_text_atomic`.
     """
     vault = Path(vault)
     candidate = Path(rel_path)
@@ -794,7 +794,7 @@ def apply_supersession_backlinks(vault, *, dry_run: bool = False) -> dict:
     contradiction-adjudication auto-apply, wins).
 
     Mutations happen under the vault write lock, re-entrant like
-    :func:`memento.archive.sweep_archive_candidates` -- acquires only if not
+    :func:`almanac.archive.sweep_archive_candidates` -- acquires only if not
     already held, never releases a lock a caller holds.
 
     Returns a report dict: ``{dry_run, checked, candidates, applied,

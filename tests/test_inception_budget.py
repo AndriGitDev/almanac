@@ -5,7 +5,7 @@ configurable floor/cap) and select_clusters_within_budget (the note-count
 based replacement for the old fixed scored[:max_clusters] slice).
 """
 
-from memento_inception import compute_inception_budget, select_clusters_within_budget
+from almanac_inception import compute_inception_budget, select_clusters_within_budget
 
 
 class TestComputeInceptionBudget:

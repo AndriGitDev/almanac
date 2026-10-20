@@ -221,11 +221,11 @@ def _looks_failure_like(summary: dict[str, Any]) -> bool:
 
 def _classify_category(text: str) -> str:
     lowered = text.lower()
-    if _contains(lowered, "memory", "almanac", "memento", "recall", "retrieval", "context packet", "note not found"):
+    if _contains(lowered, "memory", "almanac", "recall", "retrieval", "context packet", "note not found"):
         return "memory"
     if _contains(lowered, "ambiguous", "requirement", "acceptance", "scope", "spec", "unclear"):
         return "requirement"
-    if _contains(lowered, "harness", "orchestrator", "rondo", "beislið", "beislid", "linear", "github api"):
+    if _contains(lowered, "harness", "orchestrator", "rondo", "linear", "github api"):
         return "harness"
     if _contains(
         lowered, "environment", "dependency", "install", "network", "permission", "venv", "path", "rate limit"
@@ -238,7 +238,7 @@ def _classify_category(text: str) -> str:
 
 def _classify_type(text: str) -> str:
     lowered = text.lower()
-    if _contains(lowered, "memory", "almanac", "memento", "recall", "retrieval", "context packet", "note not found"):
+    if _contains(lowered, "memory", "almanac", "recall", "retrieval", "context packet", "note not found"):
         return "memory_not_retrieved"
     if _contains(lowered, "missing gate", "no gate", "gate not", "not run", "skipped gate", "missing process"):
         return "missing_process_or_gate"
@@ -246,7 +246,7 @@ def _classify_type(text: str) -> str:
         return "proof_gap"
     if _contains(lowered, "ambiguous", "requirement", "acceptance", "scope", "spec", "unclear"):
         return "ambiguous_requirements"
-    if _contains(lowered, "harness", "orchestrator", "rondo", "beislið", "beislid", "linear", "github api"):
+    if _contains(lowered, "harness", "orchestrator", "rondo", "linear", "github api"):
         return "harness_failure"
     if _contains(
         lowered, "environment", "dependency", "install", "network", "permission", "venv", "path", "rate limit"

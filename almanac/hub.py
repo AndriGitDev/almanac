@@ -1,8 +1,8 @@
 """Project hub regeneration and the two-tier vault map (MEM-160).
 
 ``projects/<slug>.md`` hubs used to grow by free-text append
-(:func:`memento.store.append_project_session_line`, formerly called from
-:func:`memento.store.update_project_index` on every MCP store/replace/capture)
+(:func:`almanac.store.append_project_session_line`, formerly called from
+:func:`almanac.store.update_project_index` on every MCP store/replace/capture)
 with no cap and no structural guarantee. Left running long enough, a hub turns
 into exactly what MEM-160 found in the real vault: a 300+ line file with
 duplicate ``## Sessions`` headers, truncated entries, and stray agent-output
@@ -81,12 +81,12 @@ def _within_window(meta, now, window_days):
 def _read_note(path: Path):
     """Read the frontmatter fields and body wikilinks hub regeneration needs from one note.
 
-    Deliberately independent of :func:`memento.graph.read_note_metadata` /
-    :func:`memento.config.get_vault` so this module can be pointed at any
+    Deliberately independent of :func:`almanac.graph.read_note_metadata` /
+    :func:`almanac.config.get_vault` so this module can be pointed at any
     vault path (a temp vault in tests, the real vault in production) without
     monkeypatching global config -- it takes ``path`` directly and reuses
-    only the vault-path-agnostic parsing helpers (:func:`memento.store.split_frontmatter`,
-    :func:`memento.graph.extract_wikilinks`).
+    only the vault-path-agnostic parsing helpers (:func:`almanac.store.split_frontmatter`,
+    :func:`almanac.graph.extract_wikilinks`).
     """
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -121,7 +121,7 @@ def _inbound_link_counts(all_notes: dict) -> dict:
     """Plain-text inbound wikilink count per stem -- the networkx-free fallback ranking.
 
     Counts only links between notes that both exist in ``all_notes`` (mirrors
-    :func:`memento.graph.build_wikilink_graph`'s "edges only where the target
+    :func:`almanac.graph.build_wikilink_graph`'s "edges only where the target
     exists" rule), so a dangling ``[[typo]]`` link never inflates a score.
     """
     counts = {stem: 0 for stem in all_notes}
@@ -135,7 +135,7 @@ def _inbound_link_counts(all_notes: dict) -> dict:
 def _rank_scores(vault: Path, all_notes: dict) -> dict:
     """Return ``{stem: score}`` centrality for every note in ``all_notes``.
 
-    Prefers PageRank from the shared wikilink graph (:func:`memento.graph.load_or_build_graph`,
+    Prefers PageRank from the shared wikilink graph (:func:`almanac.graph.load_or_build_graph`,
     reused as-is); degrades to the plain inbound-link-count fallback above
     when networkx is unavailable (empty graph/pagerank) so hub regeneration
     never hard-depends on the optional dependency.
@@ -351,7 +351,7 @@ def regenerate_stale_hubs(vault, config=None, *, now=None) -> dict:
     Gated by ``hub_regeneration_enabled`` (config, default ``False``): a
     no-op that returns immediately when disabled, matching the
     ``archive_sweep_enabled``/``fleeting_lifecycle_enabled`` convention in
-    :mod:`memento.archive`. Intended to run from ``hooks/memento-sweeper.py``'s
+    :mod:`almanac.archive`. Intended to run from ``hooks/almanac-sweeper.py``'s
     periodic sweep, after the existing fold/archive/fleeting sweeps.
 
     Returns a report dict: ``{enabled, regenerated, skipped}`` -- ``regenerated``

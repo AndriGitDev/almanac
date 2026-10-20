@@ -319,7 +319,7 @@ def check_install_execution(root: Path) -> CheckResult:
         env = os.environ.copy()
         env["HOME"] = str(home)
         # Keep XDG state inside the sandbox even if the caller overrides it.
-        for key in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "ALMANAC_VAULT_PATH", "MEMENTO_VAULT_PATH"):
+        for key in ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "ALMANAC_VAULT_PATH"):
             env.pop(key, None)
         result = subprocess.run(
             ["bash", str(installer)],
@@ -393,23 +393,12 @@ def run_command(name: str, command: list[str], *, root: Path, expect_stdout: str
 
 
 def safe_command_checks(root: Path) -> Iterable[CheckResult]:
-    almanac_cli = root / "bin" / "almanac"
-    if almanac_cli.exists():
-        yield run_command("almanac cli help", [str(almanac_cli), "help"], root=root, expect_stdout="Usage: almanac")
-        yield run_command(
-            "almanac cli version",
-            [str(almanac_cli), "version"],
-            root=root,
-            expect_stdout=read_text(root / "VERSION").strip(),
-        )
-    else:
-        yield fail("almanac cli help", "Missing bin/almanac.")
-    cli = root / "bin" / "memento-vault"
+    cli = root / "bin" / "almanac"
     if not cli.exists():
-        yield fail("cli help", "Missing bin/memento-vault; restore CLI wrapper.")
-        yield fail("cli version", "Missing bin/memento-vault; restore CLI wrapper.")
+        yield fail("cli help", "Missing bin/almanac; restore CLI wrapper.")
+        yield fail("cli version", "Missing bin/almanac; restore CLI wrapper.")
     else:
-        yield run_command("cli help", [str(cli), "help"], root=root, expect_stdout="Usage: memento-vault")
+        yield run_command("cli help", [str(cli), "help"], root=root, expect_stdout="Usage: almanac")
         expected_version = read_text(root / "VERSION").strip() if (root / "VERSION").exists() else None
         yield run_command("cli version", [str(cli), "version"], root=root, expect_stdout=expected_version)
 
@@ -420,16 +409,10 @@ def safe_command_checks(root: Path) -> Iterable[CheckResult]:
         yield fail("install help", "Missing install.sh; restore installer before release.")
 
     yield run_command(
-        "almanac python module help",
+        "python module help",
         [sys.executable, "-m", "almanac", "--help"],
         root=root,
         expect_stdout="Usage: python -m almanac",
-    )
-    yield run_command(
-        "python module help",
-        [sys.executable, "-m", "memento", "--help"],
-        root=root,
-        expect_stdout="Almanac MCP Server",
     )
 
 

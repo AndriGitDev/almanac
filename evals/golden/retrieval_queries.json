@@ -33,7 +33,7 @@
     },
     {
       "id": "installer-flag-persistence",
-      "query": "memento installer remembering flags between upgrades",
+      "query": "almanac installer remembering flags between upgrades",
       "expect_any": ["installer-flag-persistence-in-manifest"]
     },
     {

@@ -68,7 +68,7 @@ class TestWritePatternNote:
 
     def test_writes_valid_pattern_note(self, tmp_vault):
         """Written note contains correct frontmatter fields."""
-        from memento_inception import write_pattern_note
+        from almanac_inception import write_pattern_note
 
         synthesis = self._make_synthesis()
         cluster_stems = ["redis-cache-ttl", "redis-eviction-policy"]
@@ -94,7 +94,7 @@ class TestWritePatternNote:
 
     def test_atomic_write_no_temp_file(self, tmp_vault):
         """After write completes, no .inception-tmp-* files remain."""
-        from memento_inception import write_pattern_note
+        from almanac_inception import write_pattern_note
 
         synthesis = self._make_synthesis()
         cluster_stems = ["redis-cache-ttl"]
@@ -107,7 +107,7 @@ class TestWritePatternNote:
 
     def test_slug_collision_skips_duplicate(self, tmp_vault):
         """Second note with same title is skipped (returns None) instead of creating -2."""
-        from memento_inception import write_pattern_note
+        from almanac_inception import write_pattern_note
 
         synthesis = self._make_synthesis()
         cluster_stems = ["redis-cache-ttl"]
@@ -122,7 +122,7 @@ class TestWritePatternNote:
 
     def test_refresh_overwrites_existing(self, tmp_vault):
         """When merge_target is set, overwrites the existing file instead of creating -2."""
-        from memento_inception import write_pattern_note
+        from almanac_inception import write_pattern_note
 
         synthesis = self._make_synthesis()
         cluster_stems = ["redis-cache-ttl", "redis-eviction-policy"]
@@ -150,7 +150,7 @@ class TestWritePatternNote:
 
     def test_refresh_updates_synthesized_from(self, tmp_vault):
         """Refreshed note has the new synthesized_from list."""
-        from memento_inception import write_pattern_note
+        from almanac_inception import write_pattern_note
 
         synthesis = self._make_synthesis()
         cluster_stems = ["redis-cache-ttl"]
@@ -165,7 +165,7 @@ class TestWritePatternNote:
 
     def test_body_and_related(self, tmp_vault):
         """Note body text and ## Related section with wikilinks are present."""
-        from memento_inception import write_pattern_note
+        from almanac_inception import write_pattern_note
 
         synthesis = self._make_synthesis(
             body="Redis caching patterns recur across multiple services.",
@@ -183,7 +183,7 @@ class TestWritePatternNote:
 
     def test_returns_path(self, tmp_vault):
         """Function returns a Path to the written note."""
-        from memento_inception import write_pattern_note
+        from almanac_inception import write_pattern_note
 
         synthesis = self._make_synthesis()
         cluster_stems = ["redis-cache-ttl"]
@@ -196,7 +196,7 @@ class TestWritePatternNote:
 
     def test_resurfacing_signal_defaults_to_zero_without_notes_dict(self, tmp_vault):
         """No notes_dict supplied -> resurfaced_count: 0, no last_resurfaced line."""
-        from memento_inception import write_pattern_note
+        from almanac_inception import write_pattern_note
 
         synthesis = self._make_synthesis()
         result = write_pattern_note(synthesis, ["redis-cache-ttl"], tmp_vault)
@@ -208,7 +208,7 @@ class TestWritePatternNote:
     def test_resurfacing_signal_sums_and_takes_max(self, tmp_vault):
         """Pattern note inherits summed resurfaced_count and max last_resurfaced
         (MEM-148 signal) from its source notes (MEM-154)."""
-        from memento_inception import NoteRecord, write_pattern_note
+        from almanac_inception import NoteRecord, write_pattern_note
 
         notes_dict = {
             "a": NoteRecord(
@@ -241,7 +241,7 @@ class TestWritePatternNote:
 
     def test_resurfacing_signal_ignores_missing_source_records(self, tmp_vault):
         """A stem absent from notes_dict contributes nothing (no crash)."""
-        from memento_inception import NoteRecord, write_pattern_note
+        from almanac_inception import NoteRecord, write_pattern_note
 
         notes_dict = {
             "a": NoteRecord(
@@ -268,7 +268,7 @@ class TestBacklinkSources:
 
     def test_backlink_adds_to_related(self, tmp_vault):
         """Link appended to existing ## Related section."""
-        from memento_inception import backlink_sources
+        from almanac_inception import backlink_sources
 
         note_path = tmp_vault / "notes" / "redis-cache-ttl.md"
         _write_note(
@@ -285,7 +285,7 @@ class TestBacklinkSources:
 
     def test_backlink_creates_related(self, tmp_vault):
         """## Related section created when missing."""
-        from memento_inception import backlink_sources
+        from almanac_inception import backlink_sources
 
         note_path = tmp_vault / "notes" / "redis-cache-ttl.md"
         _write_note(
@@ -305,7 +305,7 @@ class TestBacklinkSources:
 
     def test_backlink_skips_existing(self, tmp_vault):
         """No duplicate link added if already present."""
-        from memento_inception import backlink_sources
+        from almanac_inception import backlink_sources
 
         note_path = tmp_vault / "notes" / "redis-cache-ttl.md"
         _write_note(
@@ -323,7 +323,7 @@ class TestBacklinkSources:
 
     def test_backlink_missing_source(self, tmp_vault):
         """No error when source note does not exist."""
-        from memento_inception import backlink_sources
+        from almanac_inception import backlink_sources
 
         # notes dir exists but note does not
         backlink_sources("new-pattern", ["nonexistent-note"], tmp_vault)
@@ -331,7 +331,7 @@ class TestBacklinkSources:
 
     def test_backlink_multiple_sources(self, tmp_vault):
         """Backlinks added to all source notes."""
-        from memento_inception import backlink_sources
+        from almanac_inception import backlink_sources
 
         stems = ["note-a", "note-b", "note-c"]
         for stem in stems:

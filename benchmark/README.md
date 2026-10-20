@@ -37,7 +37,7 @@ Full workflow for running on a dedicated machine.
 ### 1. Clone and install
 
 ```bash
-git clone <repo-url> memento-vault && cd memento-vault
+git clone <repo-url> almanac && cd almanac
 uv venv && source .venv/bin/activate
 uv pip install rank-bm25 optuna networkx numpy
 ```
@@ -101,7 +101,7 @@ python benchmark/apply_sweep_results.py sweep_results.json
 python benchmark/apply_sweep_results.py sweep_results.json --trial 1
 ```
 
-This patches the defaults in `hooks/memento_utils.py` and `benchmark/longmemeval_adapter.py`.
+This patches the defaults in `hooks/almanac_utils.py` and `benchmark/longmemeval_adapter.py`.
 
 ### 7. Verify improvement
 
@@ -118,7 +118,7 @@ Compare NDCG@10 against the baseline (0.892) and recall latency against the curr
 ### 8. Commit if happy
 
 ```bash
-git diff hooks/memento_utils.py benchmark/longmemeval_adapter.py
+git diff hooks/almanac_utils.py benchmark/longmemeval_adapter.py
 git add -p  # stage the config changes
 git commit -m "Apply sweep results: NDCG@10 X.XXX → Y.YYY"
 ```
@@ -229,7 +229,7 @@ python tools/analyze-retrieval.py
 python tools/analyze-retrieval.py --since 7
 ```
 
-Alerts when avg recall latency crosses 700ms or P95 crosses 1.5s. Rondo benchmark memory outcome reports from `benchmark/rondo/evaluation.py` can be included with `memento-vault retrieval-report --benchmark-outcomes /path/to/rondo-memory-report.json` to summarize memory-use classifications, memory-not-retrieved vs irrelevant-memory failures, retrieval latency, and token budgets.
+Alerts when avg recall latency crosses 700ms or P95 crosses 1.5s. Rondo benchmark memory outcome reports from `benchmark/rondo/evaluation.py` can be included with `almanac retrieval-report --benchmark-outcomes /path/to/rondo-memory-report.json` to summarize memory-use classifications, memory-not-retrieved vs irrelevant-memory failures, retrieval latency, and token budgets.
 
 ## Parameter space
 

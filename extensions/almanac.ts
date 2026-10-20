@@ -62,11 +62,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, "..");
 const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
-const almanacHealthLogPath = join(configHome, "almanac", "triage-health.jsonl");
-const legacyHealthLogPath = join(configHome, "memento-vault", "triage-health.jsonl");
-const bridgeHealthLogPath = existsSync(almanacHealthLogPath) || !existsSync(legacyHealthLogPath)
-    ? almanacHealthLogPath
-    : legacyHealthLogPath;
+const bridgeHealthLogPath = join(configHome, "almanac", "triage-health.jsonl");
 
 function sanitizeBridgeHealthText(value: unknown): string {
 	let text = String(value ?? "");

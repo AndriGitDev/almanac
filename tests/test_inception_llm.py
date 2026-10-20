@@ -3,8 +3,8 @@
 import json
 from unittest.mock import patch
 
-from memento_inception import call_llm, parse_synthesis
-from memento.llm import LLMResult
+from almanac_inception import call_llm, parse_synthesis
+from almanac.llm import LLMResult
 
 
 class TestParseSynthesis:
@@ -86,7 +86,7 @@ class TestParseSynthesis:
 class TestCallLlm:
     """Tests for call_llm via shared llm_complete."""
 
-    @patch("memento_inception.llm_complete")
+    @patch("almanac_inception.llm_complete")
     def test_call_codex_command(self, mock_complete):
         mock_complete.return_value = LLMResult(text="some output", ok=True, error=None)
 
@@ -98,7 +98,7 @@ class TestCallLlm:
         )
         assert result == "some output"
 
-    @patch("memento_inception.llm_complete")
+    @patch("almanac_inception.llm_complete")
     def test_call_claude_command(self, mock_complete):
         mock_complete.return_value = LLMResult(text="claude output", ok=True, error=None)
 
@@ -116,7 +116,7 @@ class TestCallLlm:
         )
         assert result == "claude output"
 
-    @patch("memento_inception.llm_complete")
+    @patch("almanac_inception.llm_complete")
     def test_call_timeout(self, mock_complete):
         mock_complete.return_value = LLMResult(text="", ok=False, error="timed out")
 
@@ -124,7 +124,7 @@ class TestCallLlm:
 
         assert result == ""
 
-    @patch("memento_inception.llm_complete")
+    @patch("almanac_inception.llm_complete")
     def test_call_missing_binary(self, mock_complete):
         mock_complete.return_value = LLMResult(text="", ok=False, error="codex not found")
 

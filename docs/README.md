@@ -7,6 +7,7 @@ Grouped by what you're trying to do, not by when it was written.
 - [Install](install.md) -- flags, upgrading, requirements, health/doctor, portable archives, model warmup
 - [Configuration](configuration.md) -- every tunable knob, one config file
 - [Search backends](search-backends.md) -- QMD, Embedded, and Grep, and when each is used
+- [Example vault](../examples/demo-vault) -- fictional linked notes to browse or open in Obsidian
 
 ## Integrate an agent
 
@@ -21,7 +22,12 @@ Grouped by what you're trying to do, not by when it was written.
 - [Architecture](architecture.md) -- module map, request flow, LLM backend abstraction
 - [Frontmatter schema](frontmatter-schema.md) -- note fields, certainty scale, durability tiers, auto-archive and fleeting-note lifecycle
 - [Performance analysis](performance-analysis.md) -- latency, injection rate, and cost benchmarks
-- [Automation MemoryProvider contract](automation-memory-provider.md) -- rules for Rondo/Beislið-style automated runners
+- [Automation MemoryProvider contract](automation-memory-provider.md) -- rules for automated runners
+
+## Contribute
+
+- [Contributing](../CONTRIBUTING.md) -- development setup and validation commands
+- [Releasing](releasing.md) -- versioning, smoke checks, and Homebrew formula updates
 
 ## History
 

@@ -1,6 +1,6 @@
 """Tests for local non-MCP retrieval CLI surfaces."""
 
-from memento import __main__ as memento_main
+from almanac import __main__ as almanac_main
 
 
 def test_local_search_cli_emits_search_envelope(monkeypatch, capsys):
@@ -12,9 +12,9 @@ def test_local_search_cli_emits_search_envelope(monkeypatch, capsys):
                 "metadata": {"backend": "FakeBackend"},
             }
 
-    monkeypatch.setattr("memento.retrieval_policy.ExplicitSearchRuntime", lambda: FakeRuntime())
+    monkeypatch.setattr("almanac.retrieval_policy.ExplicitSearchRuntime", lambda: FakeRuntime())
 
-    code = memento_main.main(["search", "redis", "cache"])
+    code = almanac_main.main(["search", "redis", "cache"])
 
     assert code == 0
     out = capsys.readouterr().out
@@ -33,9 +33,9 @@ def test_local_recall_cli_uses_build_recall_readonly(monkeypatch, capsys):
         calls.append((prompt, cwd, session_id, record, host_id))
         return FakeResult()
 
-    monkeypatch.setattr("memento.lifecycle.build_recall", fake_build_recall)
+    monkeypatch.setattr("almanac.lifecycle.build_recall", fake_build_recall)
 
-    code = memento_main.main(["recall", "prior", "context", "--cwd", "/repo", "--session-id", "s1"])
+    code = almanac_main.main(["recall", "prior", "context", "--cwd", "/repo", "--session-id", "s1"])
 
     assert code == 0
     assert calls == [("prior context", "/repo", "s1", False, "cli")]

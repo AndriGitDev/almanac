@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""End-to-end lifecycle benchmark for the memento-vault pipeline.
+"""End-to-end lifecycle benchmark for the almanac pipeline.
 
 Simulates a full session lifecycle: triage → notes → briefing → recall → inception.
 Uses mock LLM with configurable latency to model best/typical/worst scenarios.
@@ -126,7 +126,7 @@ def create_test_transcript(tmpdir):
 
 def create_test_config(vault_path):
     """Create a config dict pointing at the test vault."""
-    from memento_utils import DEFAULT_CONFIG
+    from almanac_utils import DEFAULT_CONFIG
 
     config = dict(DEFAULT_CONFIG)
     config["vault_path"] = str(vault_path)
@@ -149,7 +149,7 @@ def simulate_triage(vault, transcript_path, config, scenario):
 
     # Step 1: Parse transcript
     with Timer("parse_transcript") as t:
-        from memento_triage import parse_transcript
+        from almanac_triage import parse_transcript
 
         meta = parse_transcript(str(transcript_path))
     results["steps"]["parse_transcript"] = t.elapsed_ms
@@ -165,7 +165,7 @@ def simulate_triage(vault, transcript_path, config, scenario):
 
     # Step 3: Check substantiality
     with Timer("is_substantial") as t:
-        from memento_triage import is_substantial
+        from almanac_triage import is_substantial
 
         substantial = is_substantial(meta)
     results["steps"]["is_substantial"] = t.elapsed_ms
@@ -207,7 +207,7 @@ def simulate_briefing(vault, config):
     results = {"steps": {}}
 
     with Timer("briefing_project_detect") as t:
-        from memento_utils import detect_project
+        from almanac_utils import detect_project
 
         slug, ticket = detect_project("/home/user/projects/billing", "fix/cache-bug")
     results["steps"]["project_detect"] = t.elapsed_ms
@@ -243,7 +243,7 @@ def simulate_recall(vault, config, prompt):
 
     if not skipped:
         with Timer("recall_multi_hop_gate") as t:
-            from memento_utils import extract_wikilinks
+            from almanac_utils import extract_wikilinks
 
             hop_needed = len(extract_wikilinks("See [[example-note]] for context.")) > 0
         results["steps"]["multi_hop_gate"] = t.elapsed_ms
@@ -310,7 +310,7 @@ def run_scenario(name, scenario):
     print(f"  {scenario['label']}")
     print(f"{'=' * 60}")
 
-    with tempfile.TemporaryDirectory(prefix="memento-e2e-") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="almanac-e2e-") as tmpdir:
         vault = create_test_vault(tmpdir)
         transcript = create_test_transcript(tmpdir)
         config = create_test_config(vault)
@@ -402,7 +402,7 @@ def run_scenario(name, scenario):
         checks.append(("recall skips short prompts", ok))
 
         # Check wikilink extraction works (multi-hop gate)
-        from memento_utils import extract_wikilinks
+        from almanac_utils import extract_wikilinks
 
         ok = len(extract_wikilinks("Related: [[some-note]]")) > 0
         checks.append(("multi-hop wikilink extraction works", ok))
@@ -431,11 +431,11 @@ def main():
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
-        "memento_triage",
-        str(Path(__file__).parent.parent / "hooks" / "memento-triage.py"),
+        "almanac_triage",
+        str(Path(__file__).parent.parent / "hooks" / "almanac-triage.py"),
     )
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["memento_triage"] = mod
+    sys.modules["almanac_triage"] = mod
     spec.loader.exec_module(mod)
 
     # Also import vault_recall
@@ -448,7 +448,7 @@ def main():
     spec2.loader.exec_module(mod2)
 
     print("=" * 60)
-    print("  MEMENTO VAULT — END-TO-END LIFECYCLE BENCHMARK")
+    print("  ALMANAC VAULT — END-TO-END LIFECYCLE BENCHMARK")
     print("=" * 60)
 
     scenarios = [args.scenario] if args.scenario != "all" else ["best", "typical", "worst"]

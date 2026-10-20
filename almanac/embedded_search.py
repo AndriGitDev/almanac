@@ -37,7 +37,7 @@ _VEC_DISTANCE_METRIC = "cosine"
 # Bounded-transform constant for FTS5 BM25 rank normalization (MEM-127): see
 # normalize_fts5_score() below for the empirical rationale. Read from config
 # ("fts5_score_k") by callers that construct this backend from the singleton
-# (memento.search_backend._make_embedded); this module-level default is only
+# (almanac.search_backend._make_embedded); this module-level default is only
 # the fallback for direct instantiation (e.g. tests, scripts).
 _DEFAULT_FTS5_SCORE_K = 2.0
 
@@ -92,7 +92,7 @@ def normalize_vec_cosine_distance(distance: float) -> float:
     0, discarding the negative-similarity signal entirely (everything past
     distance=1 read identically as "no relevance"). It also silently assumed
     every embedding provider L2-normalizes its output, which is only
-    guaranteed for the local Nomic provider (see memento.embedding
+    guaranteed for the local Nomic provider (see almanac.embedding
     ``_truncate_and_normalize``), not the remote Voyage/OpenAI/Google
     providers.
 
@@ -372,9 +372,9 @@ class EmbeddedSearchBackend(SearchBackend):
                     legacy_metadata = None
                 if isinstance(legacy_metadata, dict):
                     provider_class = legacy_metadata.get("provider_class")
-                    if isinstance(provider_class, str) and provider_class.startswith("memento.embedding."):
+                    if isinstance(provider_class, str) and provider_class.startswith("almanac.embedding."):
                         legacy_metadata["provider_class"] = provider_class.replace(
-                            "memento.embedding.", "almanac.embedding.", 1
+                            "almanac.embedding.", "almanac.embedding.", 1
                         )
                         if _metadata_json(legacy_metadata) == signature:
                             existing_signature = signature

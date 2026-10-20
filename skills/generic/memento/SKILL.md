@@ -1,9 +1,9 @@
 ---
-name: memento
+name: almanac
 description: Capture durable knowledge from the current work session into Almanac. Use when the user asks to remember, save, capture, or record decisions, discoveries, bug fixes, or reusable patterns.
 ---
 
-# Memento
+# Almanac
 
 Capture durable session knowledge as atomic notes in Almanac.
 
@@ -11,17 +11,17 @@ Capture durable session knowledge as atomic notes in Almanac.
 
 Use MCP tools when they are available:
 
-1. Search first with `memento_search` to avoid duplicate notes.
-2. Store each durable idea with `memento_store`.
-3. For a broad end-of-session capture, use `memento_capture` with a concise structured summary.
-4. Check vault health with `memento_status` if the vault location or connection is unclear.
+1. Search first with `almanac_search` to avoid duplicate notes.
+2. Store each durable idea with `almanac_store`.
+3. For a broad end-of-session capture, use `almanac_capture` with a concise structured summary.
+4. Check vault health with `almanac_status` if the vault location or connection is unclear.
 
 ## Fallback Path
 
 If MCP tools are not available, use the configured local vault:
 
-1. Read `~/.config/memento-vault/memento.yml` or `~/memento/memento.yml` to find `vault_path`.
-2. Default to `~/memento` if no config exists.
+1. Read `~/.config/almanac/almanac.yml` or `~/almanac/almanac.yml` to find `vault_path`.
+2. Default to `~/almanac` if no config exists.
 3. Search `notes/` and `projects/` before writing.
 4. Write new notes under `notes/`.
 5. Update the relevant project index under `projects/`.

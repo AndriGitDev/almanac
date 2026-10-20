@@ -1,7 +1,6 @@
 """Entry points for Almanac.
 
-Default behavior stays the MCP server so existing ``python -m memento`` MCP
-registrations keep working. Named subcommands provide a local, non-MCP retrieval
+The default entry point runs the MCP server. Named subcommands provide a local, non-MCP retrieval
 surface for skills and agents that can run shell commands but cannot call MCP
 tools.
 """

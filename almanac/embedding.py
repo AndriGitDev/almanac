@@ -112,9 +112,7 @@ class NomicLocalProvider(EmbeddingProvider):
         elif get_env("MODEL_CACHE_DIR"):
             self._cache_dir = Path(get_env("MODEL_CACHE_DIR"))
         else:
-            current = Path.home() / ".cache" / "almanac" / "models"
-            legacy = Path.home() / ".cache" / "memento-vault" / "models"
-            self._cache_dir = legacy if legacy.exists() and not current.exists() else current
+            self._cache_dir = Path.home() / ".cache" / "almanac" / "models"
         self._session = None  # lazy onnxruntime.InferenceSession
         self._tokenizer = None  # lazy tokenizers.Tokenizer
 

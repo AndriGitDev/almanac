@@ -1,6 +1,6 @@
 """Tests for the shared retrieval policy/runtime seam."""
 
-from memento.retrieval_policy import (
+from almanac.retrieval_policy import (
     ExplicitSearchRequest,
     ExplicitSearchRuntime,
     PromptRecallRequest,
@@ -251,8 +251,8 @@ def test_prompt_recall_runtime_all_invalidated_is_a_structured_miss(tmp_path):
 
 def test_normalized_natural_query_keeps_durable_search_terms():
     assert normalized_natural_query("how should we store bearer tokens that appear in URLs") == "store bearer token url"
-    assert normalized_natural_query("memento installer remembering flags between upgrades") == (
-        "memento installer remember flag upgrade"
+    assert normalized_natural_query("almanac installer remembering flags between upgrades") == (
+        "almanac installer remember flag upgrade"
     )
     assert normalized_natural_query("what status code should a proxy return when upstream fails with 5xx") == (
         "proxy upstream fail 5xx"

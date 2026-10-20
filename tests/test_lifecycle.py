@@ -9,9 +9,9 @@ from unittest.mock import patch
 
 import pytest
 
-from memento import health, lifecycle, store
-from memento.config import DEFAULT_CONFIG
-from memento.lifecycle import (
+from almanac import health, lifecycle, store
+from almanac.config import DEFAULT_CONFIG
+from almanac.lifecycle import (
     LifecycleResult,
     _run_recall_lines,
     build_briefing,
@@ -31,17 +31,17 @@ from memento.lifecycle import (
 @pytest.fixture(autouse=True)
 def isolate_pi_queue_state(monkeypatch, tmp_path):
     """Keep session-context queue/status tests away from the user's real state."""
-    monkeypatch.delenv("MEMENTO_PI_STATE_HOME", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_STATE_HOME", raising=False)
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     monkeypatch.setattr(store, "AUTOMATION_MEMORY_HEALTH_LOG_PATH", str(tmp_path / "automation-memory-health.jsonl"))
     monkeypatch.setattr(health, "AUTOMATION_MEMORY_HEALTH_LOG_PATH", str(tmp_path / "automation-memory-health.jsonl"))
     monkeypatch.setattr(health, "RETRIEVAL_LOG_PATH", str(tmp_path / "retrieval.jsonl"))
     monkeypatch.setattr(health, "TRIAGE_HEALTH_LOG_PATH", str(tmp_path / "triage-health.jsonl"))
     monkeypatch.setattr(
-        "memento.lifecycle.TRIAGE_WARN_STATE_PATH", str(tmp_path / "triage-warn-state.json"), raising=False
+        "almanac.lifecycle.TRIAGE_WARN_STATE_PATH", str(tmp_path / "triage-warn-state.json"), raising=False
     )
     monkeypatch.setattr(
-        "memento.lifecycle.PI_BRIDGE_WARN_STATE_PATH", str(tmp_path / "pi-bridge-warn-state.json"), raising=False
+        "almanac.lifecycle.PI_BRIDGE_WARN_STATE_PATH", str(tmp_path / "pi-bridge-warn-state.json"), raising=False
     )
 
 
@@ -119,7 +119,7 @@ def test_build_session_context_combines_briefing_recall_status_and_queue(tmp_pat
     queue_file = xdg_state / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
     queue_file.parent.mkdir(parents=True)
     queue_file.write_text('{"id":"q1"}\n')
-    monkeypatch.delenv("MEMENTO_PI_STATE_HOME", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_STATE_HOME", raising=False)
     monkeypatch.setenv("XDG_STATE_HOME", str(xdg_state))
     (vault / "notes").mkdir(parents=True)
     (vault / "notes" / "a.md").write_text("# A")
@@ -134,12 +134,12 @@ def test_build_session_context_combines_briefing_recall_status_and_queue(tmp_pat
     )
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=briefing) as mock_briefing,
-        patch("memento.lifecycle.build_recall", return_value=recall) as mock_recall,
-        patch("memento.lifecycle.get_vault", return_value=vault),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value="[vault] WARN: triage failing"),
-        patch("memento.lifecycle.pi_bridge_health_warning", return_value="[vault] WARN: Pi bridge failing"),
+        patch("almanac.lifecycle.build_briefing", return_value=briefing) as mock_briefing,
+        patch("almanac.lifecycle.build_recall", return_value=recall) as mock_recall,
+        patch("almanac.lifecycle.get_vault", return_value=vault),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value="[vault] WARN: triage failing"),
+        patch("almanac.lifecycle.pi_bridge_health_warning", return_value="[vault] WARN: Pi bridge failing"),
     ):
         payload = build_session_context(
             cwd="/repo",
@@ -175,13 +175,13 @@ def test_lifecycle_queue_path_resolution_characterization(tmp_path, monkeypatch)
     """Freeze queue-path/state-home resolution semantics across the queue-module extraction."""
     vault = tmp_path / "vault"
 
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(tmp_path / "pi-state"))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "pi-state"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "ignored-xdg"))
     assert lifecycle._pi_queue_file() == tmp_path / "pi-state" / "queue" / "pi-captures.jsonl"
     assert lifecycle._legacy_pi_queue_file(vault) == vault / "queue" / "pi-captures.jsonl"
     assert lifecycle._pi_queue_path_source() == "almanac_pi_state_home"
 
-    monkeypatch.delenv("MEMENTO_PI_STATE_HOME")
+    monkeypatch.delenv("ALMANAC_PI_STATE_HOME")
     assert lifecycle._pi_queue_file() == tmp_path / "ignored-xdg" / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
     assert lifecycle._pi_queue_path_source() == "xdg_state_home"
 
@@ -198,15 +198,15 @@ def test_build_session_context_explicitly_reports_legacy_queue_fallback(tmp_path
     legacy_queue_file = vault / "queue" / "pi-captures.jsonl"
     legacy_queue_file.parent.mkdir(parents=True)
     legacy_queue_file.write_text('{"id":"legacy-q1"}\n')
-    monkeypatch.delenv("MEMENTO_PI_STATE_HOME", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_STATE_HOME", raising=False)
     monkeypatch.setenv("XDG_STATE_HOME", str(xdg_state))
     (vault / "notes").mkdir(parents=True)
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
-        patch("memento.lifecycle.get_vault", return_value=vault),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value=None),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.get_vault", return_value=vault),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value=None),
     ):
         payload = build_session_context("/repo", "", "s1", token_budget=200, include_recall=False)
 
@@ -230,15 +230,15 @@ def test_build_session_context_reports_almanac_pi_state_home_queue_source(tmp_pa
     queue_file = state_home / "queue" / "pi-captures.jsonl"
     queue_file.parent.mkdir(parents=True)
     queue_file.write_text('{"id":"q1"}\n')
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(state_home))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(state_home))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "ignored-xdg-state"))
     (vault / "notes").mkdir(parents=True)
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
-        patch("memento.lifecycle.get_vault", return_value=vault),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value=None),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.get_vault", return_value=vault),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value=None),
     ):
         payload = build_session_context("/repo", "", "s1", token_budget=200, include_recall=False)
 
@@ -260,15 +260,15 @@ def test_build_session_context_counts_current_plus_unmigrated_legacy_queue(tmp_p
     legacy_queue_file = vault / "queue" / "pi-captures.jsonl"
     legacy_queue_file.parent.mkdir(parents=True)
     legacy_queue_file.write_text('{"id":"q1"}\n{"id":"legacy-q2"}\n')
-    monkeypatch.delenv("MEMENTO_PI_STATE_HOME", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_STATE_HOME", raising=False)
     monkeypatch.setenv("XDG_STATE_HOME", str(xdg_state))
     (vault / "notes").mkdir(parents=True)
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
-        patch("memento.lifecycle.get_vault", return_value=vault),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value=None),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.get_vault", return_value=vault),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value=None),
     ):
         payload = build_session_context("/repo", "", "s1", token_budget=200, include_recall=False)
 
@@ -291,15 +291,15 @@ def test_build_session_context_mirrors_bridge_migration_count_for_malformed_queu
     legacy_queue_file = vault / "queue" / "pi-captures.jsonl"
     legacy_queue_file.parent.mkdir(parents=True)
     legacy_queue_file.write_text('not json\n{"title":"legacy no id"}\n')
-    monkeypatch.delenv("MEMENTO_PI_STATE_HOME", raising=False)
+    monkeypatch.delenv("ALMANAC_PI_STATE_HOME", raising=False)
     monkeypatch.setenv("XDG_STATE_HOME", str(xdg_state))
     (vault / "notes").mkdir(parents=True)
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
-        patch("memento.lifecycle.get_vault", return_value=vault),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value=None),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.get_vault", return_value=vault),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value=None),
     ):
         payload = build_session_context("/repo", "", "s1", token_budget=200, include_recall=False)
 
@@ -325,11 +325,11 @@ def test_build_session_context_respects_budget_and_reports_expandable_paths(tmp_
     )
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
-        patch("memento.lifecycle.build_recall", return_value=recall),
-        patch("memento.lifecycle.get_vault", return_value=tmp_path),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value=None),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.build_recall", return_value=recall),
+        patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value=None),
     ):
         payload = build_session_context("/repo", "memory", "s1", token_budget=100)
 
@@ -351,11 +351,11 @@ def test_build_session_context_compacts_structured_payload_under_budget_overhead
     )
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
-        patch("memento.lifecycle.build_recall", return_value=recall),
-        patch("memento.lifecycle.get_vault", return_value=tmp_path),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value=None),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.build_recall", return_value=recall),
+        patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value=None),
     ):
         payload = build_session_context("/repo", "memory", "s1", token_budget=100)
 
@@ -372,10 +372,10 @@ def test_build_session_context_final_budget_fallback_handles_long_metadata(tmp_p
     long_value = "x" * 5000
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
-        patch("memento.lifecycle.get_vault", return_value=tmp_path),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value="[vault] WARN: " + long_value),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value="[vault] WARN: " + long_value),
     ):
         payload = build_session_context(long_value, "", long_value, token_budget=100, include_recall=False)
 
@@ -390,10 +390,10 @@ def test_build_session_context_recomputes_should_inject_on_early_fit(tmp_path):
     briefing = LifecycleResult(True, "short context", "briefing")
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=briefing),
-        patch("memento.lifecycle.get_vault", return_value=tmp_path),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value="[vault] WARN: " + ("x" * 1000)),
+        patch("almanac.lifecycle.build_briefing", return_value=briefing),
+        patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value="[vault] WARN: " + ("x" * 1000)),
     ):
         payload = build_session_context("/repo", "", "s1", token_budget=50, include_recall=False)
 
@@ -407,9 +407,9 @@ def test_build_session_context_records_recall_only_after_final_payload_includes_
     (tmp_path / "notes").mkdir()
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
         patch(
-            "memento.lifecycle._run_recall_lines",
+            "almanac.lifecycle._run_recall_lines",
             return_value=(
                 ["[vault] Related memories:", "  - Cache policy: Use TTLs."],
                 "notes/cache.md",
@@ -417,10 +417,10 @@ def test_build_session_context_records_recall_only_after_final_payload_includes_
                 None,
             ),
         ),
-        patch("memento.lifecycle.record_recall") as mock_record,
-        patch("memento.lifecycle.get_vault", return_value=tmp_path),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value=None),
+        patch("almanac.lifecycle.record_recall") as mock_record,
+        patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value=None),
     ):
         payload = build_session_context("/repo", "cache", "s1", token_budget=2000)
 
@@ -432,9 +432,9 @@ def test_build_session_context_does_not_record_recall_when_final_payload_drops_c
     (tmp_path / "notes").mkdir()
 
     with (
-        patch("memento.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
+        patch("almanac.lifecycle.build_briefing", return_value=empty_result("briefing", "disabled")),
         patch(
-            "memento.lifecycle._run_recall_lines",
+            "almanac.lifecycle._run_recall_lines",
             return_value=(
                 ["[vault] Related memories:", "  - Cache policy: Use TTLs."],
                 "notes/cache.md",
@@ -442,10 +442,10 @@ def test_build_session_context_does_not_record_recall_when_final_payload_drops_c
                 None,
             ),
         ),
-        patch("memento.lifecycle.record_recall") as mock_record,
-        patch("memento.lifecycle.get_vault", return_value=tmp_path),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.triage_health_warning", return_value="[vault] WARN: " + ("x" * 1000)),
+        patch("almanac.lifecycle.record_recall") as mock_record,
+        patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.triage_health_warning", return_value="[vault] WARN: " + ("x" * 1000)),
     ):
         payload = build_session_context("/repo", "cache", "s1", token_budget=1)
 
@@ -457,15 +457,15 @@ def test_build_session_context_disables_deferred_briefing_work(tmp_path):
     (tmp_path / "notes").mkdir()
 
     with (
-        patch("memento.lifecycle.get_config", return_value={"session_briefing": True, "project_maps_enabled": True}),
-        patch("memento.lifecycle.get_vault", return_value=tmp_path),
-        patch("memento.lifecycle.get_git_branch", return_value="feature"),
-        patch("memento.lifecycle.detect_project", return_value=("repo", None)),
-        patch("memento.lifecycle.read_project_index", return_value=([], [])),
-        patch("memento.lifecycle.triage_health_warning", return_value=None),
-        patch("memento.lifecycle.has_qmd", return_value=True),
-        patch("memento.lifecycle.load_or_build_graph"),
-        patch("memento.lifecycle.spawn_deferred_search") as mock_spawn,
+        patch("almanac.lifecycle.get_config", return_value={"session_briefing": True, "project_maps_enabled": True}),
+        patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+        patch("almanac.lifecycle.get_git_branch", return_value="feature"),
+        patch("almanac.lifecycle.detect_project", return_value=("repo", None)),
+        patch("almanac.lifecycle.read_project_index", return_value=([], [])),
+        patch("almanac.lifecycle.triage_health_warning", return_value=None),
+        patch("almanac.lifecycle.has_qmd", return_value=True),
+        patch("almanac.lifecycle.load_or_build_graph"),
+        patch("almanac.lifecycle.spawn_deferred_search") as mock_spawn,
     ):
         payload = build_session_context("/repo", "", "s1", include_recall=False)
 
@@ -536,39 +536,39 @@ def test_broad_project_history_query_gate_allows_specific_prompts(prompt):
     assert is_broad_project_history_query(prompt) is False
 
 
-@patch("memento.lifecycle.get_config", return_value={"prompt_recall": True})
+@patch("almanac.lifecycle.get_config", return_value={"prompt_recall": True})
 def test_build_recall_skips_low_signal_prompt(_config):
-    result = build_recall("go for the extensions cleanup", "/home/vic/Projects/memento-vault", "s1")
+    result = build_recall("go for the extensions cleanup", "/home/vic/Projects/almanac", "s1")
 
     assert result.should_inject is False
     assert result.reason == "low-signal-prompt"
 
 
-@patch("memento.lifecycle.get_config", return_value={"prompt_recall": True})
+@patch("almanac.lifecycle.get_config", return_value={"prompt_recall": True})
 def test_build_recall_skips_broad_project_history_prompt(_config):
-    result = build_recall("what previous decisions did we make on Fundid?", "/home/vic/Projects/memento-vault", "s1")
+    result = build_recall("what previous decisions did we make on Fundid?", "/home/vic/Projects/almanac", "s1")
 
     assert result.should_inject is False
     assert result.reason == "broad-project-query"
 
 
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.get_config", return_value={"prompt_recall": True, "recall_diagnostics": False})
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.get_config", return_value={"prompt_recall": True, "recall_diagnostics": False})
 def test_recall_diagnostics_disabled_by_default(_config, mock_log):
-    build_recall("go for the extensions cleanup", "/home/vic/Projects/memento-vault", "s1")
+    build_recall("go for the extensions cleanup", "/home/vic/Projects/almanac", "s1")
 
     actions = [call.args[1] for call in mock_log.call_args_list]
     assert "low-signal-prompt" in actions
     assert not any(action.startswith("diagnostic-") for action in actions)
 
 
-@patch("memento.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.log_retrieval")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={"prompt_recall": True, "recall_diagnostics": True, "recall_diagnostics_include_candidates": False},
 )
 def test_recall_diagnostics_logs_skip_decision(_config, mock_log):
-    build_recall("go for the extensions cleanup", "/home/vic/Projects/memento-vault", "s1")
+    build_recall("go for the extensions cleanup", "/home/vic/Projects/almanac", "s1")
 
     actions = [call.args[1] for call in mock_log.call_args_list]
     assert "diagnostic-start" in actions
@@ -578,24 +578,24 @@ def test_recall_diagnostics_logs_skip_decision(_config, mock_log):
     assert decision == {"decision": "skipped", "reason": "low-signal-prompt"}
 
 
-@patch("memento.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.log_retrieval")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={"prompt_recall": True, "recall_diagnostics": True, "recall_diagnostics_include_candidates": False},
 )
 def test_recall_diagnostics_logs_broad_project_skip_detail(_config, mock_log):
-    build_recall("what do we know about Fundid?", "/home/vic/Projects/memento-vault", "s1")
+    build_recall("what do we know about Fundid?", "/home/vic/Projects/almanac", "s1")
 
     skip = [call.kwargs for call in mock_log.call_args_list if call.args[1] == "diagnostic-skip"][-1]
     assert skip["reason"] == "broad-project-query"
     assert skip["broad_project_query"] is True
 
 
-@patch("memento.remote_client.is_remote", return_value=False)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
-@patch("memento.lifecycle.get_config", return_value={"prompt_recall": True, "recall_diagnostics": True})
+@patch("almanac.remote_client.is_remote", return_value=False)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
+@patch("almanac.lifecycle.get_config", return_value={"prompt_recall": True, "recall_diagnostics": True})
 def test_run_recall_lines_broad_project_skip_does_not_search(
     _config, mock_vault, _has_qmd, mock_search, _is_remote, tmp_path
 ):
@@ -608,14 +608,14 @@ def test_run_recall_lines_broad_project_skip_does_not_search(
     mock_search.assert_not_called()
 
 
-@patch("memento.remote_client.is_remote", return_value=False)
-@patch("memento.lifecycle.recently_injected_paths", return_value=set())
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
+@patch("almanac.remote_client.is_remote", return_value=False)
+@patch("almanac.lifecycle.recently_injected_paths", return_value=set())
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -655,8 +655,8 @@ def test_run_recall_lines_specific_project_prompt_searches(
             {"path": "notes/src-a.md", "title": "src/a.py", "score": 0.99},
         ),
         (
-            "MEMENTO_VAULT_PATH",
-            {"path": "notes/env.md", "title": "MEMENTO_VAULT_PATH", "score": 0.98},
+            "ALMANAC_VAULT_PATH",
+            {"path": "notes/env.md", "title": "ALMANAC_VAULT_PATH", "score": 0.98},
         ),
         (
             "550e8400-e29b-41d4-a716-446655440000",
@@ -668,14 +668,14 @@ def test_run_recall_lines_specific_project_prompt_searches(
         ),
     ],
 )
-@patch("memento.remote_client.is_remote", return_value=False)
-@patch("memento.lifecycle.recently_injected_paths", return_value=set())
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
+@patch("almanac.remote_client.is_remote", return_value=False)
+@patch("almanac.lifecycle.recently_injected_paths", return_value=set())
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_concrete_mode": "auto",
@@ -709,10 +709,10 @@ def test_run_recall_lines_opt_in_concrete_mode_uses_literal_search(
     assert mock_search.call_args.kwargs["semantic"] is False
 
 
-@patch("memento.remote_client.is_remote", return_value=True)
-@patch("memento.remote_client.search")
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.get_config", return_value={"prompt_recall": True, "recall_diagnostics": True})
+@patch("almanac.remote_client.is_remote", return_value=True)
+@patch("almanac.remote_client.search")
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.get_config", return_value={"prompt_recall": True, "recall_diagnostics": True})
 def test_run_recall_lines_remote_broad_project_skip_does_not_search(
     _config, mock_local_search, mock_remote_search, _is_remote
 ):
@@ -723,12 +723,12 @@ def test_run_recall_lines_remote_broad_project_skip_does_not_search(
     mock_local_search.assert_not_called()
 
 
-@patch("memento.remote_client.is_remote", return_value=True)
-@patch("memento.lifecycle.recently_injected_paths", return_value=set())
-@patch("memento.remote_client.search_envelope")
-@patch("memento.lifecycle.has_qmd")
+@patch("almanac.remote_client.is_remote", return_value=True)
+@patch("almanac.lifecycle.recently_injected_paths", return_value=set())
+@patch("almanac.remote_client.search_envelope")
+@patch("almanac.lifecycle.has_qmd")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -757,12 +757,12 @@ def test_run_recall_lines_remote_specific_project_prompt_injects_match(
     mock_has_qmd.assert_not_called()
 
 
-@patch("memento.remote_client.is_remote", return_value=True)
-@patch("memento.lifecycle.recently_injected_paths", return_value=set())
-@patch("memento.remote_client.search_envelope")
-@patch("memento.lifecycle.has_qmd")
+@patch("almanac.remote_client.is_remote", return_value=True)
+@patch("almanac.lifecycle.recently_injected_paths", return_value=set())
+@patch("almanac.remote_client.search_envelope")
+@patch("almanac.lifecycle.has_qmd")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_concrete_mode": "auto",
@@ -788,12 +788,12 @@ def test_run_recall_lines_remote_concrete_mode_uses_literal_search(
     mock_has_qmd.assert_not_called()
 
 
-@patch("memento.remote_client.is_remote", return_value=True)
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.remote_client.search_envelope")
-@patch("memento.lifecycle.has_qmd")
+@patch("almanac.remote_client.is_remote", return_value=True)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.remote_client.search_envelope")
+@patch("almanac.lifecycle.has_qmd")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -822,11 +822,11 @@ def test_run_recall_lines_remote_project_mismatch_skips_without_candidate_diagno
     ]
 
 
-@patch("memento.remote_client.is_remote", return_value=True)
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.remote_client.search_envelope")
+@patch("almanac.remote_client.is_remote", return_value=True)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.remote_client.search_envelope")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -861,13 +861,13 @@ def test_run_recall_lines_remote_project_filter_logs_candidate_diagnostics_when_
     ]
 
 
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -944,7 +944,7 @@ def test_explicit_project_filter_does_not_treat_sentence_initial_caps_as_project
 
 
 def test_explicit_project_filter_does_not_treat_acronyms_as_projects():
-    results = [{"path": "notes/mcp.md", "title": "MCP lifecycle", "score": 0.8, "project": "memento-vault"}]
+    results = [{"path": "notes/mcp.md", "title": "MCP lifecycle", "score": 0.8, "project": "almanac"}]
 
     filtered, decisions = filter_recall_results_by_explicit_project(
         "what did we decide about MCP lifecycle tools?", results
@@ -967,7 +967,7 @@ def test_explicit_project_filter_detects_lowercase_project_subject():
     ]
 
 
-@patch("memento.lifecycle.read_note_metadata", return_value={"project": "dala-care"})
+@patch("almanac.lifecycle.read_note_metadata", return_value={"project": "dala-care"})
 def test_explicit_project_filter_reads_local_note_metadata_when_result_metadata_was_stripped(_read_meta):
     results = [{"path": "notes/dala.md", "title": "Dala scheduling", "score": 0.8}]
 
@@ -981,14 +981,14 @@ def test_explicit_project_filter_reads_local_note_metadata_when_result_metadata_
     ]
 
 
-@patch("memento.remote_client.is_remote", return_value=False)
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
+@patch("almanac.remote_client.is_remote", return_value=False)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -1023,14 +1023,14 @@ def test_run_recall_lines_project_mismatch_can_filter_everything_without_candida
     ]
 
 
-@patch("memento.remote_client.is_remote", return_value=False)
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
+@patch("almanac.remote_client.is_remote", return_value=False)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -1069,10 +1069,10 @@ def test_run_recall_lines_project_filter_logs_candidate_diagnostics_when_enabled
     assert project_filter_events[0]["query"].startswith("what did we decide about Fundid server-side email dispatch?")
 
 
-@patch("memento.remote_client.is_remote", return_value=False)
-@patch("memento.lifecycle.has_qmd", return_value=False)
-@patch("memento.lifecycle.get_vault")
-@patch("memento.lifecycle.get_config", return_value={"prompt_recall": True, "recall_diagnostics": True})
+@patch("almanac.remote_client.is_remote", return_value=False)
+@patch("almanac.lifecycle.has_qmd", return_value=False)
+@patch("almanac.lifecycle.get_vault")
+@patch("almanac.lifecycle.get_config", return_value={"prompt_recall": True, "recall_diagnostics": True})
 def test_build_recall_backend_unavailable_includes_miss_metadata(_config, mock_vault, _has_qmd, _is_remote, tmp_path):
     (tmp_path / "notes").mkdir()
     mock_vault.return_value = tmp_path
@@ -1085,13 +1085,13 @@ def test_build_recall_backend_unavailable_includes_miss_metadata(_config, mock_v
     assert any("almanac_status" in hint for hint in result.metadata["miss"]["recovery_hints"])
 
 
-@patch("memento.remote_client.is_remote", return_value=False)
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
+@patch("almanac.remote_client.is_remote", return_value=False)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -1122,14 +1122,14 @@ def test_build_recall_threshold_miss_includes_miss_metadata(
     }
 
 
-@patch("memento.remote_client.is_remote", return_value=False)
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
+@patch("almanac.remote_client.is_remote", return_value=False)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -1160,12 +1160,12 @@ def test_build_recall_project_filter_empty_includes_miss_metadata(
     assert "cwd" not in result.metadata["miss"].get("details", {})
 
 
-@patch("memento.remote_client.is_remote", return_value=True)
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.remote_client.search_envelope")
-@patch("memento.lifecycle.has_qmd", return_value=False)
+@patch("almanac.remote_client.is_remote", return_value=True)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.remote_client.search_envelope")
+@patch("almanac.lifecycle.has_qmd", return_value=False)
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -1182,7 +1182,7 @@ def test_build_recall_preserves_remote_structured_miss_when_local_unavailable(
         "results": [],
         "miss": {"reason": "threshold_too_high", "recovery_hints": ["Lower min_score."]},
     }
-    with patch("memento.lifecycle.get_vault", return_value=tmp_path):
+    with patch("almanac.lifecycle.get_vault", return_value=tmp_path):
         result = build_recall("how should cache invalidation work?", str(tmp_path), "s1")
 
     assert result.should_inject is False
@@ -1195,15 +1195,15 @@ def test_build_recall_preserves_remote_structured_miss_when_local_unavailable(
     assert decisions[-1]["reason"] == "threshold_too_high"
 
 
-@patch("memento.remote_client.is_remote", return_value=True)
-@patch("memento.lifecycle.recently_injected_paths", return_value=set())
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
-@patch("memento.lifecycle.get_vault")
-@patch("memento.remote_client.search_envelope")
+@patch("almanac.remote_client.is_remote", return_value=True)
+@patch("almanac.lifecycle.recently_injected_paths", return_value=set())
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.get_vault")
+@patch("almanac.remote_client.search_envelope")
 @patch(
-    "memento.lifecycle.get_config",
+    "almanac.lifecycle.get_config",
     return_value={
         "prompt_recall": True,
         "recall_diagnostics": True,
@@ -1262,26 +1262,26 @@ def test_tool_context_skips_agent_skill_and_memory_files():
     assert build_tool_context("Read", "/repo/.pi/settings.json", "/repo", "s1").reason == "skipped-path"
 
 
-def test_tool_context_skips_memento_bridge_adapter_files():
-    assert build_tool_context("Read", "/repo/extensions/memento.ts", "/repo", "s1").reason == "skipped-path"
-    assert build_tool_context("Read", "/repo/memento/pi_bridge.py", "/repo", "s1").reason == "skipped-path"
+def test_tool_context_skips_almanac_bridge_adapter_files():
+    assert build_tool_context("Read", "/repo/extensions/almanac.ts", "/repo", "s1").reason == "skipped-path"
+    assert build_tool_context("Read", "/repo/almanac/pi_bridge.py", "/repo", "s1").reason == "skipped-path"
 
 
-@patch("memento.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.has_qmd", return_value=True)
 def test_tool_context_skips_insufficient_keywords(_has_qmd):
-    with patch("memento.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}):
-        with patch("memento.lifecycle.save_cache"):
+    with patch("almanac.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}):
+        with patch("almanac.lifecycle.save_cache"):
             result = build_tool_context("Read", "/workspace/src/a.py", "/repo", "s1")
 
     assert result.reason == "insufficient-keywords"
 
 
-@patch("memento.lifecycle.has_qmd", return_value=False)
+@patch("almanac.lifecycle.has_qmd", return_value=False)
 def test_tool_context_resolves_relative_path_against_session_cwd(_has_qmd, tmp_path, monkeypatch):
-    # The Pi bridge runs with cwd=<memento-vault checkout> while the session
+    # The Pi bridge runs with cwd=<almanac checkout> while the session
     # works in another project and passes the Read tool's raw relative path.
     # The path must resolve under the session cwd, not the process cwd.
-    foreign_checkout = tmp_path / "memento-vault-checkout"
+    foreign_checkout = tmp_path / "almanac-checkout"
     foreign_checkout.mkdir()
     session_project = tmp_path / "user-project"
     (session_project / "src").mkdir(parents=True)
@@ -1297,7 +1297,7 @@ def test_tool_context_resolves_relative_path_against_session_cwd(_has_qmd, tmp_p
     assert result.reason in ("qmd-unavailable", "skipped-path")
 
 
-@patch("memento.lifecycle.has_qmd", return_value=False)
+@patch("almanac.lifecycle.has_qmd", return_value=False)
 def test_tool_context_absolute_path_ignores_session_cwd(_has_qmd, tmp_path):
     session_project = tmp_path / "user-project"
     (session_project / "src").mkdir(parents=True)
@@ -1308,7 +1308,7 @@ def test_tool_context_absolute_path_ignores_session_cwd(_has_qmd, tmp_path):
     assert result.metadata["file_path"] == os.path.realpath(absolute)
 
 
-@patch("memento.lifecycle.has_qmd", return_value=False)
+@patch("almanac.lifecycle.has_qmd", return_value=False)
 def test_tool_context_relative_path_without_cwd_uses_process_cwd(_has_qmd, tmp_path, monkeypatch):
     project = tmp_path / "project"
     (project / "src").mkdir(parents=True)
@@ -1320,20 +1320,20 @@ def test_tool_context_relative_path_without_cwd_uses_process_cwd(_has_qmd, tmp_p
 
 
 def test_tool_context_keywords_are_relative_to_session_cwd(tmp_path):
-    from memento.lifecycle import extract_tool_context_keywords
+    from almanac.lifecycle import extract_tool_context_keywords
 
     project = tmp_path / "rondo-workspaces" / "MEM-59"
-    file_path = project / "memento" / "lifecycle.py"
+    file_path = project / "almanac" / "lifecycle.py"
     file_path.parent.mkdir(parents=True)
     file_path.touch()
 
     query = extract_tool_context_keywords(str(file_path), str(project))
 
-    assert query == "memento lifecycle"
+    assert query == "almanac lifecycle"
 
 
 def test_load_cache_drops_pre_schema_dir_entries(tmp_path, monkeypatch):
-    import memento.lifecycle as lifecycle_module
+    import almanac.lifecycle as lifecycle_module
 
     cache_file = tmp_path / "tool-context-cache.json"
     cache_file.write_text(
@@ -1359,7 +1359,7 @@ def test_load_cache_drops_pre_schema_dir_entries(tmp_path, monkeypatch):
 
 
 def test_load_cache_keeps_current_schema_entries(tmp_path, monkeypatch):
-    import memento.lifecycle as lifecycle_module
+    import almanac.lifecycle as lifecycle_module
 
     cache_file = tmp_path / "tool-context-cache.json"
     cache_file.write_text(
@@ -1379,10 +1379,10 @@ def test_load_cache_keeps_current_schema_entries(tmp_path, monkeypatch):
     assert cache["dirs"]["/project/docs"]["results"] == [{"path": "notes/good.md"}]
 
 
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
 def test_tool_context_searches_and_formats_results(_has_qmd, mock_search, _enhance, _log):
     mock_search.return_value = [
         {
@@ -1395,9 +1395,9 @@ def test_tool_context_searches_and_formats_results(_has_qmd, mock_search, _enhan
 
     config = dict(DEFAULT_CONFIG)
     config["tool_context_min_score"] = 0.75
-    with patch("memento.lifecycle.get_config", return_value=config):
-        with patch("memento.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}):
-            with patch("memento.lifecycle.save_cache"):
+    with patch("almanac.lifecycle.get_config", return_value=config):
+        with patch("almanac.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}):
+            with patch("almanac.lifecycle.save_cache"):
                 result = build_tool_context("Read", "src/server/authMiddleware.ts", "/repo", "s1")
 
     assert result.should_inject is True
@@ -1414,14 +1414,14 @@ def test_tool_context_searches_and_formats_results(_has_qmd, mock_search, _enhan
     assert decision["query"] == "auth middleware"
 
 
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
 def test_tool_context_diagnostics_logs_terminal_skip(_has_qmd, mock_log):
     config = dict(DEFAULT_CONFIG)
     config["tool_context"] = True
-    with patch("memento.lifecycle.get_config", return_value=config):
+    with patch("almanac.lifecycle.get_config", return_value=config):
         with patch(
-            "memento.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": time.time(), "injections": {}}
+            "almanac.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": time.time(), "injections": {}}
         ):
             result = build_tool_context("Read", "src/server/authMiddleware.ts", "/repo", "s1")
 
@@ -1431,10 +1431,10 @@ def test_tool_context_diagnostics_logs_terminal_skip(_has_qmd, mock_log):
     assert decision["file_path"].endswith("/repo/src/server/authMiddleware.ts")
 
 
-@patch("memento.lifecycle.log_retrieval")
-@patch("memento.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
-@patch("memento.lifecycle.qmd_search_with_extras")
-@patch("memento.lifecycle.has_qmd", return_value=True)
+@patch("almanac.lifecycle.log_retrieval")
+@patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *args, **kwargs: results)
+@patch("almanac.lifecycle.qmd_search_with_extras")
+@patch("almanac.lifecycle.has_qmd", return_value=True)
 def test_tool_context_diagnostics_can_include_candidate_summaries(_has_qmd, mock_search, _enhance, mock_log):
     mock_search.return_value = [
         {
@@ -1447,9 +1447,9 @@ def test_tool_context_diagnostics_can_include_candidate_summaries(_has_qmd, mock
 
     config = dict(DEFAULT_CONFIG)
     config["tool_context_diagnostics_include_candidates"] = True
-    with patch("memento.lifecycle.get_config", return_value=config):
-        with patch("memento.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}):
-            with patch("memento.lifecycle.save_cache"):
+    with patch("almanac.lifecycle.get_config", return_value=config):
+        with patch("almanac.lifecycle.load_cache", return_value={"dirs": {}, "last_qmd_call": 0, "injections": {}}):
+            with patch("almanac.lifecycle.save_cache"):
                 build_tool_context("Read", "src/server/authMiddleware.ts", "/repo", "s1")
 
     decision = [call.kwargs for call in mock_log.call_args_list if call.args[:2] == ("tool-context", "decision")][-1]
@@ -1536,7 +1536,7 @@ def test_triage_health_warning_reads_always_on_health_log(tmp_path):
         + "\n"
     )
 
-    with patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+    with patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
         warning = triage_health_warning()
 
     assert warning is not None
@@ -1580,7 +1580,7 @@ def test_pi_bridge_health_warning_reads_recent_bridge_failures(tmp_path):
         + "\n"
     )
 
-    with patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+    with patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
         warning = pi_bridge_health_warning()
 
     assert warning is not None
@@ -1602,7 +1602,7 @@ def test_pi_bridge_health_warning_ignores_success_records(tmp_path):
         + "\n"
     )
 
-    with patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+    with patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
         warning = pi_bridge_health_warning()
 
     assert warning is None
@@ -1633,8 +1633,8 @@ def test_triage_health_warning_falls_back_to_legacy_retrieval_log(tmp_path):
     )
 
     with (
-        patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
-        patch("memento.lifecycle.RETRIEVAL_LOG_PATH", str(retrieval_log)),
+        patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
+        patch("almanac.lifecycle.RETRIEVAL_LOG_PATH", str(retrieval_log)),
     ):
         warning = triage_health_warning()
 
@@ -1667,7 +1667,7 @@ def test_triage_health_warning_adds_invalid_mcp_hint(tmp_path):
         + "\n"
     )
 
-    with patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+    with patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
         warning = triage_health_warning()
 
     assert warning is not None
@@ -1698,7 +1698,7 @@ def test_triage_health_warning_adds_stale_certainty_hint(tmp_path):
         + "\n"
     )
 
-    with patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+    with patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
         warning = triage_health_warning()
 
     assert warning is not None
@@ -1729,7 +1729,7 @@ def test_triage_health_warning_detects_other_accepted_certainty_labels(tmp_path)
         + "\n"
     )
 
-    with patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+    with patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
         warning = triage_health_warning()
 
     assert warning is not None
@@ -1741,12 +1741,12 @@ class TestDeferredWorkerResolution:
     def _make_layout(self, root, installed):
         """Create a fake lifecycle.py location plus a worker script.
 
-        installed=False: <root>/memento/lifecycle.py + <root>/hooks/<worker>
-        installed=True:  <root>/memento/lifecycle.py + <root>/<worker>  (the
+        installed=False: <root>/almanac/lifecycle.py + <root>/hooks/<worker>
+        installed=True:  <root>/almanac/lifecycle.py + <root>/<worker>  (the
         ~/.claude/hooks layout install.sh produces)
         """
-        (root / "memento").mkdir(parents=True)
-        fake_lifecycle = root / "memento" / "lifecycle.py"
+        (root / "almanac").mkdir(parents=True)
+        fake_lifecycle = root / "almanac" / "lifecycle.py"
         fake_lifecycle.write_text("# fake\n")
         if installed:
             worker = root / "vault-briefing.py"
@@ -1757,7 +1757,7 @@ class TestDeferredWorkerResolution:
         return fake_lifecycle, worker
 
     def test_find_hook_script_repo_layout(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         fake_lifecycle, worker = self._make_layout(tmp_path / "repo", installed=False)
         monkeypatch.setattr(lifecycle_module, "__file__", str(fake_lifecycle))
@@ -1765,7 +1765,7 @@ class TestDeferredWorkerResolution:
         assert lifecycle_module._find_hook_script("vault-briefing.py") == worker
 
     def test_find_hook_script_installed_layout(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         fake_lifecycle, worker = self._make_layout(tmp_path / "claude-hooks", installed=True)
         monkeypatch.setattr(lifecycle_module, "__file__", str(fake_lifecycle))
@@ -1773,17 +1773,17 @@ class TestDeferredWorkerResolution:
         assert lifecycle_module._find_hook_script("vault-briefing.py") == worker
 
     def test_find_hook_script_missing_returns_none(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
-        (tmp_path / "empty" / "memento").mkdir(parents=True)
-        fake_lifecycle = tmp_path / "empty" / "memento" / "lifecycle.py"
+        (tmp_path / "empty" / "almanac").mkdir(parents=True)
+        fake_lifecycle = tmp_path / "empty" / "almanac" / "lifecycle.py"
         fake_lifecycle.write_text("# fake\n")
         monkeypatch.setattr(lifecycle_module, "__file__", str(fake_lifecycle))
 
         assert lifecycle_module._find_hook_script("vault-briefing.py") is None
 
     def test_deferred_briefing_path_is_scoped_by_project_session_and_host(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         monkeypatch.setattr(lifecycle_module, "DEFERRED_BRIEFING_PATH", str(tmp_path / "deferred.json"))
 
@@ -1799,7 +1799,7 @@ class TestDeferredWorkerResolution:
         assert Path(first).name.startswith("deferred-")
 
     def test_consume_deferred_briefing_ignores_legacy_global_file(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         legacy_path = tmp_path / "deferred.json"
         monkeypatch.setattr(lifecycle_module, "DEFERRED_BRIEFING_PATH", str(legacy_path))
@@ -1817,7 +1817,7 @@ class TestDeferredWorkerResolution:
         assert not legacy_path.exists()
 
     def test_consume_deferred_briefing_requires_matching_scope_and_ttl(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         monkeypatch.setattr(lifecycle_module, "DEFERRED_BRIEFING_PATH", str(tmp_path / "deferred.json"))
         scoped_path = Path(lifecycle_module.deferred_briefing_path("api-service", "session-a", "/repo/api"))
@@ -1856,13 +1856,13 @@ class TestDeferredWorkerResolution:
         assert not expired_path.exists()
 
     def test_spawn_deferred_search_uses_installed_layout_worker(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         fake_lifecycle, worker = self._make_layout(tmp_path / "claude-hooks", installed=True)
         monkeypatch.setattr(lifecycle_module, "__file__", str(fake_lifecycle))
         monkeypatch.setattr(lifecycle_module, "DEFERRED_BRIEFING_PATH", str(tmp_path / "deferred.json"))
 
-        with patch("memento.lifecycle._subprocess.Popen") as mock_popen:
+        with patch("almanac.lifecycle._subprocess.Popen") as mock_popen:
             lifecycle_module.spawn_deferred_search("api-service", "main", [], {}, session_id="session-a")
 
         cmd = mock_popen.call_args[0][0]
@@ -1873,17 +1873,17 @@ class TestDeferredWorkerResolution:
         assert deferred_path.exists()
 
     def test_spawn_deferred_search_missing_worker_logs_and_skips(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
-        (tmp_path / "empty" / "memento").mkdir(parents=True)
-        fake_lifecycle = tmp_path / "empty" / "memento" / "lifecycle.py"
+        (tmp_path / "empty" / "almanac").mkdir(parents=True)
+        fake_lifecycle = tmp_path / "empty" / "almanac" / "lifecycle.py"
         fake_lifecycle.write_text("# fake\n")
         monkeypatch.setattr(lifecycle_module, "__file__", str(fake_lifecycle))
         monkeypatch.setattr(lifecycle_module, "DEFERRED_BRIEFING_PATH", str(tmp_path / "deferred.json"))
 
         with (
-            patch("memento.lifecycle._subprocess.Popen") as mock_popen,
-            patch("memento.lifecycle.log_retrieval") as mock_log,
+            patch("almanac.lifecycle._subprocess.Popen") as mock_popen,
+            patch("almanac.lifecycle.log_retrieval") as mock_log,
         ):
             lifecycle_module.spawn_deferred_search("api-service", "main", [], {}, session_id="session-a")
 
@@ -1894,11 +1894,11 @@ class TestDeferredWorkerResolution:
         assert mock_log.call_args[0] == ("briefing", "deferred-worker-missing")
 
     def test_spawn_deep_recall_uses_installed_layout_worker(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         root = tmp_path / "claude-hooks"
-        (root / "memento").mkdir(parents=True)
-        fake_lifecycle = root / "memento" / "lifecycle.py"
+        (root / "almanac").mkdir(parents=True)
+        fake_lifecycle = root / "almanac" / "lifecycle.py"
         fake_lifecycle.write_text("# fake\n")
         worker = root / "vault-recall.py"
         worker.write_text("# worker\n")
@@ -1906,7 +1906,7 @@ class TestDeferredWorkerResolution:
         monkeypatch.setattr(lifecycle_module, "RUNTIME_DIR", str(tmp_path))
         monkeypatch.setattr(lifecycle_module, "DEEP_RECALL_PENDING_PATH", str(tmp_path / "pending.json"))
 
-        with patch("memento.lifecycle._subprocess.Popen") as mock_popen:
+        with patch("almanac.lifecycle._subprocess.Popen") as mock_popen:
             lifecycle_module.spawn_deep_recall("why does the cache fail?", [], {})
 
         cmd = mock_popen.call_args[0][0]
@@ -1914,17 +1914,17 @@ class TestDeferredWorkerResolution:
         assert Path(cmd[1]).exists()
 
     def test_spawn_deep_recall_missing_worker_logs_and_skips(self, tmp_path, monkeypatch):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
-        (tmp_path / "empty" / "memento").mkdir(parents=True)
-        fake_lifecycle = tmp_path / "empty" / "memento" / "lifecycle.py"
+        (tmp_path / "empty" / "almanac").mkdir(parents=True)
+        fake_lifecycle = tmp_path / "empty" / "almanac" / "lifecycle.py"
         fake_lifecycle.write_text("# fake\n")
         monkeypatch.setattr(lifecycle_module, "__file__", str(fake_lifecycle))
         monkeypatch.setattr(lifecycle_module, "DEEP_RECALL_PENDING_PATH", str(tmp_path / "pending.json"))
 
         with (
-            patch("memento.lifecycle._subprocess.Popen") as mock_popen,
-            patch("memento.lifecycle.log_retrieval") as mock_log,
+            patch("almanac.lifecycle._subprocess.Popen") as mock_popen,
+            patch("almanac.lifecycle.log_retrieval") as mock_log,
         ):
             lifecycle_module.spawn_deep_recall("why does the cache fail?", [], {})
 
@@ -1963,7 +1963,7 @@ class TestTriageWarnRateLimitAndErrorText:
     def test_warning_includes_last_recorded_error_text(self, tmp_path):
         health_log = self._failing_log(tmp_path)
 
-        with patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+        with patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
             warning = triage_health_warning()
 
         assert warning is not None
@@ -1974,8 +1974,8 @@ class TestTriageWarnRateLimitAndErrorText:
         state = tmp_path / "triage-warn-state.json"
 
         with (
-            patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
-            patch("memento.lifecycle.TRIAGE_WARN_STATE_PATH", str(state)),
+            patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
+            patch("almanac.lifecycle.TRIAGE_WARN_STATE_PATH", str(state)),
         ):
             first = triage_health_warning(rate_limited=True)
             second = triage_health_warning(rate_limited=True)
@@ -1990,8 +1990,8 @@ class TestTriageWarnRateLimitAndErrorText:
         state.write_text(json.dumps({"date": "2001-01-01"}))
 
         with (
-            patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
-            patch("memento.lifecycle.TRIAGE_WARN_STATE_PATH", str(state)),
+            patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
+            patch("almanac.lifecycle.TRIAGE_WARN_STATE_PATH", str(state)),
         ):
             warning = triage_health_warning(rate_limited=True)
 
@@ -2003,8 +2003,8 @@ class TestTriageWarnRateLimitAndErrorText:
         state = tmp_path / "triage-warn-state.json"
 
         with (
-            patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
-            patch("memento.lifecycle.TRIAGE_WARN_STATE_PATH", str(state)),
+            patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
+            patch("almanac.lifecycle.TRIAGE_WARN_STATE_PATH", str(state)),
         ):
             triage_health_warning(rate_limited=True)
             unlimited = triage_health_warning()
@@ -2020,8 +2020,8 @@ class TestTriageWarnRateLimitAndErrorText:
         state = tmp_path / "triage-warn-state.json"
 
         with (
-            patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
-            patch("memento.lifecycle.TRIAGE_WARN_STATE_PATH", str(state)),
+            patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
+            patch("almanac.lifecycle.TRIAGE_WARN_STATE_PATH", str(state)),
         ):
             warning = triage_health_warning(rate_limited=True)
 
@@ -2050,7 +2050,7 @@ def test_triage_warning_error_text_is_injection_stripped(tmp_path):
         + "\n"
     )
 
-    with patch("memento.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+    with patch("almanac.lifecycle.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
         warning = triage_health_warning()
 
     assert warning is not None
@@ -2062,7 +2062,7 @@ def test_triage_warning_error_text_is_injection_stripped(tmp_path):
 
 class TestRecallDedupPerSessionMultiPath:
     def _engine(self):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         return lifecycle_module
 
@@ -2074,7 +2074,7 @@ class TestRecallDedupPerSessionMultiPath:
 
     def test_paths_expire_after_n_prompts(self):
         m = self._engine()
-        with patch("memento.lifecycle.get_config", return_value={"recall_dedup_prompts": 2}):
+        with patch("almanac.lifecycle.get_config", return_value={"recall_dedup_prompts": 2}):
             m.record_recall(["notes/a.md"], "s1")
 
         m.bump_prompts_since("s1")
@@ -2166,13 +2166,13 @@ class TestRecallDedupPerSessionMultiPath:
         ]
 
         with (
-            patch("memento.remote_client.is_remote", return_value=False),
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.get_vault", return_value=tmp_path),
-            patch("memento.lifecycle.has_qmd", return_value=True),
-            patch("memento.lifecycle.qmd_search_with_extras", return_value=results),
-            patch("memento.lifecycle.enhance_results", side_effect=lambda r, *a, **k: r),
-            patch("memento.lifecycle.recently_injected_paths", return_value={"notes/seen.md"}),
+            patch("almanac.remote_client.is_remote", return_value=False),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.qmd_search_with_extras", return_value=results),
+            patch("almanac.lifecycle.enhance_results", side_effect=lambda r, *a, **k: r),
+            patch("almanac.lifecycle.recently_injected_paths", return_value={"notes/seen.md"}),
         ):
             _lines, top_path, injected, reason = _run_recall_lines(
                 "why does the fresh cache note matter here?", str(tmp_path), "s1"
@@ -2198,13 +2198,13 @@ class TestRecallDedupPerSessionMultiPath:
         results = [{"path": "notes/seen.md", "title": "Seen note", "score": 0.9}]
 
         with (
-            patch("memento.remote_client.is_remote", return_value=False),
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.get_vault", return_value=tmp_path),
-            patch("memento.lifecycle.has_qmd", return_value=True),
-            patch("memento.lifecycle.qmd_search_with_extras", return_value=results),
-            patch("memento.lifecycle.enhance_results", side_effect=lambda r, *a, **k: r),
-            patch("memento.lifecycle.recently_injected_paths", return_value={"notes/seen.md"}),
+            patch("almanac.remote_client.is_remote", return_value=False),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.get_vault", return_value=tmp_path),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.qmd_search_with_extras", return_value=results),
+            patch("almanac.lifecycle.enhance_results", side_effect=lambda r, *a, **k: r),
+            patch("almanac.lifecycle.recently_injected_paths", return_value={"notes/seen.md"}),
         ):
             lines, _top_path, _injected, reason = _run_recall_lines(
                 "why does the seen cache note matter here?", str(tmp_path), "s1"
@@ -2218,7 +2218,7 @@ class TestToolContextCacheTTLAndScoping:
     def _call(self, cache, qmd_results=None, cwd="/repo", session_id="s1", lineage_id=None, config_extra=None):
         import time as _time
 
-        from memento.lifecycle import build_tool_context
+        from almanac.lifecycle import build_tool_context
 
         config = dict(DEFAULT_CONFIG)
         config["tool_context_min_score"] = 0.75
@@ -2227,16 +2227,16 @@ class TestToolContextCacheTTLAndScoping:
         saved = {}
 
         with (
-            patch("memento.lifecycle.has_qmd", return_value=True),
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.load_cache", return_value=cache),
-            patch("memento.lifecycle.save_cache", side_effect=lambda c: saved.update(c)),
+            patch("almanac.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.load_cache", return_value=cache),
+            patch("almanac.lifecycle.save_cache", side_effect=lambda c: saved.update(c)),
             patch(
-                "memento.lifecycle.qmd_search_with_extras",
+                "almanac.lifecycle.qmd_search_with_extras",
                 return_value=qmd_results if qmd_results is not None else [],
             ) as mock_search,
-            patch("memento.lifecycle.enhance_results", side_effect=lambda results, *a, **k: results),
-            patch("memento.lifecycle.log_retrieval") as mock_log,
+            patch("almanac.lifecycle.enhance_results", side_effect=lambda results, *a, **k: results),
+            patch("almanac.lifecycle.log_retrieval") as mock_log,
         ):
             result = build_tool_context(
                 "Read", "/workspace/src/server/authMiddleware.ts", cwd, session_id, lineage_id=lineage_id
@@ -2246,7 +2246,7 @@ class TestToolContextCacheTTLAndScoping:
     def test_fresh_cache_entry_serves_hit_without_search(self):
         import time as _time
 
-        from memento.lifecycle import _tool_context_dir_key
+        from almanac.lifecycle import _tool_context_dir_key
 
         key = _tool_context_dir_key("/repo", "/workspace/src/server/authMiddleware.ts")
         cache = {
@@ -2269,7 +2269,7 @@ class TestToolContextCacheTTLAndScoping:
     def test_cache_hit_restores_result_count_diagnostics(self):
         import time as _time
 
-        from memento.lifecycle import _tool_context_dir_key
+        from almanac.lifecycle import _tool_context_dir_key
 
         key = _tool_context_dir_key("/repo", "/workspace/src/server/authMiddleware.ts")
         cache = {
@@ -2299,19 +2299,19 @@ class TestToolContextCacheTTLAndScoping:
         assert decision["enhanced_result_count"] == 1
 
     def test_search_backend_error_fails_open_with_terminal_decision(self):
-        from memento.lifecycle import build_tool_context
+        from almanac.lifecycle import build_tool_context
 
         config = dict(DEFAULT_CONFIG)
         cache = {"schema": 3, "dirs": {}, "last_qmd_call": 0, "injections": {}}
         saved = {}
 
         with (
-            patch("memento.lifecycle.has_qmd", return_value=True),
-            patch("memento.lifecycle.get_config", return_value=config),
-            patch("memento.lifecycle.load_cache", return_value=cache),
-            patch("memento.lifecycle.save_cache", side_effect=lambda c: saved.update(c)),
-            patch("memento.lifecycle.qmd_search_with_extras", side_effect=RuntimeError("boom")) as mock_search,
-            patch("memento.lifecycle.log_retrieval") as mock_log,
+            patch("almanac.lifecycle.has_qmd", return_value=True),
+            patch("almanac.lifecycle.get_config", return_value=config),
+            patch("almanac.lifecycle.load_cache", return_value=cache),
+            patch("almanac.lifecycle.save_cache", side_effect=lambda c: saved.update(c)),
+            patch("almanac.lifecycle.qmd_search_with_extras", side_effect=RuntimeError("boom")) as mock_search,
+            patch("almanac.lifecycle.log_retrieval") as mock_log,
         ):
             result = build_tool_context("Read", "/workspace/src/server/authMiddleware.ts", "/repo", "s1")
 
@@ -2328,7 +2328,7 @@ class TestToolContextCacheTTLAndScoping:
     def test_expired_cache_entry_triggers_fresh_search(self):
         import time as _time
 
-        from memento.lifecycle import _tool_context_dir_key
+        from almanac.lifecycle import _tool_context_dir_key
 
         key = _tool_context_dir_key("/repo", "/workspace/src/server/authMiddleware.ts")
         cache = {
@@ -2354,7 +2354,7 @@ class TestToolContextCacheTTLAndScoping:
         assert any(call.args[:2] == ("tool-context", "cache-expired") for call in mock_log.call_args_list)
 
     def test_ttl_zero_disables_expiry(self):
-        from memento.lifecycle import _tool_context_dir_key
+        from almanac.lifecycle import _tool_context_dir_key
 
         key = _tool_context_dir_key("/repo", "/workspace/src/server/authMiddleware.ts")
         cache = {
@@ -2390,7 +2390,7 @@ class TestToolContextCacheTTLAndScoping:
         assert key_b.endswith("::/workspace/src/server")
 
     def test_injection_cap_keyed_by_lineage_survives_resume(self):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         cache = lifecycle_module._empty_tool_context_cache()
         lifecycle_module.record_injection(
@@ -2407,7 +2407,7 @@ class TestToolContextCacheTTLAndScoping:
         mock_search.assert_not_called()
 
     def test_injection_state_is_isolated_by_host_and_project(self):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         cache = {"schema": lifecycle_module.TOOL_CONTEXT_CACHE_SCHEMA, "dirs": {}, "last_qmd_call": 0, "injections": {}}
         lifecycle_module.record_injection(cache, "shared-session", ["notes/a.md"], cwd="/repo/api", host_id="claude")
@@ -2419,7 +2419,7 @@ class TestToolContextCacheTTLAndScoping:
     def test_concurrent_tool_context_cache_saves_merge_without_corruption(self, tmp_path, monkeypatch):
         import threading
 
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         monkeypatch.setattr(lifecycle_module, "CACHE_PATH", str(tmp_path / "tool-context-cache.json"))
 
@@ -2454,8 +2454,8 @@ class TestToolContextCacheTTLAndScoping:
     def test_duplicate_paths_keyed_by_lineage_survive_resume(self):
         import time as _time
 
-        import memento.lifecycle as lifecycle_module
-        from memento.lifecycle import _tool_context_dir_key
+        import almanac.lifecycle as lifecycle_module
+        from almanac.lifecycle import _tool_context_dir_key
 
         key = _tool_context_dir_key("/repo", "/workspace/src/server/authMiddleware.ts")
         cache = lifecycle_module._empty_tool_context_cache()
@@ -2472,7 +2472,7 @@ class TestToolContextCacheTTLAndScoping:
         assert result.reason == "duplicate"
 
     def test_cache_merge_keeps_newest_dir_entry_for_same_key(self):
-        import memento.lifecycle as lifecycle_module
+        import almanac.lifecycle as lifecycle_module
 
         existing = lifecycle_module._empty_tool_context_cache()
         incoming = lifecycle_module._empty_tool_context_cache()
@@ -2494,23 +2494,23 @@ class TestBuildBriefingVaultMap:
     def _setup_vault(self, tmp_path, monkeypatch):
         vault = tmp_path / "vault"
         (vault / "notes").mkdir(parents=True)
-        monkeypatch.setattr("memento.lifecycle.get_vault", lambda: vault)
-        monkeypatch.setattr("memento.lifecycle.detect_project", lambda cwd, branch: ("demo-project", None))
-        monkeypatch.setattr("memento.lifecycle.get_git_branch", lambda cwd: "main")
-        monkeypatch.setattr("memento.graph._GRAPH_CACHE", [None])
-        monkeypatch.setattr("memento.graph._GRAPH_CACHE_PATH", str(tmp_path / "wikilink-graph-cache.json"))
+        monkeypatch.setattr("almanac.lifecycle.get_vault", lambda: vault)
+        monkeypatch.setattr("almanac.lifecycle.detect_project", lambda cwd, branch: ("demo-project", None))
+        monkeypatch.setattr("almanac.lifecycle.get_git_branch", lambda cwd: "main")
+        monkeypatch.setattr("almanac.graph._GRAPH_CACHE", [None])
+        monkeypatch.setattr("almanac.graph._GRAPH_CACHE_PATH", str(tmp_path / "wikilink-graph-cache.json"))
         return vault
 
     def test_vault_map_excluded_by_default(self, tmp_path, monkeypatch):
         self._setup_vault(tmp_path, monkeypatch)
         vault_map_calls = []
         monkeypatch.setattr(
-            "memento.lifecycle.vault_map",
+            "almanac.lifecycle.vault_map",
             lambda vault, project_slug, config=None: vault_map_calls.append(project_slug) or "SHOULD-NOT-APPEAR",
         )
 
         config = dict(DEFAULT_CONFIG)
-        with patch("memento.lifecycle.get_config", return_value=config):
+        with patch("almanac.lifecycle.get_config", return_value=config):
             result = build_briefing("/repo", "sess-1", allow_deferred=False)
 
         assert result.should_inject
@@ -2520,13 +2520,13 @@ class TestBuildBriefingVaultMap:
     def test_vault_map_injected_when_enabled(self, tmp_path, monkeypatch):
         self._setup_vault(tmp_path, monkeypatch)
         monkeypatch.setattr(
-            "memento.lifecycle.vault_map",
+            "almanac.lifecycle.vault_map",
             lambda vault, project_slug, config=None: f"VAULT-MAP-FOR-{project_slug}",
         )
 
         config = dict(DEFAULT_CONFIG)
         config["vault_map_in_briefing"] = True
-        with patch("memento.lifecycle.get_config", return_value=config):
+        with patch("almanac.lifecycle.get_config", return_value=config):
             result = build_briefing("/repo", "sess-1", allow_deferred=False)
 
         assert result.should_inject
@@ -2538,11 +2538,11 @@ class TestBuildBriefingVaultMap:
         def _boom(vault, project_slug, config=None):
             raise RuntimeError("vault_map exploded")
 
-        monkeypatch.setattr("memento.lifecycle.vault_map", _boom)
+        monkeypatch.setattr("almanac.lifecycle.vault_map", _boom)
 
         config = dict(DEFAULT_CONFIG)
         config["vault_map_in_briefing"] = True
-        with patch("memento.lifecycle.get_config", return_value=config):
+        with patch("almanac.lifecycle.get_config", return_value=config):
             result = build_briefing("/repo", "sess-1", allow_deferred=False)
 
         assert result.should_inject

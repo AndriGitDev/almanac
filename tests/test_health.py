@@ -12,8 +12,8 @@ from unittest.mock import patch
 
 import pytest
 
-from memento import health
-from memento.config import reset_config
+from almanac import health
+from almanac.config import reset_config
 
 
 def _make_vault(path: Path):
@@ -35,8 +35,8 @@ def isolate_health(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     vault = _make_vault(tmp_path / "vault")
-    monkeypatch.setenv("MEMENTO_VAULT_PATH", str(vault))
-    monkeypatch.setenv("MEMENTO_SEARCH_BACKEND", "grep")
+    monkeypatch.setenv("ALMANAC_VAULT_PATH", str(vault))
+    monkeypatch.setenv("ALMANAC_SEARCH_BACKEND", "grep")
     monkeypatch.setattr(health, "TRIAGE_HEALTH_LOG_PATH", str(tmp_path / "triage-health.jsonl"))
     monkeypatch.setattr(health, "RETRIEVAL_LOG_PATH", str(tmp_path / "retrieval.jsonl"))
     monkeypatch.setattr(health, "AUTOMATION_MEMORY_HEALTH_LOG_PATH", str(tmp_path / "automation-memory-health.jsonl"))
@@ -99,7 +99,7 @@ def test_deep_search_probe_uses_selected_backend(monkeypatch):
     monkeypatch.setattr(health, "reset_backend", lambda: None)
     monkeypatch.setattr(health, "get_backend", lambda: FakeBackend())
 
-    result = health._check_deep_search_probe(config={"qmd_collection": "memento"}, probe_timeout_seconds=7)
+    result = health._check_deep_search_probe(config={"qmd_collection": "almanac"}, probe_timeout_seconds=7)
 
     assert result.status == "pass"
     assert result.details["timeout_seconds"] == 7
@@ -107,7 +107,7 @@ def test_deep_search_probe_uses_selected_backend(monkeypatch):
     assert calls == [
         {
             "query": "almanac health probe",
-            "collection": "memento",
+            "collection": "almanac",
             "limit": 1,
             "semantic": False,
             "timeout": 7,
@@ -119,7 +119,7 @@ def test_deep_search_probe_uses_selected_backend(monkeypatch):
 
 def test_deep_mcp_probe_calls_tools(monkeypatch):
     calls = []
-    import memento.mcp_server as mcp_server
+    import almanac.mcp_server as mcp_server
 
     monkeypatch.setattr(mcp_server, "almanac_status", lambda: {"vault_exists": True, "qmd_available": True})
     monkeypatch.setattr(
@@ -439,8 +439,8 @@ def test_retrieval_health_warns_when_log_is_unreadable():
 
 def test_automation_memory_reports_stale_embedded_index_fails(tmp_path):
     """Lag >1h on the active embedded backend → stale_index status fail."""
-    from memento.embedded_search import EmbeddedSearchBackend
-    from memento.search_backend import set_backend, reset_backend
+    from almanac.embedded_search import EmbeddedSearchBackend
+    from almanac.search_backend import set_backend, reset_backend
 
     vault = _make_vault(tmp_path / "stale-vault")
     db = vault / ".search" / "search.db"
@@ -478,8 +478,8 @@ def test_automation_memory_reports_stale_embedded_index_fails(tmp_path):
 
 def test_automation_memory_embedded_index_warns(tmp_path):
     """Lag >60s but <=3600s on embedded backend → stale_index status warn."""
-    from memento.embedded_search import EmbeddedSearchBackend
-    from memento.search_backend import set_backend, reset_backend
+    from almanac.embedded_search import EmbeddedSearchBackend
+    from almanac.search_backend import set_backend, reset_backend
 
     vault = _make_vault(tmp_path / "warn-vault")
     db = vault / ".search" / "search.db"
@@ -516,8 +516,8 @@ def test_automation_memory_embedded_index_warns(tmp_path):
 
 def test_automation_memory_embedded_index_pass_when_fresh(tmp_path):
     """Lag <=60s on embedded backend → stale_index status pass."""
-    from memento.embedded_search import EmbeddedSearchBackend
-    from memento.search_backend import set_backend, reset_backend
+    from almanac.embedded_search import EmbeddedSearchBackend
+    from almanac.search_backend import set_backend, reset_backend
 
     vault = _make_vault(tmp_path / "fresh-vault")
     db = vault / ".search" / "search.db"
@@ -543,7 +543,7 @@ def test_automation_memory_embedded_index_pass_when_fresh(tmp_path):
 
 def test_automation_memory_qmd_index_staleness(tmp_path):
     """QMD backend: compare qmd index mtime vs newest note mtime."""
-    from memento.search_backend import set_backend, reset_backend, QMDBackend
+    from almanac.search_backend import set_backend, reset_backend, QMDBackend
 
     vault = _make_vault(tmp_path / "qmd-vault")
     note = vault / "notes" / "qmd-note.md"
@@ -585,7 +585,7 @@ def test_automation_memory_qmd_index_staleness(tmp_path):
 def test_automation_memory_grep_backend_no_staleness_warning(tmp_path):
     """GrepBackend has no index → stale_index passes (not fail/warn)."""
     vault = _make_vault(tmp_path / "grep-vault")
-    # Fixture sets MEMENTO_SEARCH_BACKEND=grep, so get_backend() returns GrepBackend
+    # Fixture sets ALMANAC_SEARCH_BACKEND=grep, so get_backend() returns GrepBackend
     readiness = health.build_automation_memory_readiness(
         config={"vault_path": str(vault)},
         vault=vault,
@@ -598,7 +598,7 @@ def test_automation_memory_grep_backend_no_staleness_warning(tmp_path):
 
 def test_automation_memory_reports_remote_sync_pending_retries(tmp_path, monkeypatch):
     vault = _make_vault(tmp_path / "remote-vault")
-    monkeypatch.setenv("MEMENTO_VAULT_URL", "https://vault.example.com/mcp")
+    monkeypatch.setenv("ALMANAC_VAULT_URL", "https://vault.example.com/mcp")
     ledger = vault / ".sync" / "ledger.jsonl"
     ledger.parent.mkdir()
     ledger.write_text(
@@ -923,8 +923,8 @@ def test_inception_health_reports_live_lock(monkeypatch):
 
 
 def test_health_prefers_xdg_config_dir_when_file_exists(tmp_path):
-    home_config = Path.home() / ".config" / "memento-vault"
-    xdg_config = Path(os.environ["XDG_CONFIG_HOME"]) / "memento-vault"
+    home_config = Path.home() / ".config" / "almanac"
+    xdg_config = Path(os.environ["XDG_CONFIG_HOME"]) / "almanac"
     home_config.mkdir(parents=True)
     xdg_config.mkdir(parents=True)
     (home_config / "manifest.json").write_text(json.dumps({"version": "home", "files": {}}))
@@ -938,7 +938,7 @@ def test_health_prefers_xdg_config_dir_when_file_exists(tmp_path):
 
 
 def test_health_falls_back_to_installer_config_dir_when_xdg_file_missing(tmp_path):
-    home_config = Path.home() / ".config" / "memento-vault"
+    home_config = Path.home() / ".config" / "almanac"
     home_config.mkdir(parents=True)
     (home_config / "manifest.json").write_text(json.dumps({"version": "home", "files": {}}))
 
@@ -959,7 +959,7 @@ def test_install_manifest_health_reports_present_manifest(tmp_path):
                 "version": "4.1.0",
                 "vault_path": str(tmp_path / "vault"),
                 "options": {"experimental": True, "mcp": True},
-                "files": {"hooks/memento-triage.py": "abc123"},
+                "files": {"hooks/almanac-triage.py": "abc123"},
             }
         )
     )
@@ -1005,7 +1005,7 @@ def test_managed_file_drift_reports_stale_local_and_missing_critical():
 
     claude_hooks = Path.home() / ".claude" / "hooks"
     claude_hooks.mkdir(parents=True)
-    (claude_hooks / "memento-triage.py").write_text("old managed copy")
+    (claude_hooks / "almanac-triage.py").write_text("old managed copy")
     (claude_hooks / "vault-commit.sh").write_text("local edited hook")
 
     config_dir = health._config_dir()
@@ -1015,9 +1015,9 @@ def test_managed_file_drift_reports_stale_local_and_missing_critical():
             {
                 "version": "4.1.0",
                 "files": {
-                    "hooks/memento-triage.py": sha("old managed copy"),
+                    "hooks/almanac-triage.py": sha("old managed copy"),
                     "hooks/vault-commit.sh": sha("previous managed copy"),
-                    "memento/config.py": sha("previous package copy"),
+                    "almanac/config.py": sha("previous package copy"),
                 },
             }
         )
@@ -1028,9 +1028,9 @@ def test_managed_file_drift_reports_stale_local_and_missing_critical():
 
     assert check.status == "fail"
     assert "./install.sh --reinstall" in check.message
-    assert "hooks/memento-triage.py" in check.details["stale_managed"]
+    assert "hooks/almanac-triage.py" in check.details["stale_managed"]
     assert "hooks/vault-commit.sh" in check.details["locally_modified"]
-    assert "memento/config.py" in check.details["missing_critical"]
+    assert "almanac/config.py" in check.details["missing_critical"]
 
 
 def test_strict_exits_nonzero_on_warnings():
@@ -1063,7 +1063,7 @@ def test_claude_hook_registration_warns_when_retrieval_hooks_missing():
     settings.parent.mkdir(parents=True)
     settings.write_text(
         json.dumps(
-            {"hooks": {"SessionEnd": [{"hooks": [{"type": "command", "command": "python3 /tmp/memento-triage.py"}]}]}}
+            {"hooks": {"SessionEnd": [{"hooks": [{"type": "command", "command": "python3 /tmp/almanac-triage.py"}]}]}}
         )
     )
 
@@ -1084,7 +1084,7 @@ def test_mcp_remote_shape_valid_and_redacts_headers(capsys):
     config_path.write_text(
         json.dumps(
             {
-                "memento-vault": {
+                "almanac": {
                     "type": "http",
                     "url": "https://vault.example.com/mcp",
                     "headers": {"Authorization": f"Bearer {token}"},
@@ -1106,7 +1106,7 @@ def test_mcp_remote_shape_valid_and_redacts_headers(capsys):
 def test_mcp_registration_warns_when_cli_registration_missing(monkeypatch):
     config_path = Path.home() / ".claude" / "mcp-servers.json"
     config_path.parent.mkdir(parents=True)
-    config_path.write_text(json.dumps({"memento-vault": {"type": "http", "url": "https://vault.example.com/mcp"}}))
+    config_path.write_text(json.dumps({"almanac": {"type": "http", "url": "https://vault.example.com/mcp"}}))
 
     def fake_which(binary):
         return f"/usr/bin/{binary}" if binary == "claude" else None
@@ -1151,7 +1151,7 @@ def test_mcp_registration_passes_when_cli_registration_exists(monkeypatch):
         return f"/usr/bin/{binary}" if binary == "codex" else None
 
     def fake_run(*args, **kwargs):
-        return SimpleNamespace(returncode=0, stdout="memento-vault: http https://vault.example.com/mcp", stderr="")
+        return SimpleNamespace(returncode=0, stdout="almanac: http https://vault.example.com/mcp", stderr="")
 
     monkeypatch.setattr(health.shutil, "which", fake_which)
     monkeypatch.setattr(health.subprocess, "run", fake_run)
@@ -1169,9 +1169,9 @@ def test_mcp_local_stdio_shape_valid():
     config_path.write_text(
         json.dumps(
             {
-                "memento-vault": {
+                "almanac": {
                     "command": "python3",
-                    "args": ["-m", "memento"],
+                    "args": ["-m", "almanac"],
                     "env": {"PYTHONPATH": str(Path.home() / ".claude" / "hooks")},
                 }
             }
@@ -1186,22 +1186,22 @@ def test_mcp_local_stdio_shape_valid():
 
 
 def test_mcp_registration_shape_rejects_wrong_python_module():
-    assert health._mcp_registration_shape("memento-vault: stdio python3 -m other_module") == "invalid"
-    assert health._mcp_registration_shape("memento-vault: stdio python3 /tmp/server.py") == "invalid"
-    assert health._mcp_registration_shape("memento-vault: stdio python3 -m memento") == "local stdio"
-    assert health._mcp_registration_shape("memento-vault: stdio python3 -m almanac") == "local stdio"
-    assert health._mcp_registration_shape("memento-vault\n  Command: python3\n  Args: -m memento") == "local stdio"
-    assert health._mcp_registration_shape("memento-vault: http https://vault.example.com") == "invalid"
-    assert health._mcp_registration_shape("memento-vault: http https://vault.example.com/mcp") == "remote http"
+    assert health._mcp_registration_shape("almanac: stdio python3 -m other_module") == "invalid"
+    assert health._mcp_registration_shape("almanac: stdio python3 /tmp/server.py") == "invalid"
+    assert health._mcp_registration_shape("almanac: stdio python3 -m almanac") == "local stdio"
+    assert health._mcp_registration_shape("almanac: stdio python3 -m almanac") == "local stdio"
+    assert health._mcp_registration_shape("almanac\n  Command: python3\n  Args: -m almanac") == "local stdio"
+    assert health._mcp_registration_shape("almanac: http https://vault.example.com") == "invalid"
+    assert health._mcp_registration_shape("almanac: http https://vault.example.com/mcp") == "remote http"
 
 
 def test_mcp_local_stdio_shape_rejects_reordered_args():
     assert (
         health._mcp_entry_shape(
             {
-                "memento-vault": {
+                "almanac": {
                     "command": "python3",
-                    "args": ["memento", "-m"],
+                    "args": ["almanac", "-m"],
                     "env": {"PYTHONPATH": "/tmp/hooks"},
                 }
             }
@@ -1214,7 +1214,7 @@ def test_mcp_local_stdio_shape_accepts_almanac_module():
     assert (
         health._mcp_entry_shape(
             {
-                "memento-vault": {
+                "almanac": {
                     "command": "python3",
                     "args": ["-m", "almanac"],
                     "env": {"PYTHONPATH": "/tmp/hooks"},
@@ -1329,11 +1329,11 @@ def test_pi_bridge_health_warns_when_log_missing():
 
 def test_health_queue_path_resolution_characterization(tmp_path, monkeypatch):
     """Freeze queue-path/state-home resolution semantics across the queue-module extraction."""
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(tmp_path / "pi-state"))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "pi-state"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "ignored-xdg"))
     assert health._pi_queue_file() == tmp_path / "pi-state" / "queue" / "pi-captures.jsonl"
 
-    monkeypatch.delenv("MEMENTO_PI_STATE_HOME")
+    monkeypatch.delenv("ALMANAC_PI_STATE_HOME")
     assert health._pi_queue_file() == tmp_path / "ignored-xdg" / "almanac" / "pi" / "queue" / "pi-captures.jsonl"
 
     monkeypatch.delenv("XDG_STATE_HOME")
@@ -1346,7 +1346,7 @@ def test_health_queue_path_resolution_characterization(tmp_path, monkeypatch):
 
 def test_queue_health_warns_on_backlog_size(tmp_path, monkeypatch):
     state_home = tmp_path / "state"
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(state_home))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(state_home))
     queue_file = state_home / "queue" / "pi-captures.jsonl"
     now = datetime.now().astimezone().isoformat(timespec="seconds")
     _write_queue(
@@ -1374,7 +1374,7 @@ def test_queue_health_warns_on_backlog_size(tmp_path, monkeypatch):
 
 def test_queue_health_fails_on_oldest_entry_age(tmp_path, monkeypatch):
     state_home = tmp_path / "state"
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(state_home))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(state_home))
     queue_file = state_home / "queue" / "pi-captures.jsonl"
     created_at = (datetime.now().astimezone() - timedelta(days=4)).isoformat(timespec="seconds")
     _write_queue(
@@ -1401,7 +1401,7 @@ def test_queue_health_fails_on_oldest_entry_age(tmp_path, monkeypatch):
 
 def test_queue_health_thresholds_are_config_overridable(tmp_path, monkeypatch):
     state_home = tmp_path / "state"
-    monkeypatch.setenv("MEMENTO_PI_STATE_HOME", str(state_home))
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(state_home))
     queue_file = state_home / "queue" / "pi-captures.jsonl"
     now = datetime.now().astimezone().isoformat(timespec="seconds")
     _write_queue(
@@ -1424,7 +1424,7 @@ def test_queue_health_thresholds_are_config_overridable(tmp_path, monkeypatch):
         ],
     )
     vault = _make_vault(tmp_path / "vault")
-    (vault / "memento.yml").write_text(
+    (vault / "almanac.yml").write_text(
         "\n".join(
             [
                 "queue_backlog_warn_threshold: 2",
@@ -1450,7 +1450,7 @@ def test_queue_health_thresholds_are_config_overridable(tmp_path, monkeypatch):
 
 
 def test_stale_headless_mcp_config_static_check_warns(tmp_path):
-    stale = Path.home() / ".claude" / "hooks" / "memento" / "llm.py"
+    stale = Path.home() / ".claude" / "hooks" / "almanac" / "llm.py"
     stale.parent.mkdir(parents=True)
     stale.write_text("cmd = [\n    'claude',\n    '--strict-mcp-config',\n    '--mcp-config',\n    '{}',\n]\n")
 
@@ -1674,9 +1674,9 @@ def test_output_redacts_secrets_in_verbose_and_json(capsys):
 
 
 def test_config_parse_failure_is_fail(tmp_path):
-    config_dir = Path.home() / ".config" / "memento-vault"
+    config_dir = Path.home() / ".config" / "almanac"
     config_dir.mkdir(parents=True)
-    (config_dir / "memento.yml").write_text("vault_path: [unterminated\n")
+    (config_dir / "almanac.yml").write_text("vault_path: [unterminated\n")
 
     report = health.build_report()
     check = next(check for check in report.checks if check.name == "config")
@@ -1686,7 +1686,7 @@ def test_config_parse_failure_is_fail(tmp_path):
 
 
 def test_simple_yaml_parser_handles_empty_and_spaced_lists(tmp_path):
-    config = tmp_path / "memento.yml"
+    config = tmp_path / "almanac.yml"
     config.write_text("extra_qmd_collections: []\nrecall_skip_patterns: [ \"a\", 'b' ]\n")
 
     parsed = health._parse_simple_yaml(config)
@@ -1696,7 +1696,7 @@ def test_simple_yaml_parser_handles_empty_and_spaced_lists(tmp_path):
 
 
 def test_explicit_qmd_backend_missing_is_fail(monkeypatch):
-    monkeypatch.setenv("MEMENTO_SEARCH_BACKEND", "qmd")
+    monkeypatch.setenv("ALMANAC_SEARCH_BACKEND", "qmd")
 
     real_which = health.shutil.which
 
@@ -1735,11 +1735,11 @@ def test_health_subprocess_does_not_create_runtime_or_cache_dirs(tmp_path):
     env["HOME"] = str(home)
     env["XDG_CONFIG_HOME"] = str(tmp_path / "config")
     env["XDG_RUNTIME_DIR"] = str(runtime)
-    env["MEMENTO_VAULT_PATH"] = str(vault)
-    env["MEMENTO_SEARCH_BACKEND"] = "grep"
+    env["ALMANAC_VAULT_PATH"] = str(vault)
+    env["ALMANAC_SEARCH_BACKEND"] = "grep"
 
     result = subprocess.run(
-        [sys.executable, "-m", "memento.health", "--json"],
+        [sys.executable, "-m", "almanac.health", "--json"],
         text=True,
         capture_output=True,
         env=env,
@@ -1748,8 +1748,8 @@ def test_health_subprocess_does_not_create_runtime_or_cache_dirs(tmp_path):
 
     assert result.returncode == 0
     assert json.loads(result.stdout)["status"] in {"pass", "warn"}
-    assert not (home / ".cache" / "memento-vault").exists()
-    assert not (runtime / "memento-vault").exists()
+    assert not (home / ".cache" / "almanac").exists()
+    assert not (runtime / "almanac").exists()
 
 
 def test_unreadable_mcp_config_reports_failure():
@@ -1827,7 +1827,7 @@ def test_single_invalid_mcp_failure_below_threshold_does_not_fail():
 def test_lock_check_inspects_temp_fallback_path(tmp_path, monkeypatch):
     monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
     monkeypatch.setenv("TMPDIR", str(tmp_path))
-    lock_dir = tmp_path / f"memento-vault-{os.getuid()}"
+    lock_dir = tmp_path / f"almanac-{os.getuid()}"
     lock_dir.mkdir()
     lock = lock_dir / "vault-write.lock"
     lock.write_text(str(os.getpid()))

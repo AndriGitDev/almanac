@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from memento import store
-from memento.store import (
+from almanac import store
+from almanac.store import (
     acquire_vault_write_lock,
     append_fleeting_session,
     apply_access_log_boost,
@@ -36,8 +36,8 @@ class TestShimExports:
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "memento_utils_shim",
-            str(Path(__file__).parent.parent / "hooks" / "memento_utils.py"),
+            "almanac_utils_shim",
+            str(Path(__file__).parent.parent / "hooks" / "almanac_utils.py"),
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
@@ -197,7 +197,7 @@ class TestWriteNote:
 
         fake_backend = FakeBackend()
 
-        with patch("memento.search_backend.get_backend", return_value=fake_backend):
+        with patch("almanac.search_backend.get_backend", return_value=fake_backend):
             path = write_note(
                 tmp_vault,
                 title="Indexing test note",
@@ -223,8 +223,8 @@ class TestWriteNote:
                 return True
 
         fake_backend = ReindexOnlyBackend()
-        with patch("memento.search_backend.get_backend", return_value=fake_backend):
-            from memento.store import _reset_debouncer
+        with patch("almanac.search_backend.get_backend", return_value=fake_backend):
+            from almanac.store import _reset_debouncer
 
             _reset_debouncer()
             path = write_note(
@@ -239,17 +239,17 @@ class TestWriteNote:
         # The fallback calls backend.reindex() directly, and the
         # supplementary debouncer also calls reindex(). Accept ≤2.
         assert 1 <= len(fake_backend.calls) <= 2
-        assert fake_backend.calls[0] == ("memento", False)  # immediate fallback
-        assert all(c == ("memento", False) for c in fake_backend.calls)
+        assert fake_backend.calls[0] == ("almanac", False)  # immediate fallback
+        assert all(c == ("almanac", False) for c in fake_backend.calls)
 
     def test_write_note_survives_indexing_failure(self, tmp_vault):
         """If index_note raises, the note is still written successfully."""
-        from memento.embedded_search import EmbeddedSearchBackend
+        from almanac.embedded_search import EmbeddedSearchBackend
 
         mock_backend = MagicMock(spec=EmbeddedSearchBackend)
         mock_backend.index_note.side_effect = RuntimeError("index exploded")
 
-        with patch("memento.search_backend.get_backend", return_value=mock_backend):
+        with patch("almanac.search_backend.get_backend", return_value=mock_backend):
             path = write_note(
                 tmp_vault,
                 title="Survives index failure",
@@ -283,11 +283,11 @@ class TestWriteNote:
         # Large debounce window so the timer never fires mid-loop: only the
         # threshold-triggered flushes count, making the assertion exact.
         # threshold=5, 10 writes → exactly 2 batch reindexes, no timer flush.
-        with patch("memento.search_backend.get_backend", return_value=fake_backend):
+        with patch("almanac.search_backend.get_backend", return_value=fake_backend):
             with patch(
-                "memento.store.get_config", return_value={"index_debounce_count": 5, "index_debounce_ms": 60000}
+                "almanac.store.get_config", return_value={"index_debounce_count": 5, "index_debounce_ms": 60000}
             ):
-                from memento.store import _reset_debouncer
+                from almanac.store import _reset_debouncer
 
                 _reset_debouncer()
 
@@ -323,9 +323,9 @@ class TestWriteNote:
 
         fake_backend = CountingBackend()
 
-        with patch("memento.search_backend.get_backend", return_value=fake_backend):
-            with patch("memento.store.get_config", return_value={"index_debounce_count": 5, "index_debounce_ms": 2000}):
-                from memento.store import _reset_debouncer
+        with patch("almanac.search_backend.get_backend", return_value=fake_backend):
+            with patch("almanac.store.get_config", return_value={"index_debounce_count": 5, "index_debounce_ms": 2000}):
+                from almanac.store import _reset_debouncer
 
                 _reset_debouncer()
 
@@ -418,7 +418,7 @@ class TestUniqueTmpNames:
                 assert second_done.wait(timeout=10), "second writer never finished"
             return real_replace(src, dst)
 
-        monkeypatch.setattr("memento.store.os.replace", gated_replace)
+        monkeypatch.setattr("almanac.store.os.replace", gated_replace)
 
         results = {}
         errors = {}
@@ -604,7 +604,7 @@ class TestFindDedupCandidates:
 
 
 class TestUpdateProjectIndex:
-    """MEM-160: session-summary appends are retired here -- memento.hub.regenerate_project_hub's
+    """MEM-160: session-summary appends are retired here -- almanac.hub.regenerate_project_hub's
     mechanically-derived "## Recent activity" section is the bounded replacement. update_project_index
     now only ever appends a "[[note_name]]" link under "## Notes"; session_summary is accepted for
     call-site compatibility but is otherwise unused."""
@@ -706,7 +706,7 @@ class TestUpdateProjectIndex:
             replace_calls.append((Path(src), Path(dst)))
             return real_replace(src, dst)
 
-        monkeypatch.setattr("memento.store.os.replace", recording_replace)
+        monkeypatch.setattr("almanac.store.os.replace", recording_replace)
 
         update_project_index(tmp_vault, "api-service", "redis-cache-ttl", "Fixed cache invalidation")
 
@@ -761,8 +761,8 @@ class TestTriageHealthLog:
         health_log = tmp_path / "triage-health.jsonl"
 
         with (
-            patch("memento.store.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
-            patch("memento.store.get_config", return_value={"retrieval_log": False}),
+            patch("almanac.store.TRIAGE_HEALTH_LOG_PATH", str(health_log)),
+            patch("almanac.store.get_config", return_value={"retrieval_log": False}),
         ):
             log_triage_health("structured_notes_llm_failed", session_id="sess-123", project="api-service", error="boom")
 
@@ -778,7 +778,7 @@ class TestTriageHealthLog:
         secret = "sk-" + "a" * 30
         long_error = f"failed with {secret} " + ("x" * 600)
 
-        with patch("memento.store.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
+        with patch("almanac.store.TRIAGE_HEALTH_LOG_PATH", str(health_log)):
             log_triage_health("structured_notes_llm_failed", session_id="sess-123", error=long_error)
 
         payload = json.loads(health_log.read_text().strip())
@@ -901,12 +901,12 @@ class TestProjectSlugNormalization:
             body="Body",
             note_type="discovery",
             tags=["sync"],
-            project="/home/vic/Projects/Memento-Vault",
+            project="/home/vic/Projects/Almanac",
         )
 
         text = path.read_text()
-        assert "project: memento-vault\n" in text
-        assert "project_path: /home/vic/Projects/Memento-Vault\n" in text
+        assert "project: almanac\n" in text
+        assert "project_path: /home/vic/Projects/Almanac\n" in text
 
     def test_bare_token_project_is_normalized_not_treated_as_path(self, tmp_vault):
         path = write_note(
@@ -929,13 +929,13 @@ class TestProjectSlugNormalization:
             body="Body",
             note_type="discovery",
             tags=["sync"],
-            project="memento-vault",
-            project_path="/Users/vic/Personal/memento-vault",
+            project="almanac",
+            project_path="/Users/vic/Personal/almanac",
         )
 
         text = path.read_text()
-        assert "project: memento-vault\n" in text
-        assert "project_path: /Users/vic/Personal/memento-vault\n" in text
+        assert "project: almanac\n" in text
+        assert "project_path: /Users/vic/Personal/almanac\n" in text
 
     def test_replace_note_at_path_preserves_project_path_as_managed_key(self, tmp_vault):
         original = write_note(
@@ -944,7 +944,7 @@ class TestProjectSlugNormalization:
             body="Original body",
             note_type="discovery",
             tags=["sync"],
-            project="/home/vic/Projects/memento-vault",
+            project="/home/vic/Projects/almanac",
         )
 
         target = replace_note_at_path(
@@ -954,12 +954,12 @@ class TestProjectSlugNormalization:
             body="Updated body",
             note_type="discovery",
             tags=["sync"],
-            project="memento-vault",
-            project_path="/home/vic/Projects/memento-vault",
+            project="almanac",
+            project_path="/home/vic/Projects/almanac",
         )
 
         text = target.read_text()
-        assert "project: memento-vault\n" in text
+        assert "project: almanac\n" in text
         assert text.count("project_path:") == 1
 
 
@@ -978,7 +978,7 @@ class TestTagNormalization:
         assert 'tags: ["foo-bar", "sync"]' in path.read_text()
 
     def test_tag_aliases_from_config_merge_synonyms(self, tmp_vault):
-        with patch("memento.store.get_config", return_value={"tag_aliases": {"bugs": "bug", "test": "testing"}}):
+        with patch("almanac.store.get_config", return_value={"tag_aliases": {"bugs": "bug", "test": "testing"}}):
             path = write_note(
                 tmp_vault,
                 title="Aliased tags note",
@@ -990,7 +990,7 @@ class TestTagNormalization:
         assert 'tags: ["bug", "testing"]' in path.read_text()
 
     def test_no_stemming_without_explicit_alias(self, tmp_vault):
-        with patch("memento.store.get_config", return_value={"tag_aliases": {}}):
+        with patch("almanac.store.get_config", return_value={"tag_aliases": {}}):
             path = write_note(
                 tmp_vault,
                 title="Plural tags note",
@@ -1011,12 +1011,12 @@ class TestFoldAccessLogIntoFrontmatter:
     def _isolated_vault_write_lock(self, monkeypatch, tmp_path):
         """Point the vault write lock at a per-test file (never the real runtime dir)."""
         lock_file = tmp_path / "locks" / "vault-write.lock"
-        monkeypatch.setattr("memento.store.VAULT_WRITE_LOCK_PATH", str(lock_file))
+        monkeypatch.setattr("almanac.store.VAULT_WRITE_LOCK_PATH", str(lock_file))
         return lock_file
 
     @pytest.fixture(autouse=True)
     def _patch_config(self, monkeypatch, tmp_vault):
-        """Pin both config bindings (memento.config and memento.store) to tmp_vault.
+        """Pin both config bindings (almanac.config and almanac.store) to tmp_vault.
 
         record_access()/_should_track_access() and _current_vault_id()/
         get_vault_id() resolve get_config() from their own defining module's
@@ -1024,8 +1024,8 @@ class TestFoldAccessLogIntoFrontmatter:
         and access_log_enabled regardless of the real host config.
         """
         cfg = {"vault_path": str(tmp_vault), "access_log_enabled": True}
-        monkeypatch.setattr("memento.config.get_config", lambda: cfg, raising=False)
-        monkeypatch.setattr("memento.store.get_config", lambda: cfg, raising=False)
+        monkeypatch.setattr("almanac.config.get_config", lambda: cfg, raising=False)
+        monkeypatch.setattr("almanac.store.get_config", lambda: cfg, raising=False)
         return cfg
 
     @staticmethod

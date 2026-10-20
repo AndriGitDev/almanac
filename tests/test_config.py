@@ -1,4 +1,4 @@
-"""Tests for Almanac configuration and compatibility paths."""
+"""Tests for Almanac configuration and runtime paths."""
 
 import builtins
 import os
@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import importlib
 
-from memento.config import (
+from almanac.config import (
     DEFAULT_CONFIG,
     detect_project,
     ensure_runtime_dir,
@@ -31,20 +31,20 @@ class TestGetConfig:
         reset_config()
 
     def test_returns_dict_with_defaults(self):
-        with patch("memento.config.load_config", return_value=dict(DEFAULT_CONFIG)):
+        with patch("almanac.config.load_config", return_value=dict(DEFAULT_CONFIG)):
             config = get_config()
         assert isinstance(config, dict)
         assert "vault_path" in config
         assert "agent_model" in config
 
     def test_caches_result(self):
-        with patch("memento.config.load_config", return_value=dict(DEFAULT_CONFIG)) as mock:
+        with patch("almanac.config.load_config", return_value=dict(DEFAULT_CONFIG)) as mock:
             get_config()
             get_config()
         assert mock.call_count == 1
 
     def test_reset_clears_cache(self):
-        with patch("memento.config.load_config", return_value=dict(DEFAULT_CONFIG)) as mock:
+        with patch("almanac.config.load_config", return_value=dict(DEFAULT_CONFIG)) as mock:
             get_config()
             reset_config()
             get_config()
@@ -59,12 +59,12 @@ class TestGetVault:
         reset_config()
 
     def test_returns_path(self):
-        with patch("memento.config.load_config", return_value=dict(DEFAULT_CONFIG)):
+        with patch("almanac.config.load_config", return_value=dict(DEFAULT_CONFIG)):
             vault = get_vault()
         assert isinstance(vault, Path)
 
     def test_matches_config(self):
-        with patch("memento.config.load_config", return_value=dict(DEFAULT_CONFIG)):
+        with patch("almanac.config.load_config", return_value=dict(DEFAULT_CONFIG)):
             vault = get_vault()
             config = get_config()
         assert str(vault) == config["vault_path"]
@@ -99,9 +99,9 @@ class TestLoadConfig:
         assert DEFAULT_CONFIG["tool_context_diagnostics_max_candidates"] == 10
 
     def test_simple_yaml_coerces_tool_context_min_score_string(self, tmp_path):
-        config_dir = tmp_path / ".config" / "memento-vault"
+        config_dir = tmp_path / ".config" / "almanac"
         config_dir.mkdir(parents=True)
-        (config_dir / "memento.yml").write_text('tool_context_min_score: "0.82"\n')
+        (config_dir / "almanac.yml").write_text('tool_context_min_score: "0.82"\n')
         real_import = builtins.__import__
 
         def fake_import(name, *args, **kwargs):
@@ -123,7 +123,7 @@ class TestLoadConfig:
         """Regression: corrupt YAML must warn to stderr, not silently use defaults."""
         vault = tmp_path / "vault"
         vault.mkdir()
-        config_file = vault / "memento.yml"
+        config_file = vault / "almanac.yml"
         config_file.write_text(": : : invalid yaml : :\n")
         real_import = builtins.__import__
 
@@ -135,7 +135,7 @@ class TestLoadConfig:
         with (
             patch.object(Path, "home", return_value=tmp_path),
             patch("builtins.__import__", side_effect=fake_import),
-            patch("memento.config.DEFAULT_CONFIG", {**DEFAULT_CONFIG, "vault_path": str(vault)}),
+            patch("almanac.config.DEFAULT_CONFIG", {**DEFAULT_CONFIG, "vault_path": str(vault)}),
         ):
             reset_config()
             config = load_config()
@@ -153,27 +153,27 @@ class TestRuntimeDir:
         fallback_tmp = tmp_path / "tmp"
 
         with (
-            patch.dict("memento.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
-            patch("memento.config.tempfile.gettempdir", return_value=str(fallback_tmp)),
-            patch("memento.config._runtime_dir_is_usable", side_effect=[False, False, True]),
+            patch.dict("almanac.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
+            patch("almanac.config.tempfile.gettempdir", return_value=str(fallback_tmp)),
+            patch("almanac.config._runtime_dir_is_usable", side_effect=[False, False, True]),
         ):
             runtime_dir = get_runtime_dir(strict=True)
 
-        assert runtime_dir == str(fallback_tmp / f"memento-vault-{os.getuid()}")
+        assert runtime_dir == str(fallback_tmp / f"almanac-{os.getuid()}")
 
     def test_non_strict_returns_xdg_path_without_probing(self, tmp_path):
         """Non-strict default returns the preferred path string without probing or mkdirs."""
         xdg_runtime = tmp_path / "xdg-runtime"
 
         with (
-            patch.dict("memento.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
-            patch("memento.config._runtime_dir_is_usable", side_effect=AssertionError("must not probe")),
+            patch.dict("almanac.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
+            patch("almanac.config._runtime_dir_is_usable", side_effect=AssertionError("must not probe")),
         ):
             runtime_dir = get_runtime_dir()
 
-        assert runtime_dir == str(xdg_runtime / "memento-vault")
+        assert runtime_dir == str(xdg_runtime / "almanac")
         # Non-strict must not create the directory.
-        assert not (xdg_runtime / "memento-vault").exists()
+        assert not (xdg_runtime / "almanac").exists()
 
     def test_non_strict_never_raises_when_no_candidate_is_writable(self, tmp_path):
         """Non-strict returns a best-effort path even when strict probing would fail all candidates."""
@@ -181,14 +181,14 @@ class TestRuntimeDir:
         fallback_tmp = tmp_path / "tmp"
 
         with (
-            patch.dict("memento.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
-            patch("memento.config.tempfile.gettempdir", return_value=str(fallback_tmp)),
-            patch("memento.config._runtime_dir_is_usable", return_value=False),
+            patch.dict("almanac.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
+            patch("almanac.config.tempfile.gettempdir", return_value=str(fallback_tmp)),
+            patch("almanac.config._runtime_dir_is_usable", return_value=False),
         ):
             # Must not raise — import-time resolution is fault-tolerant.
             runtime_dir = get_runtime_dir()
 
-        assert runtime_dir == str(xdg_runtime / "memento-vault")
+        assert runtime_dir == str(xdg_runtime / "almanac")
 
     def test_strict_raises_when_all_candidates_unwritable(self, tmp_path):
         """Strict mode raises OSError when no candidate is writable."""
@@ -196,9 +196,9 @@ class TestRuntimeDir:
         fallback_tmp = tmp_path / "tmp"
 
         with (
-            patch.dict("memento.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
-            patch("memento.config.tempfile.gettempdir", return_value=str(fallback_tmp)),
-            patch("memento.config._runtime_dir_is_usable", return_value=False),
+            patch.dict("almanac.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
+            patch("almanac.config.tempfile.gettempdir", return_value=str(fallback_tmp)),
+            patch("almanac.config._runtime_dir_is_usable", return_value=False),
         ):
             with pytest.raises(OSError):
                 get_runtime_dir(strict=True)
@@ -208,22 +208,22 @@ class TestRuntimeDir:
         xdg_runtime = tmp_path / "xdg-runtime"
 
         with (
-            patch.dict("memento.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
-            patch("memento.config._runtime_dir_is_usable", side_effect=lambda p: True),
+            patch.dict("almanac.config.os.environ", {"XDG_RUNTIME_DIR": str(xdg_runtime)}, clear=False),
+            patch("almanac.config._runtime_dir_is_usable", side_effect=lambda p: True),
         ):
             path = ensure_runtime_dir()
 
-        assert path == str(xdg_runtime / "memento-vault")
+        assert path == str(xdg_runtime / "almanac")
         assert os.path.isdir(path)
 
     def test_module_import_is_tolerant_under_read_only_sandbox(self, monkeypatch):
-        """Reloading memento.config with no writable candidates must not raise at import time."""
-        import memento.config as mod
+        """Reloading almanac.config with no writable candidates must not raise at import time."""
+        import almanac.config as mod
 
         # Simulate a read-only sandbox: no XDG, no writable candidate.
         monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
 
-        with patch("memento.config._runtime_dir_is_usable", return_value=False):
+        with patch("almanac.config._runtime_dir_is_usable", return_value=False):
             importlib.reload(mod)
 
         try:
@@ -257,13 +257,13 @@ class TestDetectProject:
         reset_config()
 
     def test_returns_slug_from_cwd(self):
-        with patch("memento.config.get_config", return_value=dict(DEFAULT_CONFIG)):
+        with patch("almanac.config.get_config", return_value=dict(DEFAULT_CONFIG)):
             slug, ticket = detect_project("/home/user/Projects/my-project", None)
         assert slug == "my-project"
         assert ticket is None
 
     def test_extracts_ticket_from_branch(self):
-        with patch("memento.config.get_config", return_value=dict(DEFAULT_CONFIG)):
+        with patch("almanac.config.get_config", return_value=dict(DEFAULT_CONFIG)):
             slug, ticket = detect_project("/home/user/Projects/app", "feature/DAL-123-add-login")
         assert ticket == "DAL-123"
 
@@ -274,7 +274,7 @@ class TestDetectProject:
     def test_worktree_cwd_collapses_to_repo_slug(self, tmp_path):
         """MEM-164: per-ticket worktree checkouts must scope to the main repo, not the worktree dir."""
         repo, worktree = _repo_with_worktree(tmp_path)
-        with patch("memento.config.get_config", return_value=dict(DEFAULT_CONFIG)):
+        with patch("almanac.config.get_config", return_value=dict(DEFAULT_CONFIG)):
             slug, _ticket = detect_project(str(worktree), None)
         assert slug == "my-repo"
 
@@ -314,7 +314,7 @@ class TestRepoSlugFromPath:
         assert repo_slug_from_path(str(plain)) == "plain-dir"
 
     def test_nonexistent_path_falls_back_to_basename(self):
-        assert repo_slug_from_path("/home/vic/Projects/memento-vault") == "memento-vault"
+        assert repo_slug_from_path("/home/vic/Projects/almanac") == "almanac"
 
     def test_empty_path_returns_none(self):
         assert repo_slug_from_path("") is None
@@ -360,7 +360,7 @@ class TestTagAliasesDefault:
         assert aliases["k8s"] == "kubernetes"
 
 
-def test_graph_indexes_follow_new_or_existing_config_directory(tmp_path):
+def test_graph_indexes_follow_xdg_config_directory(tmp_path):
     import json
     import subprocess
     import sys
@@ -369,9 +369,9 @@ def test_graph_indexes_follow_new_or_existing_config_directory(tmp_path):
         "import json; from almanac.graph import CONCEPT_INDEX_PATH, load_project_maps; "
         "print(json.dumps({'concept': CONCEPT_INDEX_PATH, 'maps': load_project_maps()}))"
     )
-    for legacy in (False, True):
-        config_home = tmp_path / ("legacy" if legacy else "fresh")
-        selected = config_home / ("memento-vault" if legacy else "almanac")
+    for name in ("first", "second"):
+        config_home = tmp_path / name
+        selected = config_home / "almanac"
         selected.mkdir(parents=True)
         (selected / "project-maps.json").write_text('{"maps": {"demo": []}}')
         env = {**os.environ, "HOME": str(tmp_path), "XDG_CONFIG_HOME": str(config_home)}

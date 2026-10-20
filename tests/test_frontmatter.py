@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import memento.frontmatter as fm
+import almanac.frontmatter as fm
 
 # --- Fixture corpus ----------------------------------------------------------
 

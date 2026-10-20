@@ -2,8 +2,8 @@
 
 from unittest.mock import patch
 
-from memento.config import DEFAULT_CONFIG
-from memento.search import _extract_expansion_terms, prf_expand_query
+from almanac.config import DEFAULT_CONFIG
+from almanac.search import _extract_expansion_terms, prf_expand_query
 
 
 # --- _extract_expansion_terms ---
@@ -68,7 +68,7 @@ class TestExtractExpansionTerms:
 
 
 class TestPrfExpandQuery:
-    @patch("memento.search.qmd_search")
+    @patch("almanac.search.qmd_search")
     def test_prf_expands_query(self, mock_search):
         """Expanded query contains original query plus expansion terms."""
         mock_search.return_value = [
@@ -85,7 +85,7 @@ class TestPrfExpandQuery:
         assert len(result) > len("redis")
         mock_search.assert_called_once()
 
-    @patch("memento.search.qmd_search")
+    @patch("almanac.search.qmd_search")
     def test_prf_no_results_returns_original(self, mock_search):
         """When search returns nothing, return original query unchanged."""
         mock_search.return_value = []
@@ -101,13 +101,13 @@ class TestPrfExpandQuery:
         config = dict(DEFAULT_CONFIG)
         config["prf_enabled"] = False
 
-        with patch("memento.search.qmd_search") as mock_search:
+        with patch("almanac.search.qmd_search") as mock_search:
             result = prf_expand_query("redis", config=config)
 
         assert result == "redis"
         mock_search.assert_not_called()
 
-    @patch("memento.search.qmd_search")
+    @patch("almanac.search.qmd_search")
     def test_prf_preserves_original_query(self, mock_search):
         """The expanded query must START with the original query."""
         mock_search.return_value = [

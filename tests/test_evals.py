@@ -120,14 +120,14 @@ class TestCaptureHealth:
 
 
 class TestClock:
-    """evals/common.now() must be frozen by --now / MEMENTO_EVAL_NOW so
+    """evals/common.now() must be frozen by --now / ALMANAC_EVAL_NOW so
     time-window math never drifts with the calendar."""
 
     def teardown_method(self, _method):
         common.set_now(None)
 
     def test_no_override_uses_real_clock(self, monkeypatch):
-        monkeypatch.delenv("MEMENTO_EVAL_NOW", raising=False)
+        monkeypatch.delenv("ALMANAC_EVAL_NOW", raising=False)
         before = datetime.now(timezone.utc)
         result = common.now()
         after = datetime.now(timezone.utc)
@@ -138,11 +138,11 @@ class TestClock:
         assert common.now() == datetime(2026, 3, 1, tzinfo=timezone.utc)
 
     def test_env_fallback(self, monkeypatch):
-        monkeypatch.setenv("MEMENTO_EVAL_NOW", "2026-04-01T00:00:00Z")
+        monkeypatch.setenv("ALMANAC_EVAL_NOW", "2026-04-01T00:00:00Z")
         assert common.now() == datetime(2026, 4, 1, tzinfo=timezone.utc)
 
     def test_set_now_takes_priority_over_env(self, monkeypatch):
-        monkeypatch.setenv("MEMENTO_EVAL_NOW", "2026-04-01T00:00:00Z")
+        monkeypatch.setenv("ALMANAC_EVAL_NOW", "2026-04-01T00:00:00Z")
         common.set_now("2026-05-01T00:00:00Z")
         assert common.now() == datetime(2026, 5, 1, tzinfo=timezone.utc)
 
@@ -288,7 +288,7 @@ class TestRankedOrderChecks:
         assert proc.returncode == 0, proc.stderr[-500:]
 
     def test_vector_advisory_absent_by_default(self):
-        """Opt-in only: never present unless MEMENTO_EVAL_VECTOR_ADVISORY=1
+        """Opt-in only: never present unless ALMANAC_EVAL_VECTOR_ADVISORY=1
         (also keeps default output ONNX-jitter-free, see
         test_fixture_mode_same_now_is_byte_identical)."""
         proc = self._run_fixture()
@@ -305,13 +305,13 @@ class TestRankedOrderChecks:
             assert isinstance(entry["top5"], list) and entry["top5"]
 
     def test_regen_golden_rewrites_file_and_matches_current_pipeline(self, tmp_path):
-        """MEMENTO_REGEN_GOLDEN=1 must rewrite the committed golden file with
+        """ALMANAC_REGEN_GOLDEN=1 must rewrite the committed golden file with
         exactly what the current pipeline produces (so a plain fixture run
         right after a regen is green). Restores the original file afterward
         so this test never permanently mutates the committed golden."""
         original = self.GOLDEN_PATH.read_text()
         try:
-            regen_proc = self._run_fixture(env={"MEMENTO_REGEN_GOLDEN": "1"})
+            regen_proc = self._run_fixture(env={"ALMANAC_REGEN_GOLDEN": "1"})
             assert regen_proc.returncode == 0, regen_proc.stderr[-500:]
             regenerated = json.loads(self.GOLDEN_PATH.read_text())
             assert len(regenerated) >= 4
@@ -384,13 +384,13 @@ class TestCaptureRetrieveProbe:
 
     def test_no_vault_content_written_outside_its_own_temp_vault(self, tmp_path):
         """Isolation contract (tests/conftest.py convention): give the
-        subprocess a throwaway $HOME with no MEMENTO_VAULT_PATH/XDG
+        subprocess a throwaway $HOME with no ALMANAC_VAULT_PATH/XDG
         overrides, and confirm no note content lands there. Every note this
         probe writes must live in its own tempfile.mkdtemp() vault (OS temp
         dir, independent of $HOME), never a home-directory vault fallback.
 
-        A small `.cache/memento-vault/` runtime dir may still appear under
-        the fake home (memento.config.RUNTIME_DIR's pid-lock housekeeping,
+        A small `.cache/almanac/` runtime dir may still appear under
+        the fake home (almanac.config.RUNTIME_DIR's pid-lock housekeeping,
         unrelated to vault content and out of scope for this ticket) -- the
         assertion that matters is that no markdown note ever lands there.
         """
@@ -398,7 +398,7 @@ class TestCaptureRetrieveProbe:
         fake_home.mkdir()
         env = dict(os.environ)
         env["HOME"] = str(fake_home)
-        env.pop("MEMENTO_VAULT_PATH", None)
+        env.pop("ALMANAC_VAULT_PATH", None)
         env.pop("XDG_CONFIG_HOME", None)
 
         proc = self._run(env=env)
@@ -409,11 +409,11 @@ class TestCaptureRetrieveProbe:
 
     def test_llm_mode_skips_cleanly_without_a_configured_backend(self):
         """No LLM backend configured must produce a clean skip, never a
-        crash or a hang. Uses the test-only MEMENTO_EVAL_FORCE_LLM_BACKEND
+        crash or a hang. Uses the test-only ALMANAC_EVAL_FORCE_LLM_BACKEND
         override so this assertion is deterministic regardless of what CLI
         binaries happen to be installed on the machine running the test."""
         env = dict(os.environ)
-        env["MEMENTO_EVAL_FORCE_LLM_BACKEND"] = "does-not-exist"
+        env["ALMANAC_EVAL_FORCE_LLM_BACKEND"] = "does-not-exist"
         proc = self._run_llm(env=env)
         assert proc.returncode == 0, proc.stderr[-1000:]
         payload = json.loads(proc.stdout.strip().splitlines()[-1])

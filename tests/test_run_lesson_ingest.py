@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from memento import pi_bridge
-from memento.config import DEFAULT_CONFIG
+from almanac import pi_bridge
+from almanac.config import DEFAULT_CONFIG
 
 
 @pytest.fixture
@@ -32,8 +32,8 @@ def hermetic_vault_config(tmp_vault, monkeypatch):
     config = dict(DEFAULT_CONFIG)
     config["vault_path"] = str(tmp_vault)
     config["search_backend"] = "grep"
-    monkeypatch.setattr("memento.config._CONFIG", config)
-    monkeypatch.setattr("memento.search_backend._backend", None)
+    monkeypatch.setattr("almanac.config._CONFIG", config)
+    monkeypatch.setattr("almanac.search_backend._backend", None)
     return tmp_vault
 
 
