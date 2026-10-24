@@ -104,7 +104,7 @@ Inside an MCP client, the agent can use `almanac_search`, `almanac_query`, or `a
 
 Relevance thresholds, project filtering, duplicate suppression, and context limits control what gets injected. Optional deeper retrieval can follow links between notes or use a bounded background agent to investigate harder questions. Deep recall and agentic retrieval are experimental and disabled by default.
 
-[How retrieval works](docs/how-it-works.md#tenet-retrieval) · [Retrieval settings](docs/configuration.md#tenet--retrieval-hooks)
+[How retrieval works](docs/how-it-works.md#tenet-retrieval) · [Retrieval settings](docs/configuration.md#tenet-retrieval-hooks)
 
 ### Follow connections across your knowledge
 
