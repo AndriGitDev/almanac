@@ -30,7 +30,7 @@ embedded = ["onnxruntime", "sqlite-vec", "numpy", "tokenizers"]
 # is the single source of truth for "what a contributor venv needs to run pytest clean" -
 # keep WORKFLOW.md and .github/workflows/ci.yml pointed at this extra rather than
 # ad-hoc package lists.
-test = ["pyyaml", "numpy", "networkx", "scipy", "hdbscan", "rank_bm25", "optuna"]
+test = ["build", "wheel", "setuptools>=61", "pyyaml", "numpy", "networkx", "scipy", "hdbscan", "rank_bm25", "optuna"]
 
 [project.urls]
 Homepage = "https://github.com/AndriGitDev/almanac"

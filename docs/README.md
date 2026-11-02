@@ -12,6 +12,7 @@ Grouped by what you're trying to do, not by when it was written.
 ## Integrate an agent
 
 - [MCP](mcp.md) -- tool inventory, filtered search, `almanac_related`, connecting Cursor/Codex/Windsurf/OpenCode locally or remotely
+- [Context delivery](context-delivery.md) -- revisions, evidence, exact sections, profiles, preview, recovery, and reuse policy
 - [Pi extension](pi.md) -- native pi integration, TUI commands, queue lifecycle
 - [OpenCode integration](opencode-integration.md) -- MCP config and AGENTS.md instructions for OpenCode
 - [Remote deployment](remote-deployment.md) -- Docker Compose, Fly.io, Cloudflare Tunnel

@@ -245,6 +245,23 @@ excluded counts surface as `excluded_invalidated_count` in the response
 metadata. History stays greppable/queryable -- this is a default view
 filter, not a deletion.
 
+The same eligibility policy excludes invalidated notes from merge targets,
+Inception inputs, generated hubs and project maps, and automatic context.
+Automatic recall includes this check in literal-identifier mode and after
+expansion/reranking. Tool-context cache hits and deferred results with source
+references recheck current local Markdown before delivery. Missing optional
+metadata and unavailable remote records retain fail-open read behavior; a
+known invalidation in a result or readable source always excludes it. Legacy
+deferred records without source references retain their existing short TTL;
+they cannot claim source revalidation. Explicit historical reads keep the
+invalidation field visible.
+
+Append-merges preserve the canonical claim's metadata and certainty. Tags
+are unioned; incoming provenance and citations are recorded with the appended
+section rather than replacing the original claim's source or evidence.
+Explicit metadata changes use the replacement/review path. Cross-project
+and invalidated notes cannot be automatic merge targets.
+
 ### Contradiction detection v2 (background)
 
 Gated by `contradiction_detection_enabled` (config, default `false`), a
@@ -351,3 +368,24 @@ as a safety net alongside explicit invalidation.
 - [[redis-cluster-setup-notes]]
 - [[caching-strategy-decision]]
 ```
+
+### Context and evidence extensions (optional, v1)
+
+These additive fields use the existing scalar/inline-list grammar and survive
+legacy metadata-preserving rewrites. No backfill of guessed evidence is required.
+
+| Field | Supported encoding | Consumer |
+| --- | --- | --- |
+| `evidence` | Single-line JSON object: method, summary, applicability, action, invalidating_conditions | Capture, exact reads, composer |
+| `synthesized_revisions` | Single-line JSON object mapping source stem to semantic revision | Inception, freshness review |
+| `reuse_scope` | `project` or `reusable`; missing means unclassified | Opt-in reuse policy |
+| `export_policy` | `allow` or `deny`; missing means unclassified | Opt-in archive policy |
+| `reuse_reviewed` | Boolean; explicit owner review of broader reuse | Derived policy inheritance |
+| `review_after` | ISO date/datetime | Review reminder, independent of claim validity |
+
+`evidence.method` is observation, code_check, human_decision, or synthesis. The
+shared codec rejects unsupported keys and oversized strings. Nested YAML is not
+introduced: structured extension fields are JSON on a single line. Raw revisions
+cover original bytes; semantic revisions exclude only access/resurfacing telemetry.
+See [context delivery](context-delivery.md) for conditional-write semantics,
+section grammar, profiles, host generations, policy propagation and rollout.

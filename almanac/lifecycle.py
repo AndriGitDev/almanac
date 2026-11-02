@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from almanac.config import RUNTIME_DIR, detect_project, get_config, get_vault, slugify
+from almanac.revisions import results_fresh, stamp_results
+from almanac.eligibility import filter_eligible_results
 from almanac.graph import load_or_build_graph, lookup_concepts, lookup_project_notes, read_note_metadata
 from almanac.hub import vault_map
 from almanac import queue as capture_queue
@@ -413,6 +415,8 @@ def read_note_oneliner(note_name):
     note_path = vault / "notes" / f"{note_name}.md"
     if not note_path.exists():
         return None
+    if not filter_eligible_results(vault, [{"path": str(note_path)}])[0]:
+        return None
 
     title = note_name
     certainty = ""
@@ -773,6 +777,7 @@ def run_deferred_briefing_search(deferred_path: str | None = None):
         latency_ms = int((_time.time() - t0) * 1000)
 
         results = enhance_results(results, cwd=params.get("cwd", ""))
+        results, _ = filter_eligible_results(get_vault(), results)
 
         # Format results, dedup against linked notes
         seen = set()
@@ -812,6 +817,7 @@ def run_deferred_briefing_search(deferred_path: str | None = None):
             {
                 "status": "ready",
                 "note_lines": final_notes,
+                "note_paths": note_paths[:max_notes],
                 "timestamp": time.time(),
                 "ttl_seconds": DEFERRED_BRIEFING_TTL_SECONDS,
                 "scope": scope,
@@ -860,6 +866,7 @@ def run_remote_briefing(cwd, config, session_id="unknown", host_id: str | None =
         query += " " + git_branch.replace("-", " ").replace("/", " ")
 
     results = remote_search(query=query, limit=max_notes, cwd=cwd)
+    results, _ = filter_eligible_results(get_vault(), results)
     if results:
         note_lines = []
         for result in results[:max_notes]:
@@ -873,6 +880,7 @@ def run_remote_briefing(cwd, config, session_id="unknown", host_id: str | None =
             {
                 "status": "ready",
                 "note_lines": note_lines,
+                "note_paths": [r.get("path", "") for r in results[:max_notes]],
                 "timestamp": time.time(),
                 "ttl_seconds": DEFERRED_BRIEFING_TTL_SECONDS,
                 "source": "remote",
@@ -966,6 +974,7 @@ def build_briefing(
         try:
             max_notes = config.get("briefing_max_notes", 5)
             map_notes = lookup_project_notes(project_slug, limit=max_notes)
+            map_notes, _ = filter_eligible_results(vault, map_notes)
             if len(map_notes) >= max_notes:
                 note_lines = []
                 for note in map_notes[:max_notes]:
@@ -978,6 +987,7 @@ def build_briefing(
                     {
                         "status": "ready",
                         "note_lines": note_lines,
+                        "note_paths": [r.get("path", "") for r in map_notes[:max_notes]],
                         "timestamp": time.time(),
                         "ttl_seconds": DEFERRED_BRIEFING_TTL_SECONDS,
                         "source": "project-maps",
@@ -1527,6 +1537,11 @@ def consume_deferred_briefing(
 
         # Got results — consume and clean up
         note_lines = data.get("note_lines", [])
+        note_paths = data.get("note_paths")
+        if isinstance(note_paths, list) and len(note_paths) == len(note_lines):
+            rows = [{"path": ref, "line": line} for ref, line in zip(note_paths, note_lines)]
+            rows, _ = filter_eligible_results(get_vault(), rows)
+            note_lines = [row["line"] for row in rows]
         os.unlink(path)
 
         # Mark vsearch as warm for RRF hybrid search
@@ -1668,6 +1683,7 @@ def run_deep_recall_worker(input_path, backend):
                 {
                     "title": entry.get("title") or entry.get("path", ""),
                     "reason": entry.get("path", ""),
+                    "path": entry.get("path", ""),
                 }
                 for entry in agentic_results[:3]
             ]
@@ -1802,6 +1818,7 @@ def consume_deep_recall():
             return []
 
         suggestions = data.get("suggestions", [])
+        suggestions, _ = filter_eligible_results(get_vault(), suggestions)
         os.unlink(DEEP_RECALL_PENDING_PATH)
 
         if not suggestions:
@@ -1848,6 +1865,7 @@ def run_remote_recall(prompt, cwd, config, session_id="unknown", concrete: bool 
         query=prompt, limit=max_notes + 3, min_score=min_score, cwd=cwd, concrete=concrete
     )
     raw_results = envelope.get("results", [])
+    raw_results, _ = filter_eligible_results(get_vault(), raw_results)
     if concrete:
         results = raw_results
         project_decisions = []
@@ -2185,8 +2203,38 @@ def build_session_context(
     include_recall: bool = True,
     include_tool_context_preview: bool = False,
     host_id: str | None = None,
+    situation: str | None = None,
+    host_instance_id: str | None = None,
+    context_epoch: int | None = None,
+    profile: str | None = None,
+    preview: bool = False,
+    acknowledge_packet_id: str | None = None,
+    delivery_outcome: str = "attached",
+    retry: bool = False,
 ) -> dict:
     """Build a one-call, budgeted session initialization/context packet."""
+    if situation is not None or profile is not None or preview or get_config().get("context_composer_enabled", False):
+        from almanac.context import context_packet
+
+        return context_packet(
+            cwd=cwd,
+            prompt=prompt,
+            session_id=session_id,
+            token_budget=token_budget if token_budget is not None else 2000,
+            situation=situation,
+            host_id=runtime_host_id(host_id),
+            host_instance_id=host_instance_id,
+            context_epoch=context_epoch,
+            profile=profile,
+            preview=preview,
+            acknowledge_packet_id=acknowledge_packet_id,
+            delivery_outcome=delivery_outcome,
+            retry=retry,
+            include_status=include_status,
+            include_recent=include_recent,
+            include_recall=include_recall,
+            include_tool_context_preview=include_tool_context_preview,
+        )
     host_id = runtime_host_id(host_id)
     token_budget, char_budget = _session_context_char_budget(token_budget)
     packet_char_budget = char_budget + 1200
@@ -2916,7 +2964,10 @@ def build_tool_context(
     raw_result_count = None
     enhanced_result_count = None
     cached_entry = cache.get("dirs", {}).get(dir_key)
-    if cached_entry is not None and not _tool_context_entry_fresh(cached_entry, config):
+    if cached_entry is not None and (
+        not _tool_context_entry_fresh(cached_entry, config)
+        or not results_fresh(get_vault(), cached_entry.get("results", []))
+    ):
         del cache["dirs"][dir_key]
         cached_entry = None
         log_retrieval("tool-context", "cache-expired", dir_key=dir_key)
@@ -2959,6 +3010,7 @@ def build_tool_context(
             # Tool-context is unsolicited injection: require a positive project
             # match instead of letting untagged notes through as general knowledge.
             results = enhance_results(raw_results, config, cwd=cwd, require_project_match=True)
+            results = stamp_results(get_vault(), results)
             enhanced_result_count = len(results)
         except Exception as exc:
             latency_ms = int((time.time() - t0) * 1000)
@@ -3010,6 +3062,10 @@ def build_tool_context(
                 min_score=min_score,
             )
 
+    results, excluded = filter_eligible_results(get_vault(), results, project=cwd, config=config)
+    if not results and excluded:
+        return no_context("invalidated-filtered-empty", excluded_invalidated_count=excluded, source=source)
+
     recall_paths = get_recall_paths(session_id, cwd=cwd, host_id=host_id)
     already_injected = session_injected_paths(cache, lineage, cwd=cwd, host_id=host_id)
     exclude = recall_paths | already_injected
@@ -3026,6 +3082,23 @@ def build_tool_context(
 
     max_notes = config.get("tool_context_max_notes", 2)
     selected = filtered[:max_notes]
+    if config.get("context_composer_enabled", False):
+        from almanac.composition import compose
+
+        packet = compose(
+            get_vault(),
+            selected,
+            token_budget=int(config.get("tool_context_token_budget", 1000)),
+            project=cwd,
+            config=config,
+        )
+        if not packet["should_inject"]:
+            return no_context("whole-piece-budget", omissions=packet["metadata"]["omissions"])
+        selected = [r for r in selected if r.get("path") in {p["path"] for p in packet["results"]}]
+        record_access_hits("tool-context", "inject", selected, query=search_query or dir_key, session_id=session_id)
+        record_injection(cache, lineage, [r["path"] for r in selected], cwd=cwd, host_id=host_id)
+        save_cache(cache)
+        return LifecycleResult(True, packet["content"], "tool-context", results=selected, metadata=packet["metadata"])
     lines = ["[connected-to-vault]"]
     injected_paths = []
     vault = get_vault()

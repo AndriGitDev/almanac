@@ -75,13 +75,13 @@ MCP_TOOL_INVENTORY: tuple[McpToolInventoryItem, ...] = (
     McpToolInventoryItem(
         "almanac_session_context",
         "Lifecycle",
-        "Build a one-call budgeted session context packet that can include status, recent context, recall, and tool-context preview metadata.",
+        "Build a budgeted context packet or pure preview, with optional complete-piece profiles, situations and host context epochs.",
         "Host-adapter primitive that replaces separate briefing/recall/status calls when a host wants one compact payload.",
     ),
     McpToolInventoryItem(
         "almanac_get",
         "Read",
-        "Read full note content by name or path.",
+        "Read a known note or exact section with source revisions, validity and evidence status.",
         "Use after `almanac_search` when a returned path needs full content, or directly when the user already supplied an exact note path/name.",
     ),
     McpToolInventoryItem(
@@ -99,13 +99,13 @@ MCP_TOOL_INVENTORY: tuple[McpToolInventoryItem, ...] = (
     McpToolInventoryItem(
         "almanac_store",
         "Write",
-        "Write a single knowledge note with managed frontmatter and project indexing.",
+        "Write a knowledge note with managed frontmatter, optional evidence/citations, explicit policy metadata and project indexing.",
         "Low-level write primitive for sync/automation or agents without skill support; interactive Claude/Codex sessions should prefer `/almanac` or local hooks.",
     ),
     McpToolInventoryItem(
         "almanac_replace_note",
         "Sync",
-        "Replace an existing note at a known path for explicit conflict resolution.",
+        "Replace an existing note with optional expected_revision conflict protection and explicit metadata updates.",
         "Use only after a sync client has identified the exact remote path to resolve; it is not a general note creation primitive.",
     ),
     McpToolInventoryItem(

@@ -34,6 +34,7 @@ INCEPTION_STATE_PATH = str(get_config_dir() / "inception-state.json")
 
 INCEPTION_LOCK_PATH = os.path.join(RUNTIME_DIR, "inception.lock")
 VAULT_WRITE_LOCK_PATH = os.path.join(RUNTIME_DIR, "vault-write.lock")
+_VAULT_WRITE_OWNERS = {}
 
 
 def _should_log():
@@ -653,7 +654,7 @@ def save_inception_state(state, state_path=None):
     os.replace(tmp, path)
 
 
-def _acquire_pid_lock(path):
+def _acquire_pid_lock(path, *, allow_live_expiry=True):
     """Acquire an exclusive pid lock file, breaking stale locks."""
     lock_path = Path(path)
     os.makedirs(lock_path.parent, exist_ok=True)
@@ -661,12 +662,17 @@ def _acquire_pid_lock(path):
     if lock_path.exists():
         try:
             age = time.time() - lock_path.stat().st_mtime
-            if age < 600:
+            if age < 600 or not allow_live_expiry:
                 try:
                     pid = int(lock_path.read_text().strip())
                     os.kill(pid, 0)
                     return False
-                except (ValueError, OSError):
+                except ValueError:
+                    if not allow_live_expiry and age < 1:
+                        return False  # Another writer may still be publishing its PID.
+                except PermissionError:
+                    return False
+                except OSError:
                     pass
         except OSError:
             pass
@@ -699,7 +705,7 @@ def release_inception_lock(lock_path=None):
 
 
 def owns_vault_write_lock(lock_file=None):
-    """Return True when the vault write lock exists and is held by this process.
+    """Return True when the vault write lock exists and is held by this thread in this process.
 
     The lock file stores the owner's pid, so write paths that may be called both
     standalone and from callers that already hold the lock (e.g. the MCP server)
@@ -708,7 +714,10 @@ def owns_vault_write_lock(lock_file=None):
     """
     path = Path(lock_file or VAULT_WRITE_LOCK_PATH)
     try:
-        return int(path.read_text().strip()) == os.getpid()
+        return int(path.read_text().strip()) == os.getpid() and _VAULT_WRITE_OWNERS.get(str(path.resolve())) == (
+            os.getpid(),
+            threading.get_ident(),
+        )
     except (OSError, ValueError):
         return False
 
@@ -730,7 +739,8 @@ def acquire_vault_write_lock(lock_file=None, timeout=5.0, poll_interval=0.05, *,
     deadline = time.monotonic() + timeout
     path = lock_file or VAULT_WRITE_LOCK_PATH
     while True:
-        if _acquire_pid_lock(path):
+        if _acquire_pid_lock(path, allow_live_expiry=False):
+            _VAULT_WRITE_OWNERS[str(Path(path).resolve())] = (os.getpid(), threading.get_ident())
             return True
         if time.monotonic() >= deadline:
             return False
@@ -750,6 +760,10 @@ def release_vault_write_lock(lock_file=None, *, lock_path=None):
             raise TypeError("release_vault_write_lock(): specify either lock_file or lock_path, not both")
         lock_file = lock_path
     path = Path(lock_file or VAULT_WRITE_LOCK_PATH)
+    owner = _VAULT_WRITE_OWNERS.get(str(path.resolve()))
+    if owner is not None and owner != (os.getpid(), threading.get_ident()):
+        return
+    _VAULT_WRITE_OWNERS.pop(str(path.resolve()), None)
     try:
         path.unlink()
     except FileNotFoundError:
@@ -1189,6 +1203,7 @@ def _render_note_markdown(
     session_id=None,
     citations=None,
     extra_frontmatter_lines=None,
+    evidence=None,
 ):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M")
 
@@ -1209,6 +1224,10 @@ def _render_note_markdown(
         citations=citations,
     )
 
+    from almanac.evidence import normalize_evidence
+
+    evidence = normalize_evidence(evidence)
+
     lines = [
         "---",
         f"title: {safe_title}",
@@ -1216,6 +1235,8 @@ def _render_note_markdown(
         f"tags: {json.dumps(contract['tags'], ensure_ascii=False)}",
         f"source: {contract['source']}",
     ]
+    if evidence:
+        lines.append("evidence: " + json.dumps(evidence, ensure_ascii=False, sort_keys=True))
     if contract["origin"]:
         lines.append(f"origin: {contract['origin']}")
     if contract["certainty"] is not None:
@@ -1479,6 +1500,8 @@ def write_note(
     branch=None,
     session_id=None,
     citations=None,
+    evidence=None,
+    metadata_updates=None,
 ):
     """Write an atomic note with normalized frontmatter to notes/ using an atomic rename.
 
@@ -1499,30 +1522,43 @@ def write_note(
             if not candidate.exists():
                 target = candidate
                 break
-    _write_text_atomic(
-        target,
-        _render_note_markdown(
-            title,
-            body,
-            note_type,
-            tags,
-            certainty=certainty,
-            source=source,
-            origin=origin,
-            validity_context=validity_context,
-            supersedes=supersedes,
-            project=project,
-            project_path=project_path,
-            branch=branch,
-            citations=citations,
-            session_id=session_id,
-        ),
+    from almanac.evidence import update_metadata
+
+    rendered = _render_note_markdown(
+        title,
+        body,
+        note_type,
+        tags,
+        certainty=certainty,
+        source=source,
+        origin=origin,
+        validity_context=validity_context,
+        supersedes=supersedes,
+        project=project,
+        project_path=project_path,
+        branch=branch,
+        citations=citations,
+        evidence=evidence,
+        session_id=session_id,
     )
+    _write_text_atomic(target, update_metadata(rendered, metadata_updates))
     _index_written_note(vault_path, target)
     return target
 
 
-def replace_note_at_path(
+def replace_note_at_path(*args, **kwargs):
+    """Replace under the reentrant vault lock, optionally comparing a raw revision."""
+    already_held = owns_vault_write_lock()
+    if not already_held and not acquire_vault_write_lock():
+        raise RuntimeError("Could not acquire vault write lock")
+    try:
+        return _replace_note_at_path(*args, **kwargs)
+    finally:
+        if not already_held:
+            release_vault_write_lock()
+
+
+def _replace_note_at_path(
     vault_path,
     path,
     title,
@@ -1538,6 +1574,8 @@ def replace_note_at_path(
     project_path=None,
     branch=None,
     session_id=None,
+    expected_revision=None,
+    metadata_updates=None,
 ):
     """Replace an existing note at a vault-relative path using managed frontmatter."""
     vault = Path(vault_path).resolve()
@@ -1555,28 +1593,32 @@ def replace_note_at_path(
 
     # Round-trip frontmatter keys this write path does not manage (audit M6):
     # sync rewrites must not drop keys added by hand or by other tools.
-    existing_frontmatter, _ = split_frontmatter(target.read_text(encoding="utf-8", errors="replace"))
+    existing_text = target.read_text(encoding="utf-8")
+    from almanac.revisions import require_revision
+
+    require_revision(existing_text, expected_revision)
+    existing_frontmatter, _ = split_frontmatter(existing_text)
     preserved_lines = _unmanaged_frontmatter_lines(existing_frontmatter)
 
-    _write_text_atomic(
-        target,
-        _render_note_markdown(
-            title,
-            body,
-            note_type,
-            tags,
-            certainty=certainty,
-            source=source,
-            origin=origin,
-            validity_context=validity_context,
-            supersedes=supersedes,
-            project=project,
-            project_path=project_path,
-            branch=branch,
-            session_id=session_id,
-            extra_frontmatter_lines=preserved_lines,
-        ),
+    from almanac.evidence import update_metadata
+
+    rendered = _render_note_markdown(
+        title,
+        body,
+        note_type,
+        tags,
+        certainty=certainty,
+        source=source,
+        origin=origin,
+        validity_context=validity_context,
+        supersedes=supersedes,
+        project=project,
+        project_path=project_path,
+        branch=branch,
+        session_id=session_id,
+        extra_frontmatter_lines=preserved_lines,
     )
+    _write_text_atomic(target, update_metadata(rendered, metadata_updates))
     _index_written_note(vault_path, target)
     return target
 

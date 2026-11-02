@@ -7,6 +7,7 @@ from pathlib import Path
 
 from almanac import frontmatter
 from almanac.config import RUNTIME_DIR, get_config, get_config_dir, get_vault
+from almanac.eligibility import filter_eligible_results
 
 # --- Note metadata ---
 
@@ -74,6 +75,7 @@ def read_note_metadata(note_name):
         "source": _scalar("source"),
         "origin": _scalar("origin"),
         "supersedes": _scalar("supersedes"),
+        "invalidated_by": _scalar("invalidated_by"),
         "tags": tags,
         "links": links,
     }
@@ -843,4 +845,4 @@ def lookup_project_notes(project_slug, maps=None, limit=5):
             }
         )
 
-    return results
+    return filter_eligible_results(get_vault(), results)[0]

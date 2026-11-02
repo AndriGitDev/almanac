@@ -179,7 +179,10 @@ def classify_memory_outcome(task: dict[str, Any], outcome: dict[str, Any]) -> di
         "memory_used": memory_used,
         "memory_classification": classification,
         "memory_failure_type": failure_type,
-        "memory_contribution_measurable": bool(relevant_memory),
+        "memory_relevance_signal": bool(relevant_memory),
+        "memory_application_observed": bool(task.get("expected_actions"))
+        and set(task.get("expected_actions", [])).issubset(set(outcome.get("observed_actions", []))),
+        "memory_contribution_measurable": False,  # A single retrieval/outcome cannot establish causal contribution.
         "expected_query_intent": expected_intent,
         "intent_match_score": round(intent_score, 3),
         "useful_note_refs": useful_refs,

@@ -37,7 +37,8 @@ The vault location is configured in `almanac.yml` (default: `~/almanac`). Check 
    certainty: 1-5
    validity-context: what makes this true or false
    supersedes: "[[note-name]]" or omit
-   project: /full/path/to/working/directory
+   project: project-slug
+   project_path: /full/path/to/working/directory
    branch: branch-name-if-applicable
    date: YYYY-MM-DDTHH:MM
    session_id: current-session-id
@@ -71,7 +72,8 @@ The vault location is configured in `almanac.yml` (default: `~/almanac`). Check 
    ```yaml
    ---
    title: Project Name
-   project: /full/path/to/working/directory
+   project: project-slug
+   project_path: /full/path/to/working/directory
    branch: branch-name
    ---
    ```
@@ -116,3 +118,22 @@ The vault location is configured in `almanac.yml` (default: `~/almanac`). Check 
 - One idea per note — if you find yourself writing more than a paragraph, split it
 - If the user provided context via `/almanac "..."`, use their framing as the primary lens
 - Use controlled tags — prefer reusing tags from existing notes over inventing new ones
+
+<!-- almanac-context-contract:start -->
+Shared contract: `almanac-context/v1` (generated from `almanac/contracts.py`).
+
+Use `almanac_search` and `almanac_get` for explicit recall. Known-note
+reads accept exact sections such as `notes/cache-policy.md#applicability` and
+return source revisions and validity. Anchor checks verify text presence only.
+
+Note identity uses `project: almanac` and optional
+`project_path: /path/to/almanac`; a path is not a project slug.
+Keep applicability, recommended action and rationale together. Optional
+`evidence` is a single-line JSON object; never invent evidence or treat access
+counts as confirmation. Merges preserve original provenance and confidence.
+
+Hosts may opt into `almanac_session_context` with `situation`,
+`host_instance_id`, `context_epoch` and `profile`. `preview: true` is read-only.
+The host owns live tasks and compaction generations. Restricted reuse is
+opt-in and does not provide multiuser authorization.
+<!-- almanac-context-contract:end -->

@@ -59,7 +59,7 @@ def server(tmp_path_factory):
         p for p in os.environ.get("PATH", "").split(os.pathsep) if not os.path.isfile(os.path.join(p, "qmd"))
     )
     env = {
-        **os.environ,
+        **{key: value for key, value in os.environ.items() if not key.startswith("ALMANAC_")},
         "PATH": clean_path,
         "ALMANAC_SEARCH_BACKEND": "grep",
         "ALMANAC_VAULT_PATH": str(vault),

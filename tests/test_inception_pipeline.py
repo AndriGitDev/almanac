@@ -214,6 +214,15 @@ class TestMainPipeline:
         # ["redis-cache-ttl", "redis-eviction-policy"]. Force a cluster of
         # that exact set → check_ledger_dedup returns ("skip", None) → stems
         # get added to consolidated_stems without any LLM call.
+        from almanac.derivation import source_snapshot
+
+        path = tmp_vault / "notes" / "existing-pattern.md"
+        snapshots = source_snapshot(tmp_vault, ["redis-cache-ttl", "redis-eviction-policy"])
+        path.write_text(
+            path.read_text().replace(
+                "source: inception", "source: inception\nsynthesized_revisions: " + json.dumps(snapshots)
+            )
+        )
         with _force_cluster(["redis-cache-ttl", "redis-eviction-policy"]):
             result = _run_main(mock_config, inception_state_path, ["--full"], db_path=str(mock_qmd_db))
         assert result == 0

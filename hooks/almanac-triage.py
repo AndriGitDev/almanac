@@ -52,6 +52,15 @@ def is_substantial(meta):
     """Score whether a session is substantial or trivial."""
     config = get_config()
 
+    # A long exchange count alone is not evidence of durable knowledge.
+    # Keep actual investigation/edit sessions even when they began as monitoring.
+    status_only = re.search(
+        r"\b(keep an eye|monitor|babysit|wait for|tell me when)\b", str(meta.get("first_prompt") or ""), re.IGNORECASE
+    )
+    insight = _INSIGHT_KEYWORDS.search(str(meta.get("last_outcome") or "") + " " + str(meta.get("first_prompt") or ""))
+    if status_only and not meta.get("files_edited") and not meta.get("files_read") and not insight:
+        return False
+
     if meta["exchange_count"] > config["exchange_threshold"]:
         return True
     if len(meta["files_edited"]) > config["file_count_threshold"]:
@@ -410,6 +419,20 @@ TRIAGE_NOTES_JSON_SCHEMA = {
                     "type": {"type": "string"},
                     "tags": {"type": "array", "items": {"type": "string"}},
                     "certainty": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "evidence": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "enum": ["observation", "code_check", "human_decision", "synthesis"],
+                            },
+                            "summary": {"type": "string"},
+                            "applicability": {"type": "string"},
+                            "action": {"type": "string"},
+                            "invalidating_conditions": {"type": "string"},
+                        },
+                        "additionalProperties": False,
+                    },
                     "validity_context": {"type": "string"},
                     "supersedes": {"type": "string"},
                     "citations": {
@@ -448,13 +471,16 @@ def _build_structured_notes_prompt(session_id, transcript_text, meta, project_sl
         'Return either a JSON array of notes or {"notes": [...]}.\n'
         "Each note must include: title, body, type, tags, certainty.\n"
         "certainty must be an integer from 1 to 5, not a word such as confirmed.\n"
-        "Optional fields: validity_context, supersedes, citations.\n"
+        "Optional fields: validity_context, supersedes, citations, evidence.\n"
         "When a note asserts something about specific code you saw in the transcript, "
         "add citations: a list of {file, anchor} objects, where file is the repo-relative "
         "path you saw and anchor is a short, verbatim, distinctive line from that file "
         "(under 120 characters) that would let someone verify the claim still holds. "
         "commit is an optional short git sha for provenance only. Omit citations entirely "
         "when the note isn't about specific code.\n"
+        "For procedural advice retain the situation, recommended action and because/rationale together. "
+        "When support is explicit, evidence may include method (observation, code_check, human_decision, synthesis), "
+        "summary, applicability, action, invalidating_conditions. Never invent evidence or treat retrieval counts as confirmation.\n"
         "Do not include any prose outside JSON.\n\n"
         f"Session ID: {session_id}\n"
         f"Project slug: {project_slug}\n"
@@ -545,6 +571,7 @@ def _write_structured_notes(notes, vault, session_id, meta, project_slug, llm_te
                 origin=f"claude_triage:{meta.get('agent') or 'claude'}",
                 source="session",
                 citations=note.get("citations"),
+                evidence=note.get("evidence"),
             )
             if result.get("decision") in ("created", "merged_into"):
                 written += 1

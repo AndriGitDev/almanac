@@ -247,13 +247,20 @@ def _iter_export_files(vault: Path, *, exclude_paths: Iterable[Path] = ()):
             yield rel, path
 
 
-def export_archive(vault: Path, archive_path: Path, *, include_manifest_hashes: bool = True) -> dict:
+def export_archive(
+    vault: Path, archive_path: Path, *, include_manifest_hashes: bool = True, config=None, project=None
+) -> dict:
     """Create a portable zip archive for a vault.
 
     Markdown and vault files remain canonical; derived search indexes and
     embeddings are intentionally excluded.
     """
     vault = Path(vault)
+    preview = export_preview(vault, config=config, project=project)
+    excluded = {row["path"] for row in preview["exclusions"]}
+    if preview["enabled"]:
+        excluded.add(".sync/ledger.jsonl")
+    excluded_originals = excluded | {p.replace("archive/", "notes/", 1) for p in excluded if p.startswith("archive/")}
     archive_path = Path(archive_path)
     identity = _ensure_identity(vault)
     files = []
@@ -263,6 +270,8 @@ def export_archive(vault: Path, archive_path: Path, *, include_manifest_hashes: 
         for root_name in CONTENT_ROOTS:
             zf.writestr(f"{PAYLOAD_PREFIX}{root_name}/", b"")
         for rel, path in _iter_export_files(vault, exclude_paths=(archive_path,)):
+            if rel in excluded:
+                continue
             data = path.read_bytes()
             info = {"path": rel, "size": len(data)}
             if include_manifest_hashes:
@@ -270,7 +279,7 @@ def export_archive(vault: Path, archive_path: Path, *, include_manifest_hashes: 
             files.append(info)
             zf.writestr(f"{PAYLOAD_PREFIX}{rel}", data)
 
-        active_tombstones = _active_tombstones(vault)
+        active_tombstones = [row for row in _active_tombstones(vault) if row.get("path") not in excluded_originals]
         if active_tombstones:
             data = "".join(json.dumps(r, separators=(",", ":"), sort_keys=True) + "\n" for r in active_tombstones)
             encoded = data.encode("utf-8")
@@ -294,6 +303,8 @@ def export_archive(vault: Path, archive_path: Path, *, include_manifest_hashes: 
             ],
             "files": files,
             "tombstones": active_tombstones,
+            "reuse_policy": {key: value for key, value in preview.items() if key != "exclusions"}
+            | {"excluded_count": len(preview["exclusions"])},
             "derived_metadata": {"embeddings_included": False, "search_indexes_included": False},
         }
         zf.writestr("manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
@@ -657,6 +668,8 @@ def archive_note(vault: Path, notes_rel_path: str, *, reason: str = "archived", 
     archive_rel = _archive_rel_for(rel)
     dest = _safe_dest(vault, archive_rel)
     content_hash = _sha256_file(src)
+    if dest.exists() and _sha256_file(dest) != content_hash:
+        raise ArchiveConflictError("Archive destination already contains different provenance")
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     os.replace(src, dest)
@@ -1155,6 +1168,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     export_p = sub.add_parser("export", help="Export a vault to a portable zip archive")
     export_p.add_argument("archive", type=Path, help="Destination archive path")
+    export_p.add_argument("--preview", action="store_true")
+    export_p.add_argument("--project")
     export_p.add_argument("--vault", type=Path, default=None, help="Vault path (defaults to configured vault)")
 
     import_p = sub.add_parser("import", help="Import a portable zip archive into a vault")
@@ -1179,7 +1194,11 @@ def main(argv: list[str] | None = None) -> int:
     vault = args.vault or _default_vault()
     try:
         if args.command == "export":
-            _json_print(export_archive(vault, args.archive))
+            _json_print(
+                export_preview(vault, project=args.project)
+                if args.preview
+                else export_archive(vault, args.archive, project=args.project)
+            )
         elif args.command == "import":
             _json_print(
                 import_archive(
@@ -1192,6 +1211,42 @@ def main(argv: list[str] | None = None) -> int:
         print(f"almanac archive error: {exc}", file=sys.stderr)
         return 2
     return 0
+
+
+def export_preview(vault: Path, *, config=None, project=None) -> dict:
+    """Read-only policy inventory; excluded bodies never enter diagnostics."""
+    from almanac.config import get_config
+    from almanac.frontmatter import parse
+    from almanac.policy import reuse_decision, effective_fields
+
+    config = get_config() if config is None else config
+    exclusions, unclassified = [], 0
+    for rel, path in _iter_export_files(Path(vault)):
+        if path.suffix != ".md":
+            continue
+        try:
+            fields = effective_fields(Path(vault), parse(path.read_text(encoding="utf-8"))[0])
+        except (OSError, UnicodeError):
+            fields = {"reuse_scope": "unsupported"}
+        if (
+            config.get("reuse_policy_enabled", False)
+            and rel.startswith("projects/")
+            and not fields.get("synthesized_from")
+        ):
+            exclusions.append({"path": rel, "reason": "legacy-hub-provenance-unclassified"})
+            continue
+        decision = reuse_decision(fields, purpose="export", project=project, config=config)
+        if decision["classification"] == "unclassified":
+            unclassified += 1
+        if not decision["allowed"]:
+            exclusions.append({"path": rel, "reason": decision["reason"]})
+    return {
+        "schema": "almanac-export-policy/v1",
+        "enabled": bool(config.get("reuse_policy_enabled", False)),
+        "exclusions": exclusions,
+        "unclassified_count": unclassified,
+        "classification_complete": unclassified == 0,
+    }
 
 
 if __name__ == "__main__":

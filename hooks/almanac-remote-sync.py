@@ -20,6 +20,7 @@ note and records a fresh ok ledger entry.
 from __future__ import annotations
 
 import os
+import json
 import re
 import sys
 from pathlib import Path
@@ -72,7 +73,24 @@ def parse_note_text(raw, fallback_title):
     validity_m = re.search(r"^validity-context:\s*(.+)$", fm, re.MULTILINE)
     validity = validity_m.group(1).strip() if validity_m else None
 
+    optional = {}
+    for key in ("evidence", "citations"):
+        match = re.search(rf"^{key}:[ \t]*(.+)$", fm, re.MULTILINE)
+        if match:
+            try:
+                optional[key] = json.loads(match[1])
+            except ValueError:
+                pass
+    updates = {}
+    for key in ("reuse_scope", "export_policy", "reuse_reviewed", "review_after", "invalidated_by"):
+        match = re.search(rf"^{key}:[ \t]*(.+)$", fm, re.MULTILINE)
+        if match:
+            raw = match[1].strip().strip("\"'")
+            updates[key] = raw == "true" if key == "reuse_reviewed" else raw
+    if updates:
+        optional["metadata_updates"] = updates
     return {
+        **optional,
         "title": title,
         "body": body,
         "note_type": note_type,
@@ -91,17 +109,21 @@ def parse_note(path):
 
 def _sync_payload(note: dict) -> str:
     """Stable string fed to content_hash — changes here invalidate prior hashes."""
-    return "\n".join(
-        [
-            note.get("title", ""),
-            note.get("note_type", ""),
-            ",".join(note.get("tags") or []),
-            str(note.get("certainty") or ""),
-            note.get("project") or "",
-            note.get("branch") or "",
-            note.get("validity_context") or "",
-            note.get("body", ""),
-        ]
+    return (
+        json.dumps({k: note[k] for k in ("evidence", "citations", "metadata_updates") if k in note}, sort_keys=True)
+        + "\n"
+        + "\n".join(
+            [
+                note.get("title", ""),
+                note.get("note_type", ""),
+                ",".join(note.get("tags") or []),
+                str(note.get("certainty") or ""),
+                note.get("project") or "",
+                note.get("branch") or "",
+                note.get("validity_context") or "",
+                note.get("body", ""),
+            ]
+        )
     )
 
 
@@ -162,13 +184,20 @@ def _dry_run_note(note: dict, resolve_conflicts: str = "") -> str:
     return "conflict"
 
 
-def _replace_remote_note(vault, source, remote_path, note, chash, dry_run=False) -> bool:
+def _replace_remote_note(vault, source, remote_path, note, chash, dry_run=False, remote=None) -> bool:
     """Replace remote_path with note. Returns True on success/dry-run success."""
     if dry_run:
         print(f"  Would resolve (local overwrites remote): {note['title']} -> {remote_path}")
         return True
 
-    result = replace_note(remote_path, **note)
+    remote = _safe_get_remote(remote_path) if remote is None else remote
+    if not isinstance(remote, dict) or not remote.get("revision"):
+        print(
+            "  Conditional replacement unsupported or source unavailable; refusing unconditional overwrite.",
+            file=sys.stderr,
+        )
+        return False
+    result = replace_note(remote_path, **note, expected_revision=remote["revision"])
     if isinstance(result, dict) and "error" in result:
         print(f"  Error resolving {note['title']} -> {remote_path}: {result['error']}", file=sys.stderr)
         if vault:
@@ -252,6 +281,8 @@ def catch_up(vault, dry_run=False, batch=0, resolve_conflicts=""):
     ok ledger entry.
     """
     import hashlib
+
+    observed_remote = {}
     from almanac.remote_client import list_notes
 
     notes_dir = vault / "notes"
@@ -322,6 +353,7 @@ def catch_up(vault, dry_run=False, batch=0, resolve_conflicts=""):
                         continue
                     candidate_paths.append(candidate_path)
                     remote_full = _safe_get_remote(candidate_path)
+                    observed_remote[candidate_path] = remote_full
                     if _remote_fetch_failed(remote_full):
                         continue
                     if remote_full and _same_remote_payload(remote_full, note):
@@ -366,6 +398,7 @@ def catch_up(vault, dry_run=False, batch=0, resolve_conflicts=""):
                     continue
                 candidate_paths.append(remote_path)
                 remote_full = _safe_get_remote(remote_path)
+                observed_remote[remote_path] = remote_full
                 if _remote_fetch_failed(remote_full):
                     continue
                 if remote_full and _same_remote_payload(remote_full, note):
@@ -396,7 +429,9 @@ def catch_up(vault, dry_run=False, batch=0, resolve_conflicts=""):
             source = str(f.relative_to(vault))
             chash = _payload_hash(note)
             resolution_attempts += 1
-            if _replace_remote_note(vault, source, remote_path, note, chash, dry_run=dry_run):
+            if _replace_remote_note(
+                vault, source, remote_path, note, chash, dry_run=dry_run, remote=observed_remote.get(remote_path)
+            ):
                 resolved += 1
             else:
                 remaining_conflicts.append((f, remote_path))
@@ -620,6 +655,7 @@ def main():
                     note,
                     chash,
                     dry_run=False,
+                    remote=remote,
                 )
                 failures += 0 if ok else 1
                 continue

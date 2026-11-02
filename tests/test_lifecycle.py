@@ -1099,6 +1099,7 @@ def test_build_recall_backend_unavailable_includes_miss_metadata(_config, mock_v
         "recall_max_notes": 3,
         "recall_high_confidence": 0.55,
         "concept_index_enabled": False,
+        "prf_enabled": False,
         "rrf_enabled": False,
         "multi_hop_enabled": False,
         "reranker_enabled": False,

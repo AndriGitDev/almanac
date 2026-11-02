@@ -44,7 +44,7 @@ def test_node_extension_harnesses_run_under_node_test() -> None:
     if not node:
         pytest.fail("node is required for the Pi extension harnesses")
     result = subprocess.run(
-        [node, "--test", str(REPO_ROOT / "tests" / "node" / "almanac-extension.test.mjs")],
+        [node, "--test", *[str(p) for p in sorted((REPO_ROOT / "tests" / "node").glob("*.test.mjs"))]],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

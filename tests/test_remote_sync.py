@@ -64,6 +64,7 @@ class TestRemoteSyncDryRun:
                 "get",
                 return_value={
                     "path": "notes/same-note.md",
+                    "revision": "sha256:remote",
                     "content": note_path.read_text() + "\n## Related\n",
                 },
             ),
@@ -88,7 +89,7 @@ class TestRemoteSyncDryRun:
             patch.object(
                 mod,
                 "get",
-                return_value={"path": "notes/same-title.md", "content": remote_content},
+                return_value={"path": "notes/same-title.md", "revision": "sha256:remote", "content": remote_content},
             ),
             patch.object(mod, "store") as store,
             patch.object(sys, "argv", ["almanac-remote-sync.py", "--dry-run", str(note_path)]),
@@ -194,7 +195,7 @@ class TestRemoteSyncDryRun:
             patch.object(
                 mod,
                 "get",
-                return_value={"path": "notes/same-title.md", "content": remote_content},
+                return_value={"path": "notes/same-title.md", "revision": "sha256:remote", "content": remote_content},
             ),
             patch.object(mod, "replace_note", return_value={"path": "notes/same-title.md"}) as replace_note,
             patch.object(mod, "store") as store,
@@ -622,7 +623,11 @@ class TestCatchUp:
             patch.object(
                 mod,
                 "get",
-                return_value={"path": "notes/local-name-2.md", "content": note.read_text()},
+                return_value={
+                    "path": "notes/local-name-2.md",
+                    "revision": "sha256:remote",
+                    "content": note.read_text(),
+                },
             ) as get,
             patch.object(mod, "store") as mock_store,
             patch.object(sys, "argv", ["almanac-remote-sync.py", "--catch-up"]),
@@ -656,7 +661,7 @@ class TestCatchUp:
             patch.object(
                 mod,
                 "get",
-                return_value={"path": "notes/diverged.md", "content": remote_content},
+                return_value={"path": "notes/diverged.md", "revision": "sha256:remote", "content": remote_content},
             ),
             patch.object(mod, "replace_note", return_value={"path": "notes/diverged.md"}) as replace_note,
             patch.object(mod, "store") as mock_store,
@@ -694,6 +699,7 @@ class TestCatchUp:
                 "get",
                 side_effect=lambda path: {
                     "path": path,
+                    "revision": "sha256:remote",
                     "content": (vault / path).read_text().replace("Local edited body.", "Remote old body."),
                 },
             ),
@@ -734,6 +740,7 @@ class TestCatchUp:
                 "get",
                 side_effect=lambda path: {
                     "path": path,
+                    "revision": "sha256:remote",
                     "content": (vault / path).read_text().replace("Local edited body.", "Remote old body."),
                 },
             ),
@@ -767,8 +774,8 @@ class TestCatchUp:
 
         def fake_get(path):
             if path == "notes/same-title.md":
-                return {"path": path, "content": old_content}
-            return {"path": path, "content": note.read_text()}
+                return {"path": path, "revision": "sha256:remote", "content": old_content}
+            return {"path": path, "revision": "sha256:remote", "content": note.read_text()}
 
         with (
             patch.object(mod, "is_remote", return_value=True),
@@ -799,8 +806,8 @@ class TestCatchUp:
 
         def fake_get(path):
             if path == "notes/same-title.md":
-                return {"path": path, "content": divergent_content}
-            return {"path": path, "content": note.read_text()}
+                return {"path": path, "revision": "sha256:remote", "content": divergent_content}
+            return {"path": path, "revision": "sha256:remote", "content": note.read_text()}
 
         with (
             patch.object(mod, "is_remote", return_value=True),
@@ -837,7 +844,11 @@ class TestCatchUp:
         ]
 
         def fake_get(path):
-            return {"path": path, "content": note.read_text().replace("Local body.", f"Remote body {path}.")}
+            return {
+                "path": path,
+                "revision": "sha256:remote",
+                "content": note.read_text().replace("Local body.", f"Remote body {path}."),
+            }
 
         with (
             patch.object(mod, "is_remote", return_value=True),

@@ -24,10 +24,15 @@ a few hundred notes.
 from __future__ import annotations
 
 import re
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 
 from almanac.config import get_config
+from almanac.eligibility import note_eligible
+from almanac.policy import reuse_decision, inherited_policy, effective_fields
+from almanac.frontmatter import parse
+from almanac.revisions import semantic_revision
 from almanac.graph import extract_wikilinks, load_or_build_graph
 from almanac.store import _frontmatter_int, _frontmatter_scalar, _write_text_atomic, split_frontmatter
 
@@ -93,13 +98,20 @@ def _read_note(path: Path):
     except OSError:
         return None
     frontmatter, body = split_frontmatter(text)
+    from almanac.derivation import derived_status
+
+    freshness = derived_status(path.parent.parent, text)
     return {
+        "source_evidence_invalidated": any(row["status"] in {"invalidated", "changed"} for row in freshness["sources"]),
+        **parse(text)[0],
+        "semantic_revision": semantic_revision(text),
         "stem": path.stem,
         "title": _frontmatter_scalar(frontmatter, "title") or path.stem,
         "date": _frontmatter_scalar(frontmatter, "date"),
         "type": _frontmatter_scalar(frontmatter, "type"),
         "project": _frontmatter_scalar(frontmatter, "project"),
         "certainty": _frontmatter_int(frontmatter, "certainty"),
+        "invalidated_by": _frontmatter_scalar(frontmatter, "invalidated_by"),
         "links": extract_wikilinks(body),
     }
 
@@ -112,7 +124,7 @@ def _scan_notes(vault: Path) -> dict:
     notes = {}
     for md in sorted(notes_dir.glob("*.md")):
         meta = _read_note(md)
-        if meta is not None:
+        if meta is not None and not meta.get("source_evidence_invalidated") and note_eligible(meta, purpose="context"):
             notes[meta["stem"]] = meta
     return notes
 
@@ -293,7 +305,12 @@ def regenerate_project_hub(vault, project_slug, config=None, *, now=None) -> dic
     max_bytes = int(config.get("hub_max_bytes", HUB_MAX_BYTES_DEFAULT))
 
     all_notes = _scan_notes(vault)
-    project_notes = {stem: meta for stem, meta in all_notes.items() if meta.get("project") == project_slug}
+    project_notes = {
+        stem: meta
+        for stem, meta in all_notes.items()
+        if meta.get("project") == project_slug
+        and reuse_decision(effective_fields(vault, meta), project=project_slug, config=config)["allowed"]
+    }
     note_count = len(project_notes)
 
     scores = _rank_scores(vault, all_notes)
@@ -325,6 +342,23 @@ def regenerate_project_hub(vault, project_slug, config=None, *, now=None) -> dic
     content, shown, final_overflow, trimmed = _render_hub(
         project_slug, note_count, generated_at, top_shown, decisions_shown, activity_shown, overflow, max_bytes
     )
+
+    if config.get("reuse_policy_enabled", False) or config.get("context_composer_enabled", False):
+        included = {meta["stem"]: meta for rows in shown.values() for meta in rows}
+        snapshots = {stem: meta["semantic_revision"] for stem, meta in included.items()}
+        policy = inherited_policy([effective_fields(vault, meta) for meta in included.values()])
+        extra = (
+            "synthesized_from: "
+            + json.dumps(sorted(included))
+            + "\nsynthesized_revisions: "
+            + json.dumps(snapshots, sort_keys=True)
+        )
+        extra += "".join(f"\n{key}: {value}" for key, value in policy.items() if key != "project")
+        content = content.replace("---\n\n", extra + "\n---\n\n", 1)
+        if len(content.encode("utf-8")) > max_bytes:
+            content = f"# {project_slug}\n\nHub omitted: complete provenance exceeds budget; use almanac_search.\n"
+            if len(content.encode("utf-8")) > max_bytes:
+                content = ""
 
     project_dir = vault / "projects"
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -435,7 +469,13 @@ def vault_map(vault, project_slug, config=None) -> str:
     all_notes = _scan_notes(vault)
     scores = _rank_scores(vault, all_notes)
     cross = sorted(
-        (meta for meta in all_notes.values() if meta.get("project") and meta.get("project") != project_slug),
+        (
+            meta
+            for meta in all_notes.values()
+            if meta.get("project")
+            and meta.get("project") != project_slug
+            and reuse_decision(effective_fields(vault, meta), project=project_slug, config=config)["allowed"]
+        ),
         key=lambda meta: (-scores.get(meta["stem"], 0.0), meta["stem"]),
     )
     cross_lines = [f"{_note_line(m)} (project: {m['project']})" for m in cross[:CROSS_PROJECT_TOP_NOTES_LIMIT]]

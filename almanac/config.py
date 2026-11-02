@@ -16,6 +16,10 @@ from pathlib import Path
 # --- Configuration ---
 
 DEFAULT_CONFIG = {
+    "context_composer_enabled": False,
+    "reuse_policy_enabled": False,
+    "context_profiles": {},
+    "project_aliases": {},
     "vault_path": str(Path.home() / "almanac"),
     "exchange_threshold": 15,
     "file_count_threshold": 3,

@@ -656,8 +656,12 @@ class TestDeepRecallWorkerAgenticGate:
             data = json.load(f)
         assert data["status"] == "ready"
         assert data["suggestions"] == [
-            {"title": "Redis TTL", "reason": "notes/redis-ttl.md"},
-            {"title": "Cache invalidation", "reason": "notes/cache-invalidation.md"},
+            {"title": "Redis TTL", "reason": "notes/redis-ttl.md", "path": "notes/redis-ttl.md"},
+            {
+                "title": "Cache invalidation",
+                "reason": "notes/cache-invalidation.md",
+                "path": "notes/cache-invalidation.md",
+            },
         ]
         ready_calls = [c for c in mock_log.call_args_list if c.args[1] == "deep-recall-ready"]
         assert ready_calls[0].kwargs["source"] == "agentic"
@@ -755,7 +759,9 @@ class TestDeepRecallWorkerAgenticGate:
         mock_complete.assert_not_called()
         with open(pending_path) as f:
             data = json.load(f)
-        assert data["suggestions"] == [{"title": "notes/untitled.md", "reason": "notes/untitled.md"}]
+        assert data["suggestions"] == [
+            {"title": "notes/untitled.md", "reason": "notes/untitled.md", "path": "notes/untitled.md"}
+        ]
 
 
 class TestMainIntegration:

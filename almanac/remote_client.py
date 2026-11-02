@@ -290,6 +290,9 @@ def store(
     validity_context: str | None = None,
     supersedes: str | None = None,
     timeout: int = 30,
+    evidence: dict | None = None,
+    citations: list[dict] | None = None,
+    metadata_updates: dict | None = None,
 ) -> dict:
     """Store a note in the remote vault."""
     args = _note_args(
@@ -304,6 +307,12 @@ def store(
         validity_context,
         supersedes,
     )
+    if metadata_updates is not None:
+        args["metadata_updates"] = metadata_updates
+    if evidence is not None:
+        args["evidence"] = evidence
+    if citations is not None:
+        args["citations"] = citations
     return _call_tool("almanac_store", args, timeout=timeout)
 
 
@@ -320,6 +329,10 @@ def replace_note(
     validity_context: str | None = None,
     supersedes: str | None = None,
     timeout: int = 30,
+    expected_revision: str | None = None,
+    metadata_updates: dict | None = None,
+    evidence: dict | None = None,
+    citations: list[dict] | None = None,
 ) -> dict:
     """Replace an existing remote note at a known path.
 
@@ -338,8 +351,26 @@ def replace_note(
         validity_context,
         supersedes,
     )
+    updates = dict(metadata_updates or {})
+    if evidence is not None:
+        updates["evidence"] = evidence
+    if citations is not None:
+        updates["citations"] = citations
+    if updates:
+        args["metadata_updates"] = updates
     args["path"] = path
-    return _call_tool("almanac_replace_note", args, timeout=timeout)
+    if expected_revision is not None:
+        capability = _call_tool("almanac_status", {}, timeout=timeout)
+        if capability.get("capabilities", {}).get("conditional_writes") != 1:
+            return {
+                "error": "Server does not advertise conditional-write support",
+                "reason": "conditional_writes_unsupported",
+            }
+        args["expected_revision"] = expected_revision
+    result = _call_tool("almanac_replace_note", args, timeout=timeout)
+    if expected_revision is not None and result.get("error") and result.get("reason") != "revision_conflict":
+        result.setdefault("reason", "conditional_write_failed_or_unsupported")
+    return result
 
 
 def smart_store(
@@ -474,3 +505,19 @@ def preserve(
 def status(timeout: int = 30) -> dict:
     """Get status of the remote vault."""
     return _call_tool("almanac_status", {}, timeout=timeout)
+
+
+def session_context(**request) -> dict:
+    """One remote packet call; reject older contracts without silent downgrade."""
+    args = {key: value for key, value in request.items() if value is not None}
+    result = _call_tool("almanac_session_context", args, timeout=15)
+    if result.get("schema") != "almanac-context/v1" and not request.get("acknowledge_packet_id"):
+        return {
+            "error": "Remote context contract unavailable or unsupported",
+            "reason": "context_contract_unsupported",
+            "should_inject": False,
+            "content": "",
+            "results": [],
+            "complete": False,
+        }
+    return result

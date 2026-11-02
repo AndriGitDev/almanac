@@ -6,6 +6,7 @@ export const DEFAULT_PROCESS_QUEUE_MODEL = "claude-sonnet-4-20250514";
 
 export const defaultConfig = {
 	enabled: true,
+	contextComposer: false,
 	briefing: true,
 	promptRecall: true,
 	toolContext: true,
@@ -49,7 +50,7 @@ function bridgeConfigFrom(raw) {
 	const partial = {};
 	if (!candidate || typeof candidate !== "object") return partial;
 
-	for (const key of ["enabled", "briefing", "promptRecall", "toolContext", "autoCapture", "captureQueue", "processQueue", "processQueueOnSessionClose", "queueSummaries"]) {
+	for (const key of ["enabled", "contextComposer", "briefing", "promptRecall", "toolContext", "autoCapture", "captureQueue", "processQueue", "processQueueOnSessionClose", "queueSummaries"]) {
 		if (typeof candidate[key] === "boolean") partial[key] = candidate[key];
 	}
 	for (const key of ["maxInjectedChars", "maxToolContextPerSession", "processQueueMaxCaptures"]) {
@@ -63,6 +64,7 @@ function applyEnv(config) {
 	return {
 		...config,
 		enabled: envBool("ALMANAC_PI_ENABLED") ?? config.enabled,
+        contextComposer: envBool("ALMANAC_PI_CONTEXT_COMPOSER") ?? config.contextComposer,
 		briefing: envBool("ALMANAC_PI_BRIEFING") ?? config.briefing,
 		promptRecall: envBool("ALMANAC_PI_PROMPT_RECALL") ?? config.promptRecall,
 		toolContext: envBool("ALMANAC_PI_TOOL_CONTEXT") ?? config.toolContext,

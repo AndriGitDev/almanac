@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import re
+import json
 from pathlib import Path
 
 from almanac.config import get_vault
 from almanac.contradictions import inspect_contradictions
 from almanac.dedup_merge import find_merge_target, merge_into_canonical
+from almanac.eligibility import note_eligible
+from almanac.frontmatter import parse
 from almanac.search import has_qmd, qmd_search_with_extras, resolve_concrete_mode
 from almanac.store import (
     acquire_vault_write_lock,
@@ -24,6 +27,12 @@ from almanac.utils import sanitize_secrets
 _CLOSE_MATCH_THRESHOLD = 0.45
 _ALREADY_COVERED_THRESHOLD = 0.82
 _SUPERSEDE_CUES = (
+    "avoid",
+    "never",
+    "forbid",
+    "disable",
+    "do not",
+    "must not",
     "supersede",
     "replace",
     "replaces",
@@ -110,6 +119,10 @@ def _candidate_details(raw: dict, vault: Path, query_title: str, query_body: str
     candidate_title = _frontmatter_value(frontmatter, "title") or raw.get("title") or candidate_path.stem
     candidate_type = _frontmatter_value(frontmatter, "type") or ""
     candidate_tags = _frontmatter_tags(frontmatter)
+    try:
+        candidate_citations = json.loads(_frontmatter_value(frontmatter, "citations") or "[]")
+    except (ValueError, TypeError):
+        candidate_citations = None
     candidate_contract = {
         "note_type": candidate_type or None,
         "tags": candidate_tags,
@@ -121,6 +134,8 @@ def _candidate_details(raw: dict, vault: Path, query_title: str, query_body: str
         "project": _frontmatter_value(frontmatter, "project"),
         "branch": _frontmatter_value(frontmatter, "branch"),
         "session_id": _frontmatter_value(frontmatter, "session_id"),
+        "invalidated_by": parse(raw_text)[0].get("invalidated_by"),
+        "citations": candidate_citations,
     }
 
     title_tokens = _tokenize(candidate_title)
@@ -172,6 +187,8 @@ def _matches_exact_payload(candidate: dict, *, title: str, body: str, contract: 
         return False
 
     existing = candidate["contract"]
+    if contract["citations"] and existing.get("citations") != contract["citations"]:
+        return False
     comparisons = [
         (existing.get("note_type") or "discovery") == contract["note_type"],
         existing.get("tags") == contract["tags"],
@@ -281,6 +298,7 @@ def suggest_store_action(
     source: str = "mcp",
     candidate_limit: int = 5,
     citations: list[dict] | None = None,
+    evidence: dict | None = None,
 ) -> dict:
     """Return a write decision for a smart-store request.
 
@@ -292,6 +310,9 @@ def suggest_store_action(
     verbatim from :func:`almanac.store.normalize_note_contract`, which
     defensively drops malformed entries -- never blocks a decision here.
     """
+    from almanac.evidence import normalize_evidence
+
+    evidence = normalize_evidence(evidence)
     if not title or not str(title).strip():
         return {"error": "title is required"}
     if not body or not str(body).strip():
@@ -321,30 +342,7 @@ def suggest_store_action(
     # Fast exact-duplicate check: if a note with the same title/body/contract
     # already exists, return already_covered without running the embed gate.
     candidates = _combine_candidate_sources(vault, title, sanitized_body, tags, candidate_limit)
-    if not candidates:
-        return {
-            "decision": "created",
-            "created": True,
-            "path": None,
-            "title": title,
-            "candidates": [],
-            "reason": "no close match found",
-            "write": {
-                "title": title,
-                "body": sanitized_body,
-                "note_type": contract["note_type"],
-                "tags": contract["tags"],
-                "certainty": contract["certainty"],
-                "project": contract["project"],
-                "project_path": contract["project_path"],
-                "branch": contract["branch"],
-                "session_id": contract["session_id"],
-                "validity_context": contract["validity_context"],
-                "supersedes": contract["supersedes"],
-                "origin": contract["origin"],
-                "citations": contract["citations"],
-            },
-        }
+    candidates = [c for c in candidates if note_eligible(c["contract"], purpose="merge", project=contract["project"])]
 
     search_text = f"{title}\n{sanitized_body[:2000]}"
     search_tokens = _tokenize(search_text)
@@ -352,7 +350,7 @@ def suggest_store_action(
     update_cues = _contains_cue(search_text, _UPDATE_CUES)
 
     for candidate in candidates:
-        if _matches_exact_payload(
+        if not evidence and _matches_exact_payload(
             candidate,
             title=title,
             body=_strip_related_placeholder(sanitized_body),
@@ -371,9 +369,16 @@ def suggest_store_action(
     # Embed-match gate: check for near-duplicate via vector similarity.
     # Only runs after the exact-duplicate check above so exact matches
     # are never routed through the merge path.
-    if candidate_limit > 0:
+    if candidate_limit > 0 and not supersedes and not supersede_cues:
         try:
-            merge_target = find_merge_target(title, sanitized_body, tags=tags, threshold=None)
+            merge_target = find_merge_target(
+                title,
+                sanitized_body,
+                tags=tags,
+                project=contract["project"],
+                note_type=contract["note_type"],
+                threshold=None,
+            )
         except Exception:
             merge_target = None
         if merge_target is not None:
@@ -396,6 +401,32 @@ def suggest_store_action(
                 },
             }
 
+    if not candidates:
+        return {
+            "decision": "created",
+            "created": True,
+            "path": None,
+            "title": title,
+            "candidates": [],
+            "reason": "no close match found",
+            "write": {
+                "title": title,
+                "body": sanitized_body,
+                "note_type": contract["note_type"],
+                "tags": contract["tags"],
+                "certainty": contract["certainty"],
+                "project": contract["project"],
+                "project_path": contract["project_path"],
+                "branch": contract["branch"],
+                "session_id": contract["session_id"],
+                "validity_context": contract["validity_context"],
+                "supersedes": contract["supersedes"],
+                "origin": contract["origin"],
+                "citations": contract["citations"],
+                "evidence": evidence,
+            },
+        }
+
     best = max(candidates, key=lambda item: (item["score"], len(item["reasons"]), item["path"]))
     best_unique_ratio = len(search_tokens - set(best["tokens"])) / max(1, len(search_tokens))
     best_reasons = list(best["reasons"])
@@ -406,7 +437,14 @@ def suggest_store_action(
     if update_cues:
         best_reasons.append(f"update cue(s): {', '.join(update_cues)}")
 
-    if best["score"] >= _ALREADY_COVERED_THRESHOLD and best_unique_ratio < 0.2:
+    if (
+        not evidence
+        and not supersedes
+        and not supersede_cues
+        and best["score"] >= _ALREADY_COVERED_THRESHOLD
+        and best_unique_ratio < 0.2
+        and not (contract["citations"] and best["contract"].get("citations") != contract["citations"])
+    ):
         return {
             "decision": "already_covered",
             "created": False,
@@ -417,7 +455,7 @@ def suggest_store_action(
             "best_candidate": {**best, "reasons": best_reasons},
         }
 
-    supersede_like = bool(supersede_cues) or (best.get("status") in {"superseded", "superseding"})
+    supersede_like = bool(supersedes or supersede_cues) or (best.get("status") in {"superseded", "superseding"})
     if supersede_like and best["score"] >= _CLOSE_MATCH_THRESHOLD:
         return {
             "decision": "supersedes_suggested",
@@ -461,6 +499,7 @@ def suggest_store_action(
             "supersedes": contract["supersedes"],
             "origin": contract["origin"],
             "citations": contract["citations"],
+            "evidence": evidence,
         },
     }
 
@@ -481,6 +520,7 @@ def write_smart_store_note(
     source: str = "mcp",
     candidate_limit: int = 5,
     citations: list[dict] | None = None,
+    evidence: dict | None = None,
 ) -> dict:
     """Smart-store helper that writes only when no close match exists.
 
@@ -490,10 +530,8 @@ def write_smart_store_note(
     hold the lock (MCP server, automated run lessons) keep it — it is neither
     re-acquired nor released on their behalf.
 
-    ``citations`` (MEM-162) is only applied on the ``created`` path below --
-    the ``merged_into`` append-merge path does not carry new citations onto
-    the canonical note it appends to (a citation asserted for the new
-    content is not automatically true of the merged note's other claims).
+    Incoming citations and provenance on an append-merge are scoped to its
+    section, preserving the canonical claim's original evidence and origin.
     """
     already_held = owns_vault_write_lock()
     if not already_held and not acquire_vault_write_lock():
@@ -515,6 +553,7 @@ def write_smart_store_note(
             source=source,
             candidate_limit=candidate_limit,
             citations=citations,
+            evidence=evidence,
         )
         if decision.get("error"):
             return decision
@@ -539,9 +578,12 @@ def write_smart_store_note(
                 project=project,
                 branch=branch,
                 session_id=session_id,
+                citations=citations,
+                evidence=evidence,
             )
             return {
                 **decision,
+                "merge_reason": merge_result.get("reason"),
                 "merged": merge_result.get("merged", True),
                 "canonical_path": merge_result.get("canonical_path", decision["path"]),
             }
@@ -567,6 +609,7 @@ def write_smart_store_note(
             branch=payload["branch"],
             session_id=payload["session_id"],
             citations=payload["citations"],
+            evidence=payload.get("evidence"),
         )
 
         if payload["project"]:
