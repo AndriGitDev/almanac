@@ -177,3 +177,26 @@ and removed legacy wrappers/workflow configuration. The feature delta is being
 transplanted from audited base `874326d` onto that head, retaining those removals,
 then local checks rerun. Earlier compatibility descriptions refer to the audited
 base; final packaging follows current `main`.
+
+Final review checkpoint after reconciliation with `main` at `e2cc219`:
+
+- Complete local pytest suite: **2,139 passed, nine skipped**, in 128 seconds.
+  Skips are explicitly opt-in model/network integration tests. The count changed
+  because upstream retired compatibility tests. One dependency deprecation warning
+  comes from the installed AnyIO pytest plugin.
+- Ruff lint/format, compilation, frontmatter schema, MCP inventory and generated
+  context-contract checks pass. All 20 deterministic retrieval checks pass.
+- Fresh-HOME release/install smoke passes. Local context/capture evals report
+  five passes, zero failures, two explicitly opt-in LLM extraction skips.
+- Wheel entry-point and real Pi handler tests are included in the full suite.
+  No live SDK/model canary or paired stochastic agent improvement is claimed.
+- Current upstream Almanac naming, removed compatibility runtime wrappers and
+  supported CI Node version are preserved. Legacy-named skill source directories
+  generate canonical Almanac commands. MCP inventory tables have been regenerated.
+
+All unconditional roadmap implementation slices are ready for one final PR.
+Composer and reuse-policy rollout remains opt-in pending the plan's live evidence
+threshold. The deployment-specific OpenRig bridge remains conditional as designed.
+The user requested one consolidated PR and local testing until final review;
+there were no intermediate PRs or branch pushes. Durable session checkpoints are
+kept in the local git-backed Almanac vault as well as this tracked progress log.

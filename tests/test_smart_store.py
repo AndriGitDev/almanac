@@ -246,31 +246,31 @@ def test_suggest_store_action_write_payload_carries_slug_and_project_path(tmp_va
 @pytest.mark.parametrize("replacement", ["No longer use TTL; switch to leases.", "Replace the cache guidance."])
 def test_replacement_intent_bypasses_embedding_merge(tmp_vault, monkeypatch, replacement):
     _seed_note(tmp_vault, title="Redis cache guidance", body="Use TTL.")
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *a, **kw: {})
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *a, **kw: {})
 
     def unexpected(*a, **kw):
         pytest.fail("replacement intent must not enter automatic embedding merge")
 
-    monkeypatch.setattr("memento.smart_store.find_merge_target", unexpected)
+    monkeypatch.setattr("almanac.smart_store.find_merge_target", unexpected)
     result = write_smart_store_note(
         title="Redis cache guidance",
         body=replacement,
         tags=["sync"],
-        project="/home/vic/Projects/memento-vault",
+        project="/home/vic/Projects/almanac",
     )
     assert result["decision"] == "supersedes_suggested"
 
 
 def test_smart_merge_preserves_citations_and_reports_rejection(tmp_vault, monkeypatch):
-    from memento.dedup_merge import MergeTarget
+    from almanac.dedup_merge import MergeTarget
 
     path = write_note(tmp_vault, "Redis cache", "Use TTL.", "discovery", ["redis"], source="human")
     rel = str(path.relative_to(tmp_vault))
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store._combine_candidate_sources", lambda *a: [])
-    monkeypatch.setattr("memento.smart_store.find_merge_target", lambda *a, **kw: MergeTarget(rel, 0.99, "Redis cache"))
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store._combine_candidate_sources", lambda *a: [])
+    monkeypatch.setattr("almanac.smart_store.find_merge_target", lambda *a, **kw: MergeTarget(rel, 0.99, "Redis cache"))
     result = write_smart_store_note(
         title="Redis TTL detail",
         body="Bound the TTL.",
@@ -293,24 +293,24 @@ def test_smart_merge_preserves_citations_and_reports_rejection(tmp_vault, monkey
 def test_invalidated_or_cross_project_exact_match_cannot_suppress_capture(tmp_vault, monkeypatch, extra):
     path = write_note(tmp_vault, "Redis cache", "Use TTL.", "discovery", ["redis"])
     path.write_text(path.read_text().replace("---\n\n", extra + "\n---\n\n", 1))
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *a, **kw: {})
-    monkeypatch.setattr("memento.smart_store.find_merge_target", lambda *a, **kw: None)
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *a, **kw: {})
+    monkeypatch.setattr("almanac.smart_store.find_merge_target", lambda *a, **kw: None)
     result = write_smart_store_note(title="Redis cache", body="Use TTL.", tags=["redis"])
     assert result["created"] is True
     assert result["path"] != str(path.relative_to(tmp_vault))
 
 
 def test_new_citations_are_not_suppressed_as_exact_duplicate(tmp_vault, monkeypatch):
-    from memento.dedup_merge import MergeTarget
+    from almanac.dedup_merge import MergeTarget
 
     path = write_note(tmp_vault, "Redis cache", "Use TTL.", "discovery", ["redis"])
     rel = str(path.relative_to(tmp_vault))
-    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
-    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
-    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *a, **kw: {})
-    monkeypatch.setattr("memento.smart_store.find_merge_target", lambda *a, **kw: MergeTarget(rel, 0.99, "Redis cache"))
+    monkeypatch.setattr("almanac.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("almanac.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("almanac.smart_store.inspect_contradictions", lambda *a, **kw: {})
+    monkeypatch.setattr("almanac.smart_store.find_merge_target", lambda *a, **kw: MergeTarget(rel, 0.99, "Redis cache"))
     result = write_smart_store_note(
         title="Redis cache",
         body="Use TTL.",

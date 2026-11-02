@@ -68,7 +68,7 @@ Tell the user what was captured, what was skipped as duplicate, and where the no
 <!-- almanac-context-contract:start -->
 Shared contract: `almanac-context/v1` (generated from `almanac/contracts.py`).
 
-Use `memento_search` and `memento_get` for explicit recall. Known-note
+Use `almanac_search` and `almanac_get` for explicit recall. Known-note
 reads accept exact sections such as `notes/cache-policy.md#applicability` and
 return source revisions and validity. Anchor checks verify text presence only.
 
@@ -78,7 +78,7 @@ Keep applicability, recommended action and rationale together. Optional
 `evidence` is a single-line JSON object; never invent evidence or treat access
 counts as confirmation. Merges preserve original provenance and confidence.
 
-Hosts may opt into `memento_session_context` with `situation`,
+Hosts may opt into `almanac_session_context` with `situation`,
 `host_instance_id`, `context_epoch` and `profile`. `preview: true` is read-only.
 The host owns live tasks and compaction generations. Restricted reuse is
 opt-in and does not provide multiuser authorization.

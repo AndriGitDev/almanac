@@ -24,7 +24,7 @@ def test_installed_wheel_reads_exact_sections_and_preserves_contract(tmp_path):
     root = Path(__file__).resolve().parents[1]
     source_root = tmp_path / "source"
     source_root.mkdir()
-    for name in ["almanac", "memento"]:
+    for name in ["almanac"]:
         shutil.copytree(root / name, source_root / name, ignore=shutil.ignore_patterns("__pycache__"))
     for name in ["pyproject.toml", "README.md", "LICENSE", "VERSION"]:
         shutil.copy2(root / name, source_root / name)
@@ -43,7 +43,7 @@ def test_installed_wheel_reads_exact_sections_and_preserves_contract(tmp_path):
     (vault / "notes" / "n.md").write_text(
         "---\ntitle: Note\n---\n# Applicability\nOnly with a snapshot.\n# Other\nOther."
     )
-    env = {key: value for key, value in os.environ.items() if not key.startswith(("ALMANAC_", "MEMENTO_"))}
+    env = {key: value for key, value in os.environ.items() if not key.startswith(("ALMANAC_",))}
     env["ALMANAC_VAULT_PATH"] = str(vault)
     program = "import sys; sys.path.insert(0, sys.argv.pop(1)); import almanac; assert almanac.__file__.startswith(sys.path[0]); from almanac.__main__ import main; raise SystemExit(main())"
     result = subprocess.run(

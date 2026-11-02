@@ -295,7 +295,7 @@ def test_failed_atomic_merge_preserves_original(tmp_vault, monkeypatch):
 
 
 def test_same_text_with_new_evidence_is_not_discarded_as_retry(tmp_vault, monkeypatch):
-    monkeypatch.setattr("memento.dedup_merge._index_note", lambda *a: None)
+    monkeypatch.setattr("almanac.dedup_merge._index_note", lambda *a: None)
     path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")
     args = (tmp_vault, path, "Redis detail", "Bound the TTL.")
     assert merge_into_canonical(*args, citations=[{"file": "one.py", "anchor": "ttl"}])["merged"]

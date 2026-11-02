@@ -34,7 +34,7 @@ def test_archived_provenance_remains_resolvable(tmp_vault):
 
 
 def test_incremental_collection_revisits_processed_source_without_new_timestamp(tmp_vault):
-    from memento_inception import collect_eligible_notes
+    from almanac_inception import collect_eligible_notes
     from almanac.revisions import semantic_revision
 
     path = tmp_vault / "notes" / "source.md"

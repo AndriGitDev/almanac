@@ -6,9 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Execute the real adapter handlers with the host event API mocked. Node 24's
+// Execute the real adapter handlers with the host event API mocked. Node 22.18+'s
 // native TS stripping avoids introducing a production transpiler dependency.
-test('real Pi handlers discard pre-compaction packets and request generation recovery', { skip: Number(process.versions.node.split('.')[0]) < 24 }, async () => {
+test('real Pi handlers discard pre-compaction packets and request generation recovery', { skip: Number(process.versions.node.split('.')[0]) < 22 || (Number(process.versions.node.split('.')[0]) === 22 && Number(process.versions.node.split('.')[1]) < 18) }, async () => {
   const { registerHooks } = await import('node:module');
   const typebox = 'data:text/javascript,' + encodeURIComponent('export const Type = new Proxy({}, {get:()=>()=>({})});');
   const tui = 'data:text/javascript,' + encodeURIComponent('export class Text { constructor(){} render(){return [];} } export const Key = new Proxy({}, {get:()=>()=>""}); export const matchesKey=()=>false; export const truncateToWidth=(s)=>s; export const visibleWidth=(s)=>s.length;');

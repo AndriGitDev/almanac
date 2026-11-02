@@ -27,7 +27,7 @@ def main(argv=None):
     ]:
         path = ROOT / relative
         current = path.read_text()
-        fragment = integration_fragment("memento" if "/memento/" in relative else "almanac")
+        fragment = integration_fragment("almanac")
         marker = r"<!-- almanac-context-contract:start -->.*?<!-- almanac-context-contract:end -->"
         rendered = (
             re.sub(marker, lambda m: fragment, current, flags=re.S)

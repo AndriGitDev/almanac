@@ -3,7 +3,7 @@
 Almanac keeps Markdown authoritative while adding source revisions, evidence-aware
 maintenance, exact section reads, and opt-in complete-piece context delivery. The
 [versioned contract](contracts/context-v1.json) is generated from
-`almanac/contracts.py`. Existing tools and Memento aliases remain available.
+`almanac/contracts.py`. The current Almanac-only tools and package layout are retained.
 
 ## Integrity and revision writes
 
@@ -164,7 +164,7 @@ Pi opts in with `ALMANAC_PI_CONTEXT_COMPOSER=true` (or `contextComposer` in its
 existing bridge configuration). It keeps a process instance and generation,
 advances at `session_compact`, and requests recovery at the next
 `before_agent_start`. It discards a pre-compaction response still in flight.
-Real adapter handlers are tested against a mocked host event API using Node 24
+Real adapter handlers are tested against a mocked host event API using Node 22.18+
 native TypeScript loading; the portable JS generation tests also run on Node 20.
 A live SDK/model canary is not claimed. Pi attachment acknowledgment is
 unsupported; CLI/MCP expose explicit host reports. Legacy hooks retain their

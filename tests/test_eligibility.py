@@ -39,7 +39,7 @@ def test_shared_policy_allows_explicit_history(invalidated_note):
     assert lifecycle.read_note_oneliner("old") is None
 
 
-@pytest.mark.parametrize("hook", ["almanac-inception.py", "memento-inception.py"])
+@pytest.mark.parametrize("hook", ["almanac-inception.py"])
 def test_hubs_maps_and_inception_exclude_same_invalidated_note(invalidated_note, hook):
     hook_path = Path(__file__).resolve().parents[1] / "hooks" / hook
     spec = importlib.util.spec_from_file_location("eligibility_inception", hook_path)
