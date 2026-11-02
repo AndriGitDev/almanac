@@ -245,6 +245,23 @@ excluded counts surface as `excluded_invalidated_count` in the response
 metadata. History stays greppable/queryable -- this is a default view
 filter, not a deletion.
 
+The same eligibility policy excludes invalidated notes from merge targets,
+Inception inputs, generated hubs and project maps, and automatic context.
+Automatic recall includes this check in literal-identifier mode and after
+expansion/reranking. Tool-context cache hits and deferred results with source
+references recheck current local Markdown before delivery. Missing optional
+metadata and unavailable remote records retain fail-open read behavior; a
+known invalidation in a result or readable source always excludes it. Legacy
+deferred records without source references retain their existing short TTL;
+they cannot claim source revalidation. Explicit historical reads keep the
+invalidation field visible.
+
+Append-merges preserve the canonical claim's metadata and certainty. Tags
+are unioned; incoming provenance and citations are recorded with the appended
+section rather than replacing the original claim's source or evidence.
+Explicit metadata changes use the replacement/review path. Cross-project
+and invalidated notes cannot be automatic merge targets.
+
 ### Contradiction detection v2 (background)
 
 Gated by `contradiction_detection_enabled` (config, default `false`), a

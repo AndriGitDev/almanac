@@ -156,10 +156,10 @@ from almanac.search import (
     shape_search_results,
 )
 from almanac.retrieval_policy import ExplicitSearchRequest, ExplicitSearchRuntime, _project_slug_from_value
+from almanac.eligibility import filter_eligible_results
 from almanac.query import (
     QueryValidationError,
     build_metadata_filter,
-    is_invalidated_record,
     query_notes,
     read_note_record,
 )
@@ -466,14 +466,7 @@ def _drop_invalidated_search_results(result: dict, *, vault: Path) -> dict:
     if not results:
         return result
 
-    excluded = 0
-    kept = []
-    for entry in results:
-        record = read_note_record(vault, entry.get("path", ""))
-        if record is not None and is_invalidated_record(record):
-            excluded += 1
-            continue
-        kept.append(entry)
+    kept, excluded = filter_eligible_results(vault, results)
 
     result["results"] = kept
     result.setdefault("metadata", {})["excluded_invalidated_count"] = excluded

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import json
 from pathlib import Path
 
 from almanac.config import get_vault
@@ -112,6 +113,10 @@ def _candidate_details(raw: dict, vault: Path, query_title: str, query_body: str
     candidate_title = _frontmatter_value(frontmatter, "title") or raw.get("title") or candidate_path.stem
     candidate_type = _frontmatter_value(frontmatter, "type") or ""
     candidate_tags = _frontmatter_tags(frontmatter)
+    try:
+        candidate_citations = json.loads(_frontmatter_value(frontmatter, "citations") or "[]")
+    except (ValueError, TypeError):
+        candidate_citations = None
     candidate_contract = {
         "note_type": candidate_type or None,
         "tags": candidate_tags,
@@ -124,6 +129,7 @@ def _candidate_details(raw: dict, vault: Path, query_title: str, query_body: str
         "branch": _frontmatter_value(frontmatter, "branch"),
         "session_id": _frontmatter_value(frontmatter, "session_id"),
         "invalidated_by": parse(raw_text)[0].get("invalidated_by"),
+        "citations": candidate_citations,
     }
 
     title_tokens = _tokenize(candidate_title)
@@ -175,6 +181,8 @@ def _matches_exact_payload(candidate: dict, *, title: str, body: str, contract: 
         return False
 
     existing = candidate["contract"]
+    if contract["citations"] and existing.get("citations") != contract["citations"]:
+        return False
     comparisons = [
         (existing.get("note_type") or "discovery") == contract["note_type"],
         existing.get("tags") == contract["tags"],
@@ -418,6 +426,7 @@ def suggest_store_action(
         and not supersede_cues
         and best["score"] >= _ALREADY_COVERED_THRESHOLD
         and best_unique_ratio < 0.2
+        and not (contract["citations"] and best["contract"].get("citations") != contract["citations"])
     ):
         return {
             "decision": "already_covered",

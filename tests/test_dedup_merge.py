@@ -294,6 +294,18 @@ def test_failed_atomic_merge_preserves_original(tmp_vault, monkeypatch):
     assert not list((tmp_vault / "notes").glob(".tmp-*"))
 
 
+def test_same_text_with_new_evidence_is_not_discarded_as_retry(tmp_vault, monkeypatch):
+    monkeypatch.setattr("memento.dedup_merge._index_note", lambda *a: None)
+    path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")
+    args = (tmp_vault, path, "Redis detail", "Bound the TTL.")
+    assert merge_into_canonical(*args, citations=[{"file": "one.py", "anchor": "ttl"}])["merged"]
+    assert merge_into_canonical(*args, citations=[{"file": "two.py", "anchor": "ttl"}])["merged"]
+    assert not merge_into_canonical(*args, citations=[{"file": "two.py", "anchor": "ttl"}])["merged"]
+    text = (tmp_vault / path).read_text()
+    assert text.count("## Merged from") == 2
+    assert "one.py" in text and "two.py" in text
+
+
 def test_merge_idempotent_no_double_append(tmp_vault, monkeypatch):
     """Re-merging the same payload does not add a duplicate section."""
     monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)

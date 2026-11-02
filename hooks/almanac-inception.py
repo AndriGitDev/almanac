@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from almanac.config import RUNTIME_DIR, get_config, get_config_dir, slugify  # noqa: E402
 from almanac.contradictions import _normalize_note_ref, apply_invalidation  # noqa: E402
 from almanac.embedded_search import EmbeddedSearchBackend  # noqa: E402
+from almanac.eligibility import note_eligible  # noqa: E402
 from almanac.llm import llm_complete  # noqa: E402
 from almanac.search import has_qmd  # noqa: E402
 from almanac.search_backend import QMDBackend, get_backend  # noqa: E402
@@ -224,6 +225,9 @@ def collect_eligible_notes(config, state, full=False):
 
         record = parse_note(md_file)
         if record is None:
+            continue
+
+        if not note_eligible({"invalidated_by": record.invalidated_by}, purpose="synthesis"):
             continue
 
         # Skip inception-generated notes (prevent recursion)
@@ -1768,6 +1772,8 @@ def build_project_maps(vault_path):
             continue
         record = parse_note(md_file)
         if record is None or not record.project:
+            continue
+        if not note_eligible({"invalidated_by": record.invalidated_by}, purpose="context"):
             continue
         slug = slugify(Path(record.project).name)
         if not slug:

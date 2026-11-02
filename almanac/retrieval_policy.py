@@ -17,7 +17,7 @@ from typing import Callable
 from almanac.config import detect_project as default_detect_project
 from almanac.config import get_config, get_vault, slugify
 from almanac.graph import lookup_concepts, read_note_metadata
-from almanac.query import is_invalidated_record, read_note_record
+from almanac.eligibility import filter_eligible_results
 from almanac.search import (
     MISS_RECOVERY_HINTS,
     build_search_miss,
@@ -493,18 +493,7 @@ def drop_invalidated_recall_results(vault: Path, results: list[dict]) -> tuple[l
     default-safety exclusion, not a user-requested constraint. Returns
     ``(kept_results, excluded_count)``.
     """
-    if not results:
-        return results, 0
-
-    excluded = 0
-    kept = []
-    for result in results:
-        record = read_note_record(vault, result.get("path", ""))
-        if record is not None and is_invalidated_record(record):
-            excluded += 1
-            continue
-        kept.append(result)
-    return kept, excluded
+    return filter_eligible_results(vault, results)
 
 
 def _strip_injection(text: str) -> str:
@@ -1072,6 +1061,7 @@ class PromptRecallRuntime:
             query=prompt, limit=max_notes + 3, min_score=min_score, cwd=cwd, concrete=concrete
         )
         raw_results = envelope.get("results", [])
+        raw_results, _ = filter_eligible_results(self.vault_loader(), raw_results)
         if concrete:
             results = raw_results
             project_decisions = []
@@ -1499,6 +1489,9 @@ class PromptRecallRuntime:
                     self._log_candidates(config, results, "reranked", query=query)
                 except Exception:
                     pass
+
+        results, final_excluded = drop_invalidated_recall_results(vault, results)
+        excluded_invalidated_count += final_excluded
 
         if not results:
             if project_filter_applied:

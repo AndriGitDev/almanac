@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from almanac.config import RUNTIME_DIR, detect_project, get_config, get_vault, slugify
+from almanac.eligibility import filter_eligible_results
 from almanac.graph import load_or_build_graph, lookup_concepts, lookup_project_notes, read_note_metadata
 from almanac.hub import vault_map
 from almanac import queue as capture_queue
@@ -413,6 +414,8 @@ def read_note_oneliner(note_name):
     note_path = vault / "notes" / f"{note_name}.md"
     if not note_path.exists():
         return None
+    if not filter_eligible_results(vault, [{"path": str(note_path)}])[0]:
+        return None
 
     title = note_name
     certainty = ""
@@ -773,6 +776,7 @@ def run_deferred_briefing_search(deferred_path: str | None = None):
         latency_ms = int((_time.time() - t0) * 1000)
 
         results = enhance_results(results, cwd=params.get("cwd", ""))
+        results, _ = filter_eligible_results(get_vault(), results)
 
         # Format results, dedup against linked notes
         seen = set()
@@ -812,6 +816,7 @@ def run_deferred_briefing_search(deferred_path: str | None = None):
             {
                 "status": "ready",
                 "note_lines": final_notes,
+                "note_paths": note_paths[:max_notes],
                 "timestamp": time.time(),
                 "ttl_seconds": DEFERRED_BRIEFING_TTL_SECONDS,
                 "scope": scope,
@@ -860,6 +865,7 @@ def run_remote_briefing(cwd, config, session_id="unknown", host_id: str | None =
         query += " " + git_branch.replace("-", " ").replace("/", " ")
 
     results = remote_search(query=query, limit=max_notes, cwd=cwd)
+    results, _ = filter_eligible_results(get_vault(), results)
     if results:
         note_lines = []
         for result in results[:max_notes]:
@@ -873,6 +879,7 @@ def run_remote_briefing(cwd, config, session_id="unknown", host_id: str | None =
             {
                 "status": "ready",
                 "note_lines": note_lines,
+                "note_paths": [r.get("path", "") for r in results[:max_notes]],
                 "timestamp": time.time(),
                 "ttl_seconds": DEFERRED_BRIEFING_TTL_SECONDS,
                 "source": "remote",
@@ -966,6 +973,7 @@ def build_briefing(
         try:
             max_notes = config.get("briefing_max_notes", 5)
             map_notes = lookup_project_notes(project_slug, limit=max_notes)
+            map_notes, _ = filter_eligible_results(vault, map_notes)
             if len(map_notes) >= max_notes:
                 note_lines = []
                 for note in map_notes[:max_notes]:
@@ -978,6 +986,7 @@ def build_briefing(
                     {
                         "status": "ready",
                         "note_lines": note_lines,
+                        "note_paths": [r.get("path", "") for r in map_notes[:max_notes]],
                         "timestamp": time.time(),
                         "ttl_seconds": DEFERRED_BRIEFING_TTL_SECONDS,
                         "source": "project-maps",
@@ -1527,6 +1536,11 @@ def consume_deferred_briefing(
 
         # Got results — consume and clean up
         note_lines = data.get("note_lines", [])
+        note_paths = data.get("note_paths")
+        if isinstance(note_paths, list) and len(note_paths) == len(note_lines):
+            rows = [{"path": ref, "line": line} for ref, line in zip(note_paths, note_lines)]
+            rows, _ = filter_eligible_results(get_vault(), rows)
+            note_lines = [row["line"] for row in rows]
         os.unlink(path)
 
         # Mark vsearch as warm for RRF hybrid search
@@ -1668,6 +1682,7 @@ def run_deep_recall_worker(input_path, backend):
                 {
                     "title": entry.get("title") or entry.get("path", ""),
                     "reason": entry.get("path", ""),
+                    "path": entry.get("path", ""),
                 }
                 for entry in agentic_results[:3]
             ]
@@ -1802,6 +1817,7 @@ def consume_deep_recall():
             return []
 
         suggestions = data.get("suggestions", [])
+        suggestions, _ = filter_eligible_results(get_vault(), suggestions)
         os.unlink(DEEP_RECALL_PENDING_PATH)
 
         if not suggestions:
@@ -1848,6 +1864,7 @@ def run_remote_recall(prompt, cwd, config, session_id="unknown", concrete: bool 
         query=prompt, limit=max_notes + 3, min_score=min_score, cwd=cwd, concrete=concrete
     )
     raw_results = envelope.get("results", [])
+    raw_results, _ = filter_eligible_results(get_vault(), raw_results)
     if concrete:
         results = raw_results
         project_decisions = []
@@ -3009,6 +3026,10 @@ def build_tool_context(
                 enhanced_result_count=enhanced_result_count,
                 min_score=min_score,
             )
+
+    results, excluded = filter_eligible_results(get_vault(), results)
+    if not results and excluded:
+        return no_context("invalidated-filtered-empty", excluded_invalidated_count=excluded, source=source)
 
     recall_paths = get_recall_paths(session_id, cwd=cwd, host_id=host_id)
     already_injected = session_injected_paths(cache, lineage, cwd=cwd, host_id=host_id)

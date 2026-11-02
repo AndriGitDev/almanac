@@ -302,6 +302,26 @@ def test_invalidated_or_cross_project_exact_match_cannot_suppress_capture(tmp_va
     assert result["path"] != str(path.relative_to(tmp_vault))
 
 
+def test_new_citations_are_not_suppressed_as_exact_duplicate(tmp_vault, monkeypatch):
+    from memento.dedup_merge import MergeTarget
+
+    path = write_note(tmp_vault, "Redis cache", "Use TTL.", "discovery", ["redis"])
+    rel = str(path.relative_to(tmp_vault))
+    monkeypatch.setattr("memento.smart_store.get_vault", lambda: tmp_vault)
+    monkeypatch.setattr("memento.smart_store.has_qmd", lambda: False)
+    monkeypatch.setattr("memento.smart_store.inspect_contradictions", lambda *a, **kw: {})
+    monkeypatch.setattr("memento.smart_store.find_merge_target", lambda *a, **kw: MergeTarget(rel, 0.99, "Redis cache"))
+    result = write_smart_store_note(
+        title="Redis cache",
+        body="Use TTL.",
+        tags=["redis"],
+        citations=[{"file": "cache.py", "anchor": "ttl"}],
+    )
+    assert result["decision"] == "merged_into"
+    assert result["merged"] is True
+    assert '"cache.py"' in path.read_text()
+
+
 class TestSplitNoteText:
     """Only a LEADING '---' block is frontmatter; body dashes must never fabricate one (audit M6)."""
 

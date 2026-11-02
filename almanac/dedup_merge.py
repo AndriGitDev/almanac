@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import json
+import hashlib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -229,9 +230,6 @@ def _merge_into_canonical(
         return {**result, "reason": "ineligible_canonical"}
     if supersedes:
         return {**result, "reason": "supersession_requires_review"}
-    if _already_merged(canonical_body, title, body):
-        return {**result, "reason": "already_merged"}
-
     # Render incoming provenance with the shared sanitizer, but keep it scoped
     # to this section rather than asserting it for the original claim.
     incoming_fm, _ = frontmatter.split_frontmatter(
@@ -252,8 +250,18 @@ def _merge_into_canonical(
         )
     )
     safe_title = frontmatter.get_scalar(incoming_fm, "title") or "Incoming note"
+    # Retry identity includes evidence/provenance, not just claim text. A new
+    # citation for the same text must survive; routine write dates are excluded.
+    stable_fm = re.sub(r"^date:.*$", "", incoming_fm, flags=re.MULTILINE)
+    merge_id = hashlib.sha256(f"{stable_fm}\n{body.strip()}".encode()).hexdigest()
+    marker = f"<!-- almanac-merge:v1:{merge_id} -->"
+    if marker in canonical_body:
+        return {**result, "reason": "already_merged"}
+    # Compatibility with merges written before scoped provenance existed.
+    if "almanac-merge:v1:" not in canonical_body and not citations and _already_merged(canonical_body, title, body):
+        return {**result, "reason": "already_merged"}
     merged_body = canonical_body.rstrip() + "\n\n---\n\n"
-    merged_body += f"{_MERGED_SECTION_HEADER} {safe_title}\n\n{body}\n\n"
+    merged_body += f"{_MERGED_SECTION_HEADER} {safe_title}\n\n{marker}\n\n{body}\n\n"
     merged_body += f"Incoming provenance (this section only):\n\n```yaml\n{incoming_fm}\n```\n"
 
     incoming = normalize_note_contract(note_type=note_type, tags=tags or [])

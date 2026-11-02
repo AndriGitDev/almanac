@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from almanac import frontmatter as frontmatter_module
+from almanac.eligibility import note_eligible
 
 ALLOWED_AGGREGATIONS = ("project", "type", "tag", "source", "month", "date", "branch", "session_id")
 MISSING_VALUE = "(missing)"
@@ -113,7 +114,7 @@ def _read_note_record(vault: Path, path: Path) -> dict[str, Any] | None:
 
 def is_invalidated_record(record: dict[str, Any]) -> bool:
     """True when a note record carries a non-empty ``invalidated_by`` (MEM-163)."""
-    return bool(str((record or {}).get("invalidated_by") or "").strip())
+    return not note_eligible(record or {}, purpose="context")
 
 
 def _iter_note_records(vault: Path) -> list[dict[str, Any]]:

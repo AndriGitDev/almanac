@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from almanac.config import get_config
+from almanac.eligibility import note_eligible
 from almanac.graph import extract_wikilinks, load_or_build_graph
 from almanac.store import _frontmatter_int, _frontmatter_scalar, _write_text_atomic, split_frontmatter
 
@@ -100,6 +101,7 @@ def _read_note(path: Path):
         "type": _frontmatter_scalar(frontmatter, "type"),
         "project": _frontmatter_scalar(frontmatter, "project"),
         "certainty": _frontmatter_int(frontmatter, "certainty"),
+        "invalidated_by": _frontmatter_scalar(frontmatter, "invalidated_by"),
         "links": extract_wikilinks(body),
     }
 
@@ -112,7 +114,7 @@ def _scan_notes(vault: Path) -> dict:
     notes = {}
     for md in sorted(notes_dir.glob("*.md")):
         meta = _read_note(md)
-        if meta is not None:
+        if meta is not None and note_eligible(meta, purpose="context"):
             notes[meta["stem"]] = meta
     return notes
 
