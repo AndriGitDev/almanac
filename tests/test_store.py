@@ -487,7 +487,11 @@ class TestUniqueTmpNames:
         assert text.startswith("---\n")
         assert ("First writer content." in text) ^ ("Second writer content." in text)
 
-    def test_replace_note_at_path_parallel_same_target_writers_do_not_collide(self, tmp_vault, monkeypatch):
+    def test_replacement_atomic_writer_uses_unique_tmp_files(self, tmp_vault, monkeypatch):
+        # Exercise the unlocked atomic writer separately from the public
+        # thread-serialized CAS boundary (covered by test_revisions.py).
+        from almanac.store import _replace_note_at_path
+
         existing = write_note(
             tmp_vault,
             title="Replace race target",
@@ -499,7 +503,7 @@ class TestUniqueTmpNames:
 
         results, errors = self._run_interleaved(
             monkeypatch,
-            lambda: replace_note_at_path(
+            lambda: _replace_note_at_path(
                 tmp_vault,
                 rel_path,
                 title="Replace race target",
@@ -507,7 +511,7 @@ class TestUniqueTmpNames:
                 note_type="discovery",
                 tags=["race"],
             ),
-            lambda: replace_note_at_path(
+            lambda: _replace_note_at_path(
                 tmp_vault,
                 rel_path,
                 title="Replace race target",

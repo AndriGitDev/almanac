@@ -88,9 +88,8 @@ def _gate_cases():
             True,
             False,
         ),
-        # A long babysit/status session has many exchanges but produces no
-        # durable knowledge. The gate only counts exchanges, so it keeps it.
-        # Desired: content-aware gating drops it.
+        # A pure monitoring session without edits, investigation reads or
+        # insight evidence should not become durable knowledge.
         (
             "status_babysit_session",
             {
@@ -99,7 +98,7 @@ def _gate_cases():
                 "first_prompt": "keep an eye on the release PR and tell me when CI is green",
             },
             False,
-            True,
+            False,
         ),
     ]
 

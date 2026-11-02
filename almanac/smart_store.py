@@ -27,6 +27,12 @@ from almanac.utils import sanitize_secrets
 _CLOSE_MATCH_THRESHOLD = 0.45
 _ALREADY_COVERED_THRESHOLD = 0.82
 _SUPERSEDE_CUES = (
+    "avoid",
+    "never",
+    "forbid",
+    "disable",
+    "do not",
+    "must not",
     "supersede",
     "replace",
     "replaces",
@@ -292,6 +298,7 @@ def suggest_store_action(
     source: str = "mcp",
     candidate_limit: int = 5,
     citations: list[dict] | None = None,
+    evidence: dict | None = None,
 ) -> dict:
     """Return a write decision for a smart-store request.
 
@@ -303,6 +310,9 @@ def suggest_store_action(
     verbatim from :func:`almanac.store.normalize_note_contract`, which
     defensively drops malformed entries -- never blocks a decision here.
     """
+    from almanac.evidence import normalize_evidence
+
+    evidence = normalize_evidence(evidence)
     if not title or not str(title).strip():
         return {"error": "title is required"}
     if not body or not str(body).strip():
@@ -340,7 +350,7 @@ def suggest_store_action(
     update_cues = _contains_cue(search_text, _UPDATE_CUES)
 
     for candidate in candidates:
-        if _matches_exact_payload(
+        if not evidence and _matches_exact_payload(
             candidate,
             title=title,
             body=_strip_related_placeholder(sanitized_body),
@@ -362,7 +372,12 @@ def suggest_store_action(
     if candidate_limit > 0 and not supersedes and not supersede_cues:
         try:
             merge_target = find_merge_target(
-                title, sanitized_body, tags=tags, project=contract["project"], threshold=None
+                title,
+                sanitized_body,
+                tags=tags,
+                project=contract["project"],
+                note_type=contract["note_type"],
+                threshold=None,
             )
         except Exception:
             merge_target = None
@@ -408,6 +423,7 @@ def suggest_store_action(
                 "supersedes": contract["supersedes"],
                 "origin": contract["origin"],
                 "citations": contract["citations"],
+                "evidence": evidence,
             },
         }
 
@@ -422,7 +438,8 @@ def suggest_store_action(
         best_reasons.append(f"update cue(s): {', '.join(update_cues)}")
 
     if (
-        not supersedes
+        not evidence
+        and not supersedes
         and not supersede_cues
         and best["score"] >= _ALREADY_COVERED_THRESHOLD
         and best_unique_ratio < 0.2
@@ -482,6 +499,7 @@ def suggest_store_action(
             "supersedes": contract["supersedes"],
             "origin": contract["origin"],
             "citations": contract["citations"],
+            "evidence": evidence,
         },
     }
 
@@ -502,6 +520,7 @@ def write_smart_store_note(
     source: str = "mcp",
     candidate_limit: int = 5,
     citations: list[dict] | None = None,
+    evidence: dict | None = None,
 ) -> dict:
     """Smart-store helper that writes only when no close match exists.
 
@@ -534,6 +553,7 @@ def write_smart_store_note(
             source=source,
             candidate_limit=candidate_limit,
             citations=citations,
+            evidence=evidence,
         )
         if decision.get("error"):
             return decision
@@ -559,6 +579,7 @@ def write_smart_store_note(
                 branch=branch,
                 session_id=session_id,
                 citations=citations,
+                evidence=evidence,
             )
             return {
                 **decision,
@@ -588,6 +609,7 @@ def write_smart_store_note(
             branch=payload["branch"],
             session_id=payload["session_id"],
             citations=payload["citations"],
+            evidence=payload.get("evidence"),
         )
 
         if payload["project"]:

@@ -90,12 +90,26 @@ def _is_embedding_backend(backend) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def compatible_claim(fields, existing_body: str, incoming_body: str, note_type: str | None = None) -> bool:
+    """Conservative local guard; uncertain intent stays on the review path."""
+    if note_type and (fields.get("type") or "discovery") != note_type:
+        return False
+    negative = r"\b(no longer|never|avoid|do not|don.t|must not|cannot|forbid|disable|disallow)\b"
+    if bool(re.search(negative, existing_body, re.IGNORECASE)) != bool(
+        re.search(negative, incoming_body, re.IGNORECASE)
+    ):
+        return False
+    replacement = r"\b(supersede[sd]?|replace[sd]?|instead|switch to|no longer)\b"
+    return re.search(replacement, incoming_body, re.IGNORECASE) is None
+
+
 def find_merge_target(
     title: str,
     body: str,
     *,
     tags: list[str] | None = None,
     project: str | None = None,
+    note_type: str | None = None,
     threshold: float | None = None,
 ) -> MergeTarget | None:
     """Search the vault for a near-duplicate note using embedding similarity.
@@ -148,7 +162,9 @@ def find_merge_target(
         if loaded is None:
             continue
         _, raw_text = loaded
-        fields, _ = frontmatter.parse(raw_text)
+        fields, existing_body = frontmatter.parse(raw_text)
+        if not compatible_claim(fields, existing_body, body, note_type):
+            continue
         if not note_eligible(fields, purpose="merge", project=project):
             continue
         candidate_title = str(fields.get("title") or "")
@@ -217,6 +233,8 @@ def _merge_into_canonical(
     branch: str | None = None,
     session_id: str | None = None,
     citations: list[dict] | None = None,
+    expected_revision: str | None = None,
+    evidence: dict | None = None,
 ) -> dict[str, Any]:
     """Locked implementation; only tags are changed on the canonical claim."""
     result = {"canonical_path": canonical_path, "merged": False}
@@ -224,12 +242,20 @@ def _merge_into_canonical(
     if loaded is None:
         return {**result, "reason": "canonical_missing_or_malformed"}
     canonical_abs, raw_text = loaded
+    from almanac.revisions import require_revision, RevisionConflict
+
+    try:
+        require_revision(raw_text, expected_revision)
+    except RevisionConflict as exc:
+        return {**result, **exc.details}
     frontmatter_raw, canonical_body = frontmatter.split_frontmatter(raw_text)
     fields, _ = frontmatter.parse(raw_text)
     if not note_eligible(fields, purpose="merge", project=project):
         return {**result, "reason": "ineligible_canonical"}
     if supersedes:
         return {**result, "reason": "supersession_requires_review"}
+    if not compatible_claim(fields, canonical_body, body, note_type):
+        return {**result, "reason": "claim_intent_requires_review"}
     # Render incoming provenance with the shared sanitizer, but keep it scoped
     # to this section rather than asserting it for the original claim.
     incoming_fm, _ = frontmatter.split_frontmatter(
@@ -247,6 +273,7 @@ def _merge_into_canonical(
             branch=branch,
             session_id=session_id,
             citations=citations,
+            evidence=evidence,
         )
     )
     safe_title = frontmatter.get_scalar(incoming_fm, "title") or "Incoming note"

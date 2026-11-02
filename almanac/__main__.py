@@ -29,6 +29,7 @@ def _search(argv: list[str], prog: str) -> int:
     parser.add_argument("--detail-level", default="summary", choices=["brief", "summary", "full"])
     parser.add_argument("--include-content", action="store_true")
     parser.add_argument("--token-budget", type=int, default=2000)
+    parser.add_argument("--include-invalidated", action="store_true")
     args = parser.parse_args(argv)
 
     runtime = ExplicitSearchRuntime()
@@ -45,6 +46,16 @@ def _search(argv: list[str], prog: str) -> int:
             token_budget=args.token_budget,
         )
     )
+    from almanac.config import get_vault
+    from almanac.eligibility import filter_eligible_results
+    from almanac.references import attach_source_metadata
+
+    if not args.include_invalidated:
+        payload["results"], excluded = filter_eligible_results(
+            get_vault(), payload.get("results", []), project=args.cwd
+        )
+        payload.setdefault("metadata", {})["excluded_invalidated_count"] = excluded
+    attach_source_metadata(get_vault(), payload.get("results", []), cwd=args.cwd)
     _json_dump(payload)
     return 0 if payload.get("results") else 1
 
@@ -87,6 +98,73 @@ def _reindex(argv: list[str], prog: str) -> int:
 def main(argv: list[str] | None = None, *, prog: str = "python -m almanac") -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     command = argv[0] if argv else ""
+    if command == "source-review":
+        from almanac.derivation import derived_review
+        from almanac.config import get_vault
+
+        parser = argparse.ArgumentParser(prog=f"{prog} source-review")
+        parser.add_argument("--limit", type=int, default=100)
+        parser.add_argument("--cursor", type=int, default=0)
+        args = parser.parse_args(argv[1:])
+        _json_dump(derived_review(get_vault(), limit=max(0, min(100, args.limit)), cursor=max(0, args.cursor)))
+        return 0
+    if command == "get":
+        from almanac.references import read_reference, SourceError
+        from almanac.config import get_vault
+
+        parser = argparse.ArgumentParser(prog=f"{prog} get")
+        parser.add_argument("reference")
+        args = parser.parse_args(argv[1:])
+        try:
+            payload = read_reference(get_vault(), args.reference)
+            payload.pop("frontmatter", None)
+        except SourceError as exc:
+            payload = {"error": str(exc), "reason": exc.reason}
+        _json_dump(payload)
+        return int("error" in payload)
+    if command in {"session-context", "context-preview"}:
+        from almanac.pi_bridge import build_parser
+        from almanac.lifecycle import build_session_context
+
+        args = build_parser().parse_args(["session-context", *argv[1:]])
+        payload = build_session_context(
+            cwd=args.cwd,
+            prompt=args.prompt,
+            session_id=args.session_id,
+            token_budget=args.token_budget,
+            include_status=args.include_status,
+            include_recent=args.include_recent,
+            include_recall=args.include_recall,
+            include_tool_context_preview=args.include_tool_context_preview,
+            host_id="cli",
+            situation=args.situation,
+            host_instance_id=args.host_instance_id,
+            context_epoch=args.context_epoch,
+            profile=args.profile,
+            preview=args.preview or command == "context-preview",
+            acknowledge_packet_id=args.acknowledge_packet_id,
+            delivery_outcome=args.delivery_outcome,
+            retry=args.retry,
+        )
+        _json_dump(payload)
+        return int("error" in payload)
+    if command == "promotion-draft":
+        from pathlib import Path
+        from almanac.references import read_reference
+        from almanac.config import get_vault
+        from almanac.policy import promotion_draft
+
+        parser = argparse.ArgumentParser(prog=f"{prog} promotion-draft")
+        parser.add_argument("reference")
+        parser.add_argument("--body-file", type=Path, required=True)
+        parser.add_argument("--rationale", required=True)
+        args = parser.parse_args(argv[1:])
+        _json_dump(
+            promotion_draft(
+                read_reference(get_vault(), args.reference), body=args.body_file.read_text(), rationale=args.rationale
+            )
+        )
+        return 0
     if command == "search":
         return _search(argv[1:], prog)
     if command == "recall":
@@ -112,7 +190,7 @@ def main(argv: list[str] | None = None, *, prog: str = "python -m almanac") -> i
     if command in {"help", "-h", "--help"}:
         print(
             "Almanac MCP Server\n"
-            f"Usage: {prog} [search|recall|reindex|tools|archive|health|retrieval-report] ...\n"
+            f"Usage: {prog} [source-review|get|search|recall|session-context|context-preview|promotion-draft|reindex|tools|archive|health|retrieval-report] ...\n"
             "Without a subcommand, starts the MCP server."
         )
         return 0

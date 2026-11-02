@@ -39,7 +39,8 @@ tags: [relevant, tags]
 source: manual
 certainty: 1-5
 validity-context: conditions where this remains true
-project: /full/path/to/project
+project: project-slug
+project_path: /full/path/to/project
 branch: branch-name-if-known
 date: YYYY-MM-DDTHH:MM
 session_id: session-id-if-known
@@ -63,3 +64,22 @@ When unsure, redact.
 ## Output
 
 Tell the user what was captured, what was skipped as duplicate, and where the notes were stored. Keep the response concise.
+
+<!-- almanac-context-contract:start -->
+Shared contract: `almanac-context/v1` (generated from `almanac/contracts.py`).
+
+Use `memento_search` and `memento_get` for explicit recall. Known-note
+reads accept exact sections such as `notes/cache-policy.md#applicability` and
+return source revisions and validity. Anchor checks verify text presence only.
+
+Note identity uses `project: almanac` and optional
+`project_path: /path/to/almanac`; a path is not a project slug.
+Keep applicability, recommended action and rationale together. Optional
+`evidence` is a single-line JSON object; never invent evidence or treat access
+counts as confirmation. Merges preserve original provenance and confidence.
+
+Hosts may opt into `memento_session_context` with `situation`,
+`host_instance_id`, `context_epoch` and `profile`. `preview: true` is read-only.
+The host owns live tasks and compaction generations. Restricted reuse is
+opt-in and does not provide multiuser authorization.
+<!-- almanac-context-contract:end -->

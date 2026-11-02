@@ -482,7 +482,9 @@ def filter_recall_results_by_explicit_project(prompt: str, results: list[dict]) 
     return filtered, decisions
 
 
-def drop_invalidated_recall_results(vault: Path, results: list[dict]) -> tuple[list[dict], int]:
+def drop_invalidated_recall_results(
+    vault: Path, results: list[dict], *, project=None, config=None
+) -> tuple[list[dict], int]:
     """Drop recall results whose note carries `invalidated_by` (MEM-163).
 
     Runs at the same site as :func:`filter_recall_results_by_explicit_project`
@@ -493,7 +495,7 @@ def drop_invalidated_recall_results(vault: Path, results: list[dict]) -> tuple[l
     default-safety exclusion, not a user-requested constraint. Returns
     ``(kept_results, excluded_count)``.
     """
-    return filter_eligible_results(vault, results)
+    return filter_eligible_results(vault, results, project=project, config=config)
 
 
 def _strip_injection(text: str) -> str:
@@ -659,10 +661,38 @@ def _citation_match(repo_root: Path, citation: dict, max_bytes: int) -> str:
         return "missing"
     try:
         with open(target, "r", encoding="utf-8", errors="replace") as handle:
-            content = handle.read(max_bytes)
+            content = handle.read(max_bytes + 1)
     except OSError:
         return "missing"
-    return "verified" if anchor_value in content else "mismatch"
+    if anchor_value in content[:max_bytes]:
+        return "verified"
+    return "partial" if len(content) > max_bytes else "mismatch"
+
+
+def citation_evidence(vault: Path, result: dict, *, cwd: str = "", config: dict | None = None) -> dict:
+    """Bounded anchor checks, never semantic proof of the claim."""
+    config = get_config() if config is None else config
+    report = {"status": "no-citations", "checks": [], "meaning": "Anchor presence only; not semantic proof"}
+    if not config.get("citation_verification_enabled", True):
+        return {**report, "status": "disabled"}
+    citations, project_path = _read_note_citations(vault, result.get("path", ""))
+    if not citations:
+        return report
+    root = _resolve_citation_repo_root(project_path, cwd)
+    if root is None:
+        return {**report, "status": "unverifiable", "reason": "repository_unavailable"}
+    max_bytes = min(2_000_000, max(1, int(config.get("citation_max_verify_bytes", DEFAULT_CITATION_MAX_VERIFY_BYTES))))
+    outcomes = [_citation_match(root, citation, max_bytes) for citation in citations[:20]]
+    checks = [{"file": citation.get("file"), "status": outcome} for citation, outcome in zip(citations, outcomes)]
+    if "mismatch" in outcomes:
+        status = "stale"
+    elif outcomes and all(outcome == "verified" for outcome in outcomes) and len(citations) <= 20:
+        status = "verified"
+    elif "verified" in outcomes or "partial" in outcomes:
+        status = "partial"
+    else:
+        status = "unverifiable"
+    return {**report, "status": status, "checks": checks}
 
 
 def evaluate_citation_verification(
@@ -673,49 +703,14 @@ def evaluate_citation_verification(
     config: dict | None = None,
     queue_stale: Callable[[str, list[dict]], None] = default_queue_stale_citation,
 ) -> str:
-    """Return ``"verified"``, ``"stale"``, ``"unverifiable"``, or ``"no-citations"``.
-
-    Only ever called for a result actually selected for injection --
-    post-ranking, top-k (the whole point of verify-at-use is to keep this off
-    the full result-set path). On ``"stale"``, queues the note for
-    supersession review via ``queue_stale`` before returning.
-    """
-    if config is None:
-        config = get_config()
-    if not config.get("citation_verification_enabled", True):
-        return "no-citations"
-
-    rel_path = result.get("path", "")
-    citations, project_path = _read_note_citations(vault, rel_path)
-    if not citations:
-        return "no-citations"
-
-    repo_root = _resolve_citation_repo_root(project_path, cwd)
-    if repo_root is None:
-        return "unverifiable"
-
-    max_bytes = int(config.get("citation_max_verify_bytes", DEFAULT_CITATION_MAX_VERIFY_BYTES) or 0) or (
-        DEFAULT_CITATION_MAX_VERIFY_BYTES
-    )
-
-    saw_mismatch = False
-    saw_verified = False
-    for citation in citations:
-        outcome = _citation_match(repo_root, citation, max_bytes)
-        if outcome == "mismatch":
-            saw_mismatch = True
-        elif outcome == "verified":
-            saw_verified = True
-
-    if saw_mismatch:
+    report = citation_evidence(vault, result, cwd=cwd, config=config)
+    if report["status"] == "stale":
         try:
-            queue_stale(rel_path, citations)
+            citations, _ = _read_note_citations(vault, result.get("path", ""))
+            queue_stale(result.get("path", ""), citations)
         except Exception:
-            pass  # review-queue append must never block injection (fail-open)
-        return "stale"
-    if saw_verified:
-        return "verified"
-    return "unverifiable"
+            pass
+    return "no-citations" if report["status"] == "disabled" else report["status"]
 
 
 def apply_stale_citation_marker(line: str) -> str:
@@ -1061,7 +1056,7 @@ class PromptRecallRuntime:
             query=prompt, limit=max_notes + 3, min_score=min_score, cwd=cwd, concrete=concrete
         )
         raw_results = envelope.get("results", [])
-        raw_results, _ = filter_eligible_results(self.vault_loader(), raw_results)
+        raw_results, _ = filter_eligible_results(self.vault_loader(), raw_results, project=cwd, config=config)
         if concrete:
             results = raw_results
             project_decisions = []
@@ -1460,7 +1455,9 @@ class PromptRecallRuntime:
             results = self.enhance_results(results, config=config, cwd=request.cwd)
             self._log_candidates(config, results, "enhanced", query=query)
 
-            results, excluded_invalidated_count = drop_invalidated_recall_results(vault, results)
+            results, excluded_invalidated_count = drop_invalidated_recall_results(
+                vault, results, project=request.cwd, config=config
+            )
             if excluded_invalidated_count and config.get("recall_diagnostics_include_candidates", False):
                 self._log_diagnostic(
                     config,
@@ -1490,7 +1487,7 @@ class PromptRecallRuntime:
                 except Exception:
                     pass
 
-        results, final_excluded = drop_invalidated_recall_results(vault, results)
+        results, final_excluded = drop_invalidated_recall_results(vault, results, project=request.cwd, config=config)
         excluded_invalidated_count += final_excluded
 
         if not results:
@@ -1524,6 +1521,26 @@ class PromptRecallRuntime:
                 return _empty_decision("recall", "duplicate", query=prompt)
             results = fresh
 
+        if config.get("context_composer_enabled", False):
+            from almanac.composition import compose, profile_definition
+
+            packet = compose(
+                vault,
+                results[:max_notes],
+                token_budget=int(config.get("recall_token_budget", 1500)),
+                profile=profile_definition("debugging", config=config),
+                project=request.cwd,
+                config=config,
+            )
+            return RetrievalDecision(
+                packet["should_inject"],
+                "recall",
+                lines=[packet["content"]] if packet["content"] else [],
+                results=packet["results"],
+                top_path=packet["results"][0]["path"] if packet["results"] else None,
+                metadata={"packet": packet["metadata"]},
+                reason=None if packet["should_inject"] else "whole-piece-budget",
+            )
         selected = results[:max_notes]
         formatted_lines = []
         for result in selected:

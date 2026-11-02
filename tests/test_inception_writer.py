@@ -2,6 +2,17 @@
 
 from pathlib import Path
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def source_notes_for_writer(tmp_vault):
+    # Publication now verifies real source snapshots, rather than inventing lineage.
+    for stem in ["redis-cache-ttl", "redis-eviction-policy", "redis-cache-invalidation", "a", "b", "missing-stem"]:
+        path = tmp_vault / "notes" / f"{stem}.md"
+        if not path.exists():
+            path.write_text(f"---\ntitle: {stem}\n---\nObserved source claim.")
+
 
 def _write_note(
     path,

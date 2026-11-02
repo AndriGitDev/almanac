@@ -28,6 +28,8 @@ from almanac.config import RUNTIME_DIR, get_config, get_config_dir, slugify  # n
 from almanac.contradictions import _normalize_note_ref, apply_invalidation  # noqa: E402
 from almanac.embedded_search import EmbeddedSearchBackend  # noqa: E402
 from almanac.eligibility import note_eligible  # noqa: E402
+from almanac.derivation import SourceSet, derived_status, source_snapshot  # noqa: E402
+from almanac.revisions import semantic_revision, raw_revision, require_revision  # noqa: E402
 from almanac.llm import llm_complete  # noqa: E402
 from almanac.search import has_qmd  # noqa: E402
 from almanac.search_backend import QMDBackend, get_backend  # noqa: E402
@@ -67,6 +69,7 @@ class NoteRecord:
     # a note is invalid once invalidated_by is set.
     supersedes: str | None = None
     invalidated_by: str | None = None
+    semantic_revision: str | None = None
 
 
 def parse_note(path: Path) -> NoteRecord | None:
@@ -182,6 +185,7 @@ def parse_note(path: Path) -> NoteRecord | None:
         last_resurfaced=meta.get("last_resurfaced") or None,
         supersedes=supersedes,
         invalidated_by=invalidated_by,
+        semantic_revision=semantic_revision(text),
     )
 
 
@@ -239,14 +243,16 @@ def collect_eligible_notes(config, state, full=False):
             continue
 
         # Skip already processed (unless full backfill)
-        if not full and record.stem in processed:
+        previous_revision = state.get("processed_revisions", {}).get(record.stem)
+        source_changed = previous_revision is not None and previous_revision != record.semantic_revision
+        if not full and record.stem in processed and not source_changed:
             continue
 
         # For incremental runs, only include notes newer than last run.
         # Falls back to file mtime when frontmatter date is missing or
         # unparseable — otherwise an unconsolidated note with a bad date
         # would re-enter every incremental run forever.
-        if not full and last_run:
+        if not full and last_run and not source_changed:
             try:
                 if record.date:
                     note_dt = _parse_naive_dt(record.date)
@@ -691,10 +697,14 @@ def build_synthesized_from_ledger(notes_dir):
         record = parse_note(md_file)
         if record is None:
             continue
-        if record.source != "inception":
+        if record.source != "inception" or record.invalidated_by:
             continue
         if record.synthesized_from:
-            ledger[record.stem] = set(record.synthesized_from)
+            ledger[record.stem] = SourceSet(
+                record.synthesized_from,
+                fresh=derived_status(notes_path.parent, md_file.read_text())["status"] == "current",
+                revision=raw_revision(md_file.read_bytes()),
+            )
 
     return ledger
 
@@ -710,6 +720,8 @@ def check_ledger_dedup(cluster_stems, ledger):
     cluster_set = set(cluster_stems)
 
     for pattern_stem, source_set in ledger.items():
+        if cluster_set & source_set and not getattr(source_set, "fresh", True):
+            return ("merge", pattern_stem)
         # Exact match or cluster is a subset — already covered
         if cluster_set == source_set or cluster_set.issubset(source_set):
             return ("skip", None)
@@ -851,7 +863,41 @@ def aggregate_resurfacing_signal(cluster_stems, notes_dict):
     return total, latest_raw
 
 
-def write_pattern_note(synthesis, cluster_stems, vault_path, merge_target=None, notes_dict=None):
+def write_pattern_note(
+    synthesis, cluster_stems, vault_path, merge_target=None, notes_dict=None, expected_revision=None
+):
+    from almanac.store import acquire_vault_write_lock, owns_vault_write_lock, release_vault_write_lock
+
+    held = owns_vault_write_lock()
+    if not held and not acquire_vault_write_lock():
+        return None
+    try:
+        if merge_target:
+            root = (Path(vault_path) / "notes").resolve()
+            target = (root / f"{merge_target}.md").resolve()
+            if root not in target.parents:
+                return None
+            if target.exists():
+                existing = target.read_text()
+                require_revision(existing, expected_revision)
+                from almanac.frontmatter import parse
+
+                if parse(existing)[0].get("invalidated_by"):
+                    return None
+        snapshots = source_snapshot(Path(vault_path), cluster_stems)
+        for stem, revision in snapshots.items():
+            record = (notes_dict or {}).get(stem)
+            if record is not None and record.semantic_revision and record.semantic_revision != revision:
+                return None  # Sources changed while the LLM was running.
+        return _write_pattern_note(synthesis, cluster_stems, vault_path, merge_target, notes_dict)
+    except (OSError, ValueError):
+        return None
+    finally:
+        if not held:
+            release_vault_write_lock()
+
+
+def _write_pattern_note(synthesis, cluster_stems, vault_path, merge_target=None, notes_dict=None):
     """Write a pattern note to the vault using atomic write.
 
     Args:
@@ -866,6 +912,13 @@ def write_pattern_note(synthesis, cluster_stems, vault_path, merge_target=None, 
     Returns:
         Path to the written note, or None if write failed
     """
+    from almanac.store import _safe_yaml_scalar, normalize_note_contract
+
+    synthesis = dict(synthesis)
+    synthesis["title"] = _safe_yaml_scalar(synthesis["title"])
+    normalized = normalize_note_contract(tags=synthesis.get("tags", []), certainty=synthesis.get("certainty", 3))
+    synthesis["tags"] = normalized["tags"]
+    synthesis["certainty"] = normalized["certainty"] or 3
     notes_dir = Path(vault_path) / "notes"
     now = datetime.now().strftime("%Y-%m-%dT%H:%M")
 
@@ -923,19 +976,47 @@ date: {now}
         if s not in seen_links:
             content += f"- [[{s}]]\n"
 
-    # Atomic write: temp file then rename
+    # Keep refresh metadata and record the evidence snapshot used to publish.
+    from almanac.frontmatter import split_frontmatter, unmanaged_lines
+    from almanac.store import _write_text_atomic
+
     target = notes_dir / f"{slug}.md"
-    tmp = notes_dir / f".inception-tmp-{slug}.md"
+    fm, pattern_body = split_frontmatter(content)
+    managed = {
+        "title",
+        "type",
+        "tags",
+        "source",
+        "certainty",
+        "synthesized_from",
+        "synthesized_revisions",
+        "date",
+        "resurfaced_count",
+        "last_resurfaced",
+    }
+    extras = []
+    if merge_target and target.exists():
+        old_fm, _ = split_frontmatter(target.read_text())
+        extras = unmanaged_lines(old_fm, managed_keys=managed)
+    snapshots = source_snapshot(Path(vault_path), cluster_stems)
+    for stem, revision in snapshots.items():
+        record = (notes_dict or {}).get(stem)
+        if record is not None and record.semantic_revision and record.semantic_revision != revision:
+            return None
+    fm += "\nsynthesized_revisions: " + json.dumps(snapshots, sort_keys=True)
+    from almanac.policy import inherited_policy
+    from almanac.references import read_reference
+
+    policies = inherited_policy(
+        [read_reference(Path(vault_path), f"notes/{stem}.md")["metadata"] for stem in cluster_stems]
+    )
+    for key, value in policies.items():
+        fm += f"\n{key}: {value}"
+    content = "---\n" + fm + ("\n" + "\n".join(extras) if extras else "") + "\n---\n" + pattern_body
     try:
-        tmp.write_text(content)
-        os.replace(str(tmp), str(target))
+        _write_text_atomic(target, content)
         return target
     except OSError:
-        # Clean up temp file on failure
-        try:
-            tmp.unlink()
-        except OSError:
-            pass
         return None
 
 
@@ -1375,6 +1456,18 @@ def main(args=None, state_path=None, db_path=None, lock_path=None, contradiction
             print(f"New notes since last run: {len(new_notes)}", file=sys.stderr)
 
         if not new_notes:
+            # Evidence edits and legacy unknown-freshness ledgers must reach
+            # bounded refresh even when no new filename entered the vault.
+            candidates = build_synthesized_from_ledger(vault_path / "notes")
+            stale = [sources for sources in candidates.values() if not getattr(sources, "fresh", True)]
+            stale_sources = set().union(*stale[: config.get("inception_max_clusters", 10)]) if stale else set()
+            if stale_sources:
+                new_notes = [
+                    record
+                    for record in collect_eligible_notes(config, state, full=True)
+                    if record.stem in stale_sources
+                ]
+        if not new_notes:
             if args.verbose:
                 print("No new notes to process", file=sys.stderr)
             return 0
@@ -1455,6 +1548,17 @@ def main(args=None, state_path=None, db_path=None, lock_path=None, contradiction
                 )
             except Exception:
                 pass
+
+        # Adjudication may have invalidated a source from this in-memory batch.
+        refreshed = {stem: parse_note(record.path) for stem, record in notes_dict.items()}
+        keep_indices = [
+            i
+            for i, stem in enumerate(stem_index)
+            if refreshed.get(stem) is not None and not refreshed[stem].invalidated_by
+        ]
+        stem_index = [stem_index[i] for i in keep_indices]
+        embedding_matrix = embedding_matrix[keep_indices]
+        notes_dict = {stem: refreshed[stem] for stem in stem_index}
 
         # Cluster ALL notes
         max_clusters = args.max_clusters or config.get("inception_max_clusters", 10)
@@ -1593,6 +1697,7 @@ def main(args=None, state_path=None, db_path=None, lock_path=None, contradiction
                 vault_path,
                 merge_target=merge_target if action == "merge" else None,
                 notes_dict=notes_dict,
+                expected_revision=getattr(ledger.get(merge_target), "revision", None) if action == "merge" else None,
             )
             if note_path:
                 if action == "merge":
@@ -1651,7 +1756,7 @@ def main(args=None, state_path=None, db_path=None, lock_path=None, contradiction
         # processed_notes_total captured in this run's history entry
         # reflects what this run actually consolidated.
         if not args.dry_run and consolidated_stems:
-            _mark_consolidated(state, _state_path, consolidated_stems)
+            _mark_consolidated(state, _state_path, consolidated_stems, notes_dict=notes_dict)
         _record_run(
             state,
             _state_path,
@@ -1738,7 +1843,7 @@ def _record_run(
     save_inception_state(state, state_path=state_path)
 
 
-def _mark_consolidated(state, state_path, stems):
+def _mark_consolidated(state, state_path, stems, notes_dict=None):
     """Extend processed_notes with stems that were actually consolidated.
 
     A stem is consolidated when it appears in a pattern note's
@@ -1752,6 +1857,9 @@ def _mark_consolidated(state, state_path, stems):
         return
     merged = set(state.get("processed_notes", [])) | set(stems)
     state["processed_notes"] = sorted(merged)
+    for stem in stems:
+        if (notes_dict or {}).get(stem) is not None:
+            state.setdefault("processed_revisions", {})[stem] = notes_dict[stem].semantic_revision
     save_inception_state(state, state_path=state_path)
 
 

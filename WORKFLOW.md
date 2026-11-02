@@ -45,7 +45,7 @@ gates:
   - name: python-compileall
     command: .venv/bin/python -m compileall -q almanac hooks scripts
   - name: targeted-tests
-    command: .venv/bin/python -m pytest tests/test_llm_backends.py tests/test_lifecycle.py tests/test_triage.py tests/test_store.py tests/test_dedup_merge.py tests/test_smart_store.py tests/test_eligibility.py tests/test_frontmatter_schema.py tests/test_script_harnesses.py
+    command: .venv/bin/python -m pytest tests/test_llm_backends.py tests/test_lifecycle.py tests/test_triage.py tests/test_store.py tests/test_dedup_merge.py tests/test_smart_store.py tests/test_eligibility.py tests/test_revisions.py tests/test_references.py tests/test_derivation.py tests/test_evidence_contract.py tests/test_composition.py tests/test_reuse_policy.py tests/test_behavior.py tests/test_context_install.py tests/test_frontmatter_schema.py tests/test_script_harnesses.py
     timeout_ms: 600000
 agent:
   adapter: pi

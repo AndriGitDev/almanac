@@ -921,6 +921,24 @@ def _contradictions(topic: str, limit: int, min_certainty: int = 2) -> dict[str,
 def _get(path: str) -> dict[str, Any]:
     if not path.strip():
         return {"error": "path is required"}
+    from almanac.references import read_reference, SourceError
+
+    try:
+        source = read_reference(get_vault(), path)
+        source.pop("frontmatter", None)
+        source["content"] = strip_injection(source["content"])
+        source["title"] = strip_injection(str(source["title"]))
+        return source
+    except SourceError as exc:
+        if exc.reason == "missing_file" and "#" in path:
+            from almanac.remote_client import is_remote, get as remote_section
+
+            if is_remote():
+                remote = remote_section(path)
+                if remote is not None:
+                    return remote
+        if exc.reason != "missing_file" or "#" in path:
+            return {"error": str(exc), "reason": exc.reason}
     vault = get_vault()
     note_path = path.strip()
     if not note_path.endswith(".md"):
@@ -2907,6 +2925,14 @@ def build_parser() -> argparse.ArgumentParser:
     session_context.add_argument("--include-recent", action=argparse.BooleanOptionalAction, default=True)
     session_context.add_argument("--include-recall", action=argparse.BooleanOptionalAction, default=True)
     session_context.add_argument("--include-tool-context-preview", action="store_true")
+    session_context.add_argument("--situation", choices=["fresh", "resume", "post_compaction"])
+    session_context.add_argument("--host-instance-id")
+    session_context.add_argument("--context-epoch", type=int)
+    session_context.add_argument("--profile")
+    session_context.add_argument("--preview", action="store_true")
+    session_context.add_argument("--acknowledge-packet-id")
+    session_context.add_argument("--delivery-outcome", choices=["attached", "failed"], default="attached")
+    session_context.add_argument("--retry", action="store_true")
 
     tool_context = sub.add_parser("tool-context", help="Build read-tool context")
     tool_context.add_argument("--tool-name", default="")
@@ -3078,6 +3104,8 @@ def main(argv: list[str] | None = None) -> int:
             health_metadata={"cwd": args.cwd, "session_id": args.session_id},
         )
     if args.command == "session-context":
+        from almanac.contracts import optional_context_arguments
+
         return _run_json(
             "session-context",
             lambda cwd, prompt, session_id, token_budget, include_status, include_recent, include_recall, include_preview: (
@@ -3091,6 +3119,16 @@ def main(argv: list[str] | None = None) -> int:
                     include_recall,
                     include_preview,
                     host_id="pi",
+                    **optional_context_arguments(
+                        situation=args.situation,
+                        host_instance_id=args.host_instance_id,
+                        context_epoch=args.context_epoch,
+                        profile=args.profile,
+                        preview=args.preview,
+                        acknowledge_packet_id=args.acknowledge_packet_id,
+                        delivery_outcome=args.delivery_outcome,
+                        retry=args.retry,
+                    ),
                 )
             ),
             args.cwd,

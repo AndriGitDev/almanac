@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -17,6 +17,7 @@ import {
 	type AlmanacPanelState,
 } from "./almanac-ui.js";
 import { defaultConfig as bridgeDefaultConfig, loadConfig } from "./almanac-config.js";
+import { ContextGeneration } from "./almanac-context.js";
 import { decorateStatusDetails } from "./almanac-status.js";
 import { addSessionPointerDigest } from "./transcript-sanitizer.js";
 
@@ -30,6 +31,7 @@ interface LifecycleResult {
 }
 
 interface BridgeConfig {
+	contextComposer: boolean;
 	enabled: boolean;
 	briefing: boolean;
 	promptRecall: boolean;
@@ -668,7 +670,10 @@ export default function almanacExtension(pi: ExtensionAPI) {
 		pi.sendUserMessage(prompt, options);
 	}
 
+	let contextGeneration = new ContextGeneration(randomUUID());
+
 	pi.on("session_start", async (_event, ctx) => {
+		contextGeneration = new ContextGeneration(randomUUID());
 		loadedConfig = loadConfig(ctx.cwd);
 		config = loadedConfig.config;
 		briefingInjected = false;
@@ -690,6 +695,19 @@ export default function almanacExtension(pi: ExtensionAPI) {
 		if (!config.enabled) return;
 		const messages: Array<{ customType: string; content: string; display: boolean }> = [];
 		const sessionFile = ctx.sessionManager.getSessionFile() ?? "unknown";
+
+        if (config.contextComposer) {
+            const request = contextGeneration.request({ cwd: ctx.cwd, sessionId: sessionFile,
+                prompt: event.prompt, maxChars: config.maxInjectedChars });
+            const packet = await runJson(pi, ctx, request.args);
+            // A compaction event may have advanced the generation during the request.
+            if (!contextGeneration.current(request)) return;
+            if (packet.should_inject && typeof packet.content === "string") {
+                contextGeneration.returned(request);
+                return { message: { customType: "almanac-context", content: packet.content, display: true } };
+            }
+            return;
+        }
 
 		if (config.briefing && !briefingInjected) {
 			briefingInjected = true;
@@ -742,6 +760,16 @@ export default function almanacExtension(pi: ExtensionAPI) {
 		if (!filePath) return;
 
 		const sessionFile = ctx.sessionManager.getSessionFile() ?? "unknown";
+        if (config.contextComposer) {
+            const request = contextGeneration.request({ cwd: ctx.cwd, sessionId: sessionFile,
+                prompt: filePath, maxChars: config.maxInjectedChars });
+            request.args.push("--profile", "debugging");
+            const packet = await runJson(pi, ctx, request.args);
+            if (!contextGeneration.current(request) || !packet.should_inject || typeof packet.content !== "string") return;
+            contextGeneration.returned(request);
+            toolContextCount += 1;
+            return { content: [...event.content, textPart(`\n\n${packet.content}`)] };
+        }
 		const toolContext = await runLifecycle(
 			pi,
 			ctx,
@@ -769,6 +797,7 @@ export default function almanacExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_compact", async (_event, ctx) => {
+        if (config.enabled && config.contextComposer) contextGeneration.compact();
 		if (!config.enabled || !config.autoCapture) return;
 		if (lifecycleTriageStarted) {
 			lastLifecycleReason = "session_compact-after-triage";
@@ -809,6 +838,11 @@ export default function almanacExtension(pi: ExtensionAPI) {
 		label: "Almanac Session Context",
 		description: "Build a one-call budgeted almanac session context packet with briefing, prompt recall, vault health, queue status, and expandable note paths. Host-adapter primitive for startup/context injection; use almanac_search and almanac_get for explicit user recall questions.",
 		parameters: Type.Object({
+            situation: Type.Optional(Type.Union([Type.Literal("fresh"), Type.Literal("resume"), Type.Literal("post_compaction")])),
+            host_instance_id: Type.Optional(Type.String()),
+            context_epoch: Type.Optional(Type.Integer({ minimum: 0 })),
+            profile: Type.Optional(Type.String()),
+            preview: Type.Optional(Type.Boolean()),
 			prompt: Type.Optional(Type.String({ description: "Current user prompt for optional recall context" })),
 			session_id: Type.Optional(Type.String({ description: "Session identifier, defaults to the current pi session file" })),
 			token_budget: Type.Optional(Type.Integer({ description: "Approximate token budget for returned content, default 2000" })),
@@ -834,6 +868,11 @@ export default function almanacExtension(pi: ExtensionAPI) {
 			if (params.include_recent === false) args.push("--no-include-recent");
 			if (params.include_recall === false) args.push("--no-include-recall");
 			if (params.include_tool_context_preview) args.push("--include-tool-context-preview");
+            if (params.situation) args.push("--situation", params.situation);
+            if (params.host_instance_id) args.push("--host-instance-id", params.host_instance_id);
+            if (params.context_epoch !== undefined) args.push("--context-epoch", String(params.context_epoch));
+            if (params.profile) args.push("--profile", params.profile);
+            if (params.preview) args.push("--preview");
 			const payload = await runJson(pi, ctx, args);
 			return { content: [textPart(JSON.stringify(payload, null, 2))], details: payload };
 		},

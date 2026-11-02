@@ -156,6 +156,7 @@ from almanac.search import (
     shape_search_results,
 )
 from almanac.retrieval_policy import ExplicitSearchRequest, ExplicitSearchRuntime, _project_slug_from_value
+from almanac.revisions import RevisionConflict, source_revisions
 from almanac.eligibility import filter_eligible_results
 from almanac.query import (
     QueryValidationError,
@@ -449,7 +450,7 @@ def _apply_search_metadata_filters(
     return result
 
 
-def _drop_invalidated_search_results(result: dict, *, vault: Path) -> dict:
+def _drop_invalidated_search_results(result: dict, *, vault: Path, project=None) -> dict:
     """Exclude ranked search results whose note carries `invalidated_by` (MEM-163).
 
     Fails open: a result whose backing file cannot be read (missing, or a
@@ -466,10 +467,12 @@ def _drop_invalidated_search_results(result: dict, *, vault: Path) -> dict:
     if not results:
         return result
 
-    kept, excluded = filter_eligible_results(vault, results)
+    kept, excluded = filter_eligible_results(vault, results, project=project)
 
     result["results"] = kept
-    result.setdefault("metadata", {})["excluded_invalidated_count"] = excluded
+    result.setdefault("metadata", {})["excluded_invalidated_count"] = excluded + int(
+        result.get("metadata", {}).get("excluded_invalidated_count", 0)
+    )
 
     if not kept and excluded:
         return miss_envelope(
@@ -622,7 +625,7 @@ def almanac_search(
     )
 
     if not include_invalidated and result.get("results"):
-        result = _drop_invalidated_search_results(result, vault=get_vault())
+        result = _drop_invalidated_search_results(result, vault=get_vault(), project=project or cwd)
         if not result.get("results"):
             return result
 
@@ -661,6 +664,11 @@ def almanac_search(
             result.setdefault("metadata", {})["expand_links"] = True
             result["metadata"]["expanded_count"] = len(shaped["results"])
 
+    if not include_invalidated and result.get("results"):
+        result = _drop_invalidated_search_results(result, vault=get_vault(), project=project or cwd)
+    from almanac.references import attach_source_metadata
+
+    attach_source_metadata(get_vault(), result.get("results", []), cwd=cwd or "")
     return result
 
 
@@ -901,6 +909,14 @@ def almanac_session_context(
     include_recent: bool = True,
     include_recall: bool = True,
     include_tool_context_preview: bool = False,
+    situation: str | None = None,
+    host_instance_id: str | None = None,
+    context_epoch: int | None = None,
+    profile: str | None = None,
+    preview: bool = False,
+    acknowledge_packet_id: str | None = None,
+    delivery_outcome: str = "attached",
+    retry: bool = False,
 ) -> dict:
     """Host-adapter primitive for one-call budgeted session context.
 
@@ -910,6 +926,8 @@ def almanac_session_context(
     calls. For explicit recall/search requests, call almanac_search and then
     almanac_get if full note content is needed.
     """
+    from almanac.contracts import optional_context_arguments
+
     return build_session_context(
         cwd,
         prompt,
@@ -920,6 +938,16 @@ def almanac_session_context(
         include_recall,
         include_tool_context_preview,
         host_id="mcp",
+        **optional_context_arguments(
+            situation=situation,
+            host_instance_id=host_instance_id,
+            context_epoch=context_epoch,
+            profile=profile,
+            preview=preview,
+            acknowledge_packet_id=acknowledge_packet_id,
+            delivery_outcome=delivery_outcome,
+            retry=retry,
+        ),
     )
 
 
@@ -936,6 +964,9 @@ def almanac_store(
     validity_context: str | None = None,
     supersedes: str | None = None,
     origin: str | None = None,
+    evidence: dict | None = None,
+    citations: list[dict] | None = None,
+    metadata_updates: dict | None = None,
 ) -> dict:
     """Store a new note in the Almanac vault (low-level primitive).
 
@@ -962,6 +993,13 @@ def almanac_store(
     Returns:
         Dict with the path of the written note, or an error.
     """
+    from almanac.evidence import normalize_evidence, update_metadata, metadata_matches
+
+    try:
+        evidence = normalize_evidence(evidence)
+        update_metadata("---\ntitle: validation\n---\n", metadata_updates)
+    except ValueError as exc:
+        return {"error": str(exc)}
     if not title or not title.strip():
         return {"error": "title is required"}
     if not body or not body.strip():
@@ -984,6 +1022,7 @@ def almanac_store(
         project=project,
         branch=branch,
         session_id=session_id,
+        citations=citations,
     )
 
     if not acquire_vault_write_lock():
@@ -991,20 +1030,24 @@ def almanac_store(
 
     try:
         target = vault / "notes" / f"{slugify(title.strip())}.md"
-        if target.exists() and _note_payload_matches(
-            target,
-            title=title,
-            body=sanitized_body,
-            note_type=contract["note_type"],
-            tags=contract["tags"],
-            certainty=contract["certainty"],
-            source=contract["source"],
-            project=contract["project"],
-            branch=contract["branch"],
-            validity_context=contract["validity_context"],
-            supersedes=contract["supersedes"],
-            session_id=contract["session_id"],
-            origin=contract["origin"] if explicit_origin else None,
+        if (
+            target.exists()
+            and metadata_matches(target.read_text(), evidence=evidence, citations=citations, updates=metadata_updates)
+            and _note_payload_matches(
+                target,
+                title=title,
+                body=sanitized_body,
+                note_type=contract["note_type"],
+                tags=contract["tags"],
+                certainty=contract["certainty"],
+                source=contract["source"],
+                project=contract["project"],
+                branch=contract["branch"],
+                validity_context=contract["validity_context"],
+                supersedes=contract["supersedes"],
+                session_id=contract["session_id"],
+                origin=contract["origin"] if explicit_origin else None,
+            )
         ):
             rel_path = str(target.relative_to(vault))
             log_retrieval("mcp", "store_idempotent", title=title, path=rel_path)
@@ -1030,6 +1073,9 @@ def almanac_store(
             project_path=contract["project_path"],
             branch=contract["branch"],
             session_id=contract["session_id"],
+            evidence=evidence,
+            citations=citations,
+            metadata_updates=metadata_updates,
         )
 
         # Update project index under the same slug the note stores (MEM-164).
@@ -1085,6 +1131,8 @@ def almanac_replace_note(
     validity_context: str | None = None,
     supersedes: str | None = None,
     origin: str | None = None,
+    expected_revision: str | None = None,
+    metadata_updates: dict | None = None,
 ) -> dict:
     """Replace an existing note at a known vault-relative path.
 
@@ -1127,7 +1175,12 @@ def almanac_replace_note(
             project=project,
             branch=branch,
             session_id=session_id,
+            expected_revision=expected_revision,
+            metadata_updates=metadata_updates,
         )
+    except RevisionConflict as exc:
+        release_vault_write_lock()
+        return exc.details
     except (ValueError, FileNotFoundError) as exc:
         release_vault_write_lock()
         return {"error": str(exc)}
@@ -1144,7 +1197,7 @@ def almanac_replace_note(
             summary = f"MCP replace: {title.strip()[:80]}"
             update_project_index(vault, project_slug, target.stem, summary)
         log_retrieval("mcp", "replace_note", title=title, path=rel_path)
-        return {"path": rel_path, "title": title.strip(), "replaced": True}
+        return {"path": rel_path, "title": title.strip(), "replaced": True, **source_revisions(target)}
     finally:
         release_vault_write_lock()
 
@@ -1338,6 +1391,7 @@ def almanac_status() -> dict:
     status["fleeting_count"] = len(list(fleeting_dir.glob("*.md"))) if fleeting_dir.exists() else 0
 
     # Key config values (no secrets)
+    status["capabilities"] = {"conditional_writes": 1, "source_revisions": 1}
     status["config"] = {
         "qmd_collection": config.get("qmd_collection", "almanac"),
         "llm_backend": config.get("llm_backend", "claude"),
@@ -1375,6 +1429,25 @@ def almanac_get(path: str) -> dict:
     if not path or not path.strip():
         return {"error": "path is required"}
 
+    from almanac.references import read_reference, SourceError
+
+    try:
+        source = read_reference(get_vault(), path)
+        source.pop("frontmatter", None)
+        source["content"] = _strip_injection(source["content"])
+        source["title"] = _strip_injection(str(source["title"]))
+        record_access([source["path"]], hook="mcp", tool="get", query=path, result_count=1)
+        return source
+    except SourceError as exc:
+        if exc.reason == "missing_file" and "#" in path:
+            from almanac.remote_client import is_remote, get as remote_section
+
+            if is_remote():
+                remote = remote_section(path)
+                if remote is not None:
+                    return remote
+        if exc.reason != "missing_file" or "#" in path:
+            return {"error": str(exc), "reason": exc.reason}
     vault = get_vault()
     path = path.strip()
 
@@ -1402,6 +1475,7 @@ def almanac_get(path: str) -> dict:
             "path": logged_path or path,
             "title": _strip_injection(title),
             "content": _strip_injection(content),
+            **source_revisions(full_path),
         }
         record_access([result["path"]], hook="mcp", tool="get", query=path, result_count=1)
         return result

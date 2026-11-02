@@ -112,7 +112,7 @@ case "$cmd" in
         nohup "$qmd_path" vsearch "warmup" -c "${ALMANAC_QMD_COLLECTION:-almanac}" -n 1 </dev/null >/dev/null 2>&1 &
         exit 0
         ;;
-    search|recall|reindex|tools|archive|health|doctor|retrieval-report|retrieval-dashboard)
+    source-review|get|session-context|context-preview|promotion-draft|search|recall|reindex|tools|archive|health|doctor|retrieval-report|retrieval-dashboard)
         export PYTHONPATH="$SCRIPT_DIR${PYTHONPATH:+:$PYTHONPATH}"
         exec python3 -m almanac "$cmd" "$@"
         ;;

@@ -368,3 +368,24 @@ as a safety net alongside explicit invalidation.
 - [[redis-cluster-setup-notes]]
 - [[caching-strategy-decision]]
 ```
+
+### Context and evidence extensions (optional, v1)
+
+These additive fields use the existing scalar/inline-list grammar and survive
+legacy metadata-preserving rewrites. No backfill of guessed evidence is required.
+
+| Field | Supported encoding | Consumer |
+| --- | --- | --- |
+| `evidence` | Single-line JSON object: method, summary, applicability, action, invalidating_conditions | Capture, exact reads, composer |
+| `synthesized_revisions` | Single-line JSON object mapping source stem to semantic revision | Inception, freshness review |
+| `reuse_scope` | `project` or `reusable`; missing means unclassified | Opt-in reuse policy |
+| `export_policy` | `allow` or `deny`; missing means unclassified | Opt-in archive policy |
+| `reuse_reviewed` | Boolean; explicit owner review of broader reuse | Derived policy inheritance |
+| `review_after` | ISO date/datetime | Review reminder, independent of claim validity |
+
+`evidence.method` is observation, code_check, human_decision, or synthesis. The
+shared codec rejects unsupported keys and oversized strings. Nested YAML is not
+introduced: structured extension fields are JSON on a single line. Raw revisions
+cover original bytes; semantic revisions exclude only access/resurfacing telemetry.
+See [context delivery](context-delivery.md) for conditional-write semantics,
+section grammar, profiles, host generations, policy propagation and rollout.

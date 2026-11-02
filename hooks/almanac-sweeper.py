@@ -229,6 +229,13 @@ def main():
 
     try:
         try:
+            from almanac.maintenance import maintain_sources
+            from almanac.search_backend import get_backend
+
+            maintain_sources(Path(VAULT), get_backend(), limit=100)
+        except Exception:
+            pass  # Periodic repair must never block capture recovery.
+        try:
             # Durable resurfacing signal (MEM-148): fold the derived
             # access-log write-ahead buffer into note frontmatter so a
             # runtime-dir cache wipe never resets access_log_half_life_days

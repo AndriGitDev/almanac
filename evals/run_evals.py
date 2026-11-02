@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from evals.common import FAIL, PASS, SKIP, WARN, find_vault, iter_notes  # noqa: E402
 from evals.common import now as eval_now, set_now  # noqa: E402
 from evals.suites import (  # noqa: E402
+    context_behavior,
     capture_e2e,
     capture_health,
     capture_retrieve_loop,
@@ -46,6 +47,7 @@ from evals.suites import (  # noqa: E402
 )
 
 SUITES = {
+    "context_behavior": context_behavior,
     "vault_content": vault_content,
     "capture_health": capture_health,
     "retrieval_accuracy": retrieval_accuracy,

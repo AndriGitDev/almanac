@@ -365,3 +365,15 @@ def test_access_log_survives_merge(tmp_vault, monkeypatch):
     # (standard case).  Stats should still be in their pre-populated state.
     assert path in initial_stats
     assert len(initial_stats[path]["events"]) == 1
+
+
+@pytest.mark.parametrize(
+    "body,note_type", [("Do not use TTL; use leases instead.", "discovery"), ("Use bounded TTL.", "decision")]
+)
+def test_incompatible_claim_intent_requires_review(tmp_vault, body, note_type):
+    path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")
+    original = (tmp_vault / path).read_bytes()
+    result = merge_into_canonical(tmp_vault, path, "Redis cache", body, note_type=note_type)
+    assert not result["merged"]
+    assert result["reason"] == "claim_intent_requires_review"
+    assert (tmp_vault / path).read_bytes() == original

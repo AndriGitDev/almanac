@@ -1,0 +1,101 @@
+{
+  "adapters": {
+    "cli": {
+      "acknowledgment": "explicit-host-report",
+      "fresh": "explicit",
+      "post_compaction": "explicit",
+      "resume": "explicit"
+    },
+    "legacy_hooks": {
+      "behavior": "legacy delivery retained",
+      "context_epochs": "unsupported"
+    },
+    "mcp": {
+      "acknowledgment": "explicit-host-report",
+      "fresh": "explicit",
+      "host_identity": "caller-supplied",
+      "post_compaction": "explicit",
+      "resume": "explicit"
+    },
+    "pi": {
+      "acknowledgment": "unsupported",
+      "fresh": "session_start",
+      "live_sdk_canary": "not-run",
+      "post_compaction": "session_compact; next before_agent_start",
+      "resume": "subsequent current-intent request"
+    }
+  },
+  "context_schema": "almanac-context/v1",
+  "evidence": {
+    "encoding": "single-line JSON object",
+    "fields": [
+      "method",
+      "summary",
+      "applicability",
+      "action",
+      "invalidating_conditions"
+    ],
+    "meaning": "Anchor presence is not semantic proof",
+    "methods": [
+      "observation",
+      "code_check",
+      "human_decision",
+      "synthesis"
+    ],
+    "verification": [
+      "verified",
+      "partial",
+      "stale",
+      "unverifiable",
+      "no-citations",
+      "disabled"
+    ]
+  },
+  "note_example": {
+    "certainty": 4,
+    "project": "almanac",
+    "project_path": "/path/to/almanac",
+    "title": "Retain cache ownership preconditions",
+    "type": "decision"
+  },
+  "policy": {
+    "boundary": "single owner reuse policy, not a multiuser ACL",
+    "export_policy": [
+      "allow",
+      "deny"
+    ],
+    "missing": "unclassified; legacy behavior until policy enabled",
+    "reuse_scope": [
+      "project",
+      "reusable"
+    ]
+  },
+  "profile_schema": "almanac-profiles/v1",
+  "profiles": [
+    "orientation",
+    "debugging",
+    "design-review",
+    "recovery"
+  ],
+  "request_fields": [
+    "situation",
+    "host_instance_id",
+    "context_epoch",
+    "profile",
+    "preview",
+    "acknowledge_packet_id",
+    "delivery_outcome",
+    "retry"
+  ],
+  "revision": {
+    "conditional_write": "expected_revision; conflict never retries unconditionally",
+    "raw": "sha256 of original bytes",
+    "semantic": "claim and metadata excluding resurfacing/access telemetry"
+  },
+  "schema": "almanac-contracts/v1",
+  "situations": [
+    "fresh",
+    "resume",
+    "post_compaction"
+  ]
+}

@@ -47,7 +47,8 @@ def test_classifies_relevant_memory_by_intent_without_exact_note_id():
 
     assert result["memory_classification"] == "used_relevant_memory"
     assert result["memory_failure_type"] is None
-    assert result["memory_contribution_measurable"] is True
+    assert result["memory_contribution_measurable"] is False
+    assert result["memory_relevance_signal"] is True
     assert result["useful_ref_matches"] == []
 
 
@@ -135,4 +136,4 @@ def test_fixture_tasks_can_be_classified_from_minimal_sanitized_outcomes():
     )
 
     assert report["classified_count"] == 1
-    assert report["memory_contribution_measurable_count"] == 1
+    assert report["memory_contribution_measurable_count"] == 0

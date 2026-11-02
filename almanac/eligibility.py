@@ -30,7 +30,12 @@ def note_eligible(fields: Mapping, *, purpose: Purpose, project: str | None = No
 
 
 def filter_eligible_results(
-    vault: Path, results: list[dict], *, purpose: Purpose = "context"
+    vault: Path,
+    results: list[dict],
+    *,
+    purpose: Purpose = "context",
+    project: str | None = None,
+    config: dict | None = None,
 ) -> tuple[list[dict], int]:
     """Recheck bounded result sets against current Markdown before use.
 
@@ -41,6 +46,11 @@ def filter_eligible_results(
     """
     from almanac.query import read_note_record
 
+    from almanac.config import get_config
+    from almanac.policy import reuse_decision, effective_fields
+    from almanac.frontmatter import parse
+
+    config = get_config() if config is None else config
     kept = []
     for result in results:
         snapshots = [result, result.get("_meta") or {}]
@@ -50,6 +60,30 @@ def filter_eligible_results(
             record = None
         if record is not None:
             snapshots.append(record)
-        if all(note_eligible(fields, purpose=purpose) for fields in snapshots):
+        if purpose != "history":
+            try:
+                path = (vault / result.get("path", "")).resolve()
+                path.relative_to(vault.resolve())
+                text = path.read_text(encoding="utf-8")
+                if parse(text)[0].get("synthesized_from"):
+                    from almanac.derivation import derived_status
+
+                    freshness = derived_status(vault, text)
+                    if any(row["status"] in {"invalidated", "changed"} for row in freshness["sources"]):
+                        continue
+            except (OSError, ValueError, UnicodeError):
+                pass
+        if config.get("reuse_policy_enabled", False) and purpose != "history":
+            fields = record or result
+            try:
+                path = (vault / result.get("path", "")).resolve()
+                path.relative_to(vault.resolve())
+                fields = parse(path.read_text(encoding="utf-8"))[0]
+            except (OSError, ValueError, UnicodeError):
+                pass
+            fields = effective_fields(vault, fields)
+            if not reuse_decision(fields, project=project, config=config)["allowed"]:
+                continue
+        if all(note_eligible(fields, purpose=purpose, project=project) for fields in snapshots):
             kept.append(result)
     return kept, len(results) - len(kept)
