@@ -8,6 +8,8 @@ from pathlib import Path
 from almanac.config import get_vault
 from almanac.contradictions import inspect_contradictions
 from almanac.dedup_merge import find_merge_target, merge_into_canonical
+from almanac.eligibility import note_eligible
+from almanac.frontmatter import parse
 from almanac.search import has_qmd, qmd_search_with_extras, resolve_concrete_mode
 from almanac.store import (
     acquire_vault_write_lock,
@@ -121,6 +123,7 @@ def _candidate_details(raw: dict, vault: Path, query_title: str, query_body: str
         "project": _frontmatter_value(frontmatter, "project"),
         "branch": _frontmatter_value(frontmatter, "branch"),
         "session_id": _frontmatter_value(frontmatter, "session_id"),
+        "invalidated_by": parse(raw_text)[0].get("invalidated_by"),
     }
 
     title_tokens = _tokenize(candidate_title)
@@ -321,30 +324,7 @@ def suggest_store_action(
     # Fast exact-duplicate check: if a note with the same title/body/contract
     # already exists, return already_covered without running the embed gate.
     candidates = _combine_candidate_sources(vault, title, sanitized_body, tags, candidate_limit)
-    if not candidates:
-        return {
-            "decision": "created",
-            "created": True,
-            "path": None,
-            "title": title,
-            "candidates": [],
-            "reason": "no close match found",
-            "write": {
-                "title": title,
-                "body": sanitized_body,
-                "note_type": contract["note_type"],
-                "tags": contract["tags"],
-                "certainty": contract["certainty"],
-                "project": contract["project"],
-                "project_path": contract["project_path"],
-                "branch": contract["branch"],
-                "session_id": contract["session_id"],
-                "validity_context": contract["validity_context"],
-                "supersedes": contract["supersedes"],
-                "origin": contract["origin"],
-                "citations": contract["citations"],
-            },
-        }
+    candidates = [c for c in candidates if note_eligible(c["contract"], purpose="merge", project=contract["project"])]
 
     search_text = f"{title}\n{sanitized_body[:2000]}"
     search_tokens = _tokenize(search_text)
@@ -371,9 +351,11 @@ def suggest_store_action(
     # Embed-match gate: check for near-duplicate via vector similarity.
     # Only runs after the exact-duplicate check above so exact matches
     # are never routed through the merge path.
-    if candidate_limit > 0:
+    if candidate_limit > 0 and not supersedes and not supersede_cues:
         try:
-            merge_target = find_merge_target(title, sanitized_body, tags=tags, threshold=None)
+            merge_target = find_merge_target(
+                title, sanitized_body, tags=tags, project=contract["project"], threshold=None
+            )
         except Exception:
             merge_target = None
         if merge_target is not None:
@@ -396,6 +378,31 @@ def suggest_store_action(
                 },
             }
 
+    if not candidates:
+        return {
+            "decision": "created",
+            "created": True,
+            "path": None,
+            "title": title,
+            "candidates": [],
+            "reason": "no close match found",
+            "write": {
+                "title": title,
+                "body": sanitized_body,
+                "note_type": contract["note_type"],
+                "tags": contract["tags"],
+                "certainty": contract["certainty"],
+                "project": contract["project"],
+                "project_path": contract["project_path"],
+                "branch": contract["branch"],
+                "session_id": contract["session_id"],
+                "validity_context": contract["validity_context"],
+                "supersedes": contract["supersedes"],
+                "origin": contract["origin"],
+                "citations": contract["citations"],
+            },
+        }
+
     best = max(candidates, key=lambda item: (item["score"], len(item["reasons"]), item["path"]))
     best_unique_ratio = len(search_tokens - set(best["tokens"])) / max(1, len(search_tokens))
     best_reasons = list(best["reasons"])
@@ -406,7 +413,12 @@ def suggest_store_action(
     if update_cues:
         best_reasons.append(f"update cue(s): {', '.join(update_cues)}")
 
-    if best["score"] >= _ALREADY_COVERED_THRESHOLD and best_unique_ratio < 0.2:
+    if (
+        not supersedes
+        and not supersede_cues
+        and best["score"] >= _ALREADY_COVERED_THRESHOLD
+        and best_unique_ratio < 0.2
+    ):
         return {
             "decision": "already_covered",
             "created": False,
@@ -417,7 +429,7 @@ def suggest_store_action(
             "best_candidate": {**best, "reasons": best_reasons},
         }
 
-    supersede_like = bool(supersede_cues) or (best.get("status") in {"superseded", "superseding"})
+    supersede_like = bool(supersedes or supersede_cues) or (best.get("status") in {"superseded", "superseding"})
     if supersede_like and best["score"] >= _CLOSE_MATCH_THRESHOLD:
         return {
             "decision": "supersedes_suggested",
@@ -490,10 +502,8 @@ def write_smart_store_note(
     hold the lock (MCP server, automated run lessons) keep it — it is neither
     re-acquired nor released on their behalf.
 
-    ``citations`` (MEM-162) is only applied on the ``created`` path below --
-    the ``merged_into`` append-merge path does not carry new citations onto
-    the canonical note it appends to (a citation asserted for the new
-    content is not automatically true of the merged note's other claims).
+    Incoming citations and provenance on an append-merge are scoped to its
+    section, preserving the canonical claim's original evidence and origin.
     """
     already_held = owns_vault_write_lock()
     if not already_held and not acquire_vault_write_lock():
@@ -539,9 +549,11 @@ def write_smart_store_note(
                 project=project,
                 branch=branch,
                 session_id=session_id,
+                citations=citations,
             )
             return {
                 **decision,
+                "merge_reason": merge_result.get("reason"),
                 "merged": merge_result.get("merged", True),
                 "canonical_path": merge_result.get("canonical_path", decision["path"]),
             }

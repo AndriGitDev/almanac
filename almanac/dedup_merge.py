@@ -2,21 +2,32 @@
 
 ``find_merge_target`` checks if an incoming note is a near-duplicate of an
 existing note (vector similarity above threshold).  ``merge_into_canonical``
-appends the incoming content into the canonical note, unions frontmatter
-(tags, certainty), and preserves the access-log signal on the canonical path.
+appends incoming content and scoped provenance, unions tags, and preserves
+canonical metadata and the access-log signal.
 """
 
 from __future__ import annotations
 
 import logging
-import os
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from almanac.config import get_config, get_vault, slugify
-from almanac.store import _render_note_markdown, load_access_log_stats, write_access_log_stats
+from almanac import frontmatter
+from almanac.store import (
+    _render_note_markdown,
+    _write_text_atomic,
+    normalize_note_contract,
+    acquire_vault_write_lock,
+    owns_vault_write_lock,
+    release_vault_write_lock,
+    load_access_log_stats,
+    write_access_log_stats,
+)
+from almanac.eligibility import note_eligible
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +94,7 @@ def find_merge_target(
     body: str,
     *,
     tags: list[str] | None = None,
+    project: str | None = None,
     threshold: float | None = None,
 ) -> MergeTarget | None:
     """Search the vault for a near-duplicate note using embedding similarity.
@@ -110,7 +122,7 @@ def find_merge_target(
         results = backend.search(
             query,
             collection="almanac",
-            limit=1,
+            limit=5,
             semantic=True,
             timeout=10,
             min_score=threshold,
@@ -123,58 +135,71 @@ def find_merge_target(
     if not results:
         return None
 
-    best = results[0]
-    score = float(best.get("score", 0.0))
-    if score < threshold:
-        return None
-
-    # Title-token overlap gate (disabled when threshold is 0)
+    vault = get_vault()
     config = get_config()
-    min_title_overlap = int(config.get("dedup_embed_min_title_overlap", 0))
-    if min_title_overlap > 0:
-        candidate_title = str(best.get("title", ""))
-        cand_tokens = set(re.findall(r"[a-z0-9]+", candidate_title.lower()))
-        inc_tokens = set(re.findall(r"[a-z0-9]+", title.lower()))
-        if cand_tokens and inc_tokens:
+    min_title_overlap = float(config.get("dedup_embed_min_title_overlap", 0))
+    for best in results[:5]:
+        score = float(best.get("score", 0.0))
+        if score < threshold:
+            continue
+        candidate_path = str(best.get("path", ""))
+        loaded = _load_canonical(vault, candidate_path)
+        if loaded is None:
+            continue
+        _, raw_text = loaded
+        fields, _ = frontmatter.parse(raw_text)
+        if not note_eligible(fields, purpose="merge", project=project):
+            continue
+        candidate_title = str(fields.get("title") or "")
+        if min_title_overlap > 0:
+            cand_tokens = set(re.findall(r"[a-z0-9]+", candidate_title.lower()))
+            inc_tokens = set(re.findall(r"[a-z0-9]+", title.lower()))
             overlap = len(cand_tokens & inc_tokens) / max(len(inc_tokens), 1)
             if overlap < min_title_overlap:
-                logger.debug("Title overlap below threshold: %.2f < %d", overlap, min_title_overlap)
-                return None
-
-    # Load canonical note's contract for the MergeTarget
-    vault = get_vault()
-    candidate_path = str(best.get("path", ""))
-    contract: dict[str, Any] = {}
-
-    if candidate_path:
-        try:
-            raw_text = (vault / candidate_path).read_text(encoding="utf-8", errors="replace")
-            parts = raw_text.split("---", 2)
-            if len(parts) >= 3:
-                frontmatter = parts[1]
-                # Extract key contract fields from frontmatter
-                contract = {
-                    "title": _fm_value(frontmatter, "title") or "",
-                    "note_type": _fm_value(frontmatter, "type") or "discovery",
-                    "tags": _fm_tags(frontmatter),
-                    "certainty": _fm_int(frontmatter, "certainty"),
-                    "supersedes": _fm_value(frontmatter, "supersedes"),
-                    "project": _fm_value(frontmatter, "project"),
-                    "branch": _fm_value(frontmatter, "branch"),
-                    "session_id": _fm_value(frontmatter, "session_id"),
-                }
-        except Exception:
-            logger.debug("Could not read candidate note %s for contract", candidate_path, exc_info=True)
-
-    return MergeTarget(
-        path=candidate_path,
-        similarity=score,
-        title=str(best.get("title", "")),
-        contract=contract,
-    )
+                continue
+        return MergeTarget(
+            path=candidate_path,
+            similarity=score,
+            title=candidate_title,
+            contract={**fields, "note_type": fields.get("type") or "discovery"},
+        )
+    return None
 
 
-def merge_into_canonical(
+def _load_canonical(vault: Path, path: str) -> tuple[Path, str] | None:
+    """Read only existing Markdown notes contained by this vault."""
+    try:
+        root = Path(vault).resolve()
+        target = (root / path).resolve()
+        rel = target.relative_to(root)
+        if not rel.parts or rel.parts[0] != "notes" or target.suffix != ".md":
+            return None
+        raw = target.read_text(encoding="utf-8")
+        fm, _ = frontmatter.split_frontmatter(raw)
+        if not fm:
+            return None
+        return target, raw
+    except (OSError, ValueError, UnicodeError):
+        return None
+
+
+def merge_into_canonical(vault: Path, canonical_path: str, title: str, body: str, **kwargs) -> dict[str, Any]:
+    """Append under the vault write lock; preserve the original claim's metadata.
+
+    Incoming provenance belongs to the appended section. Explicit changes to
+    established certainty, validity or origin require a deliberate replacement.
+    """
+    already_held = owns_vault_write_lock()
+    if not already_held and not acquire_vault_write_lock():
+        return {"canonical_path": canonical_path, "merged": False, "reason": "lock_unavailable"}
+    try:
+        return _merge_into_canonical(vault, canonical_path, title, body, **kwargs)
+    finally:
+        if not already_held:
+            release_vault_write_lock()
+
+
+def _merge_into_canonical(
     vault: Path,
     canonical_path: str,
     title: str,
@@ -190,88 +215,59 @@ def merge_into_canonical(
     project: str | None = None,
     branch: str | None = None,
     session_id: str | None = None,
+    citations: list[dict] | None = None,
 ) -> dict[str, Any]:
-    """Merge *title*/*body* into an existing canonical note.
-
-    Reads the canonical note, appends the incoming content under a labelled
-    ``## Merged from`` section, unions tags, takes the higher certainty,
-    writes the result atomically, re-indexes the canonical, and re-keys any
-    access-log events from an orphaned old path to the canonical stem.
-
-    Returns a dict with ``canonical_path``, ``merged`` (bool), and ``reason``.
-    ``merged=False`` with ``reason="already_merged"`` is the idempotent no-op
-    response (same incoming payload already present).
-    """
-    tags = tags or []
-
-    # --- Parse canonical note ---
-    canonical_abs = vault / canonical_path
-    try:
-        raw_text = canonical_abs.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return {"canonical_path": canonical_path, "merged": False, "reason": "canonical_not_found"}
-
-    parts = raw_text.split("---", 2)
-    if len(parts) < 3:
-        return {"canonical_path": canonical_path, "merged": False, "reason": "malformed_frontmatter"}
-
-    frontmatter_raw = parts[1]
-    canonical_body = parts[2]
-
-    # --- Idempotency check: same incoming body already merged? ---
+    """Locked implementation; only tags are changed on the canonical claim."""
+    result = {"canonical_path": canonical_path, "merged": False}
+    loaded = _load_canonical(vault, canonical_path)
+    if loaded is None:
+        return {**result, "reason": "canonical_missing_or_malformed"}
+    canonical_abs, raw_text = loaded
+    frontmatter_raw, canonical_body = frontmatter.split_frontmatter(raw_text)
+    fields, _ = frontmatter.parse(raw_text)
+    if not note_eligible(fields, purpose="merge", project=project):
+        return {**result, "reason": "ineligible_canonical"}
+    if supersedes:
+        return {**result, "reason": "supersession_requires_review"}
     if _already_merged(canonical_body, title, body):
-        return {"canonical_path": canonical_path, "merged": False, "reason": "already_merged"}
+        return {**result, "reason": "already_merged"}
 
-    # --- Extract canonical contract fields ---
-    canonical_title = _fm_value(frontmatter_raw, "title") or canonical_abs.stem
-    canonical_type = _fm_value(frontmatter_raw, "type") or "discovery"
-    canonical_tags = _fm_tags(frontmatter_raw) or []
-    canonical_certainty = _fm_int(frontmatter_raw, "certainty")
-    canonical_supersedes = _fm_value(frontmatter_raw, "supersedes")
-    canonical_project = _fm_value(frontmatter_raw, "project")
-    canonical_branch = _fm_value(frontmatter_raw, "branch")
-    canonical_session = _fm_value(frontmatter_raw, "session_id")
-
-    # --- Union tags ---
-    merged_tags = list(dict.fromkeys(canonical_tags + list(tags)))
-    merged_tags.sort()
-
-    # --- Max certainty ---
-    merged_certainty = max(
-        (c for c in (canonical_certainty, certainty) if c is not None),
-        default=None,
+    # Render incoming provenance with the shared sanitizer, but keep it scoped
+    # to this section rather than asserting it for the original claim.
+    incoming_fm, _ = frontmatter.split_frontmatter(
+        _render_note_markdown(
+            title,
+            body,
+            note_type,
+            tags or [],
+            certainty=certainty,
+            source=source,
+            origin=origin,
+            validity_context=validity_context,
+            supersedes=supersedes,
+            project=project,
+            branch=branch,
+            session_id=session_id,
+            citations=citations,
+        )
     )
-
-    # --- Build merged body ---
+    safe_title = frontmatter.get_scalar(incoming_fm, "title") or "Incoming note"
     merged_body = canonical_body.rstrip() + "\n\n---\n\n"
-    merged_body += f"{_MERGED_SECTION_HEADER} {title}\n\n"
-    merged_body += body
-    merged_body += "\n"
+    merged_body += f"{_MERGED_SECTION_HEADER} {safe_title}\n\n{body}\n\n"
+    merged_body += f"Incoming provenance (this section only):\n\n```yaml\n{incoming_fm}\n```\n"
 
-    # --- Render the updated note ---
-    merged_markdown = _render_note_markdown(
-        canonical_title,
-        merged_body,
-        note_type=canonical_type or note_type,
-        tags=merged_tags,
-        certainty=merged_certainty,
-        source=source,
-        origin=origin,
-        validity_context=validity_context or None,
-        supersedes=canonical_supersedes or supersedes or None,
-        project=canonical_project or project or None,
-        branch=canonical_branch or branch or None,
-        session_id=canonical_session or session_id or None,
-    )
-
-    # --- Atomic write ---
-    slug = slugify(canonical_title)
-    tmp = canonical_abs.with_name(f".tmp-{slug}.md")
+    incoming = normalize_note_contract(note_type=note_type, tags=tags or [])
+    merged_tags = sorted(set(frontmatter.get_list(frontmatter_raw, "tags") + incoming["tags"]))
+    # Keep the original bytes of every other field, including comments and
+    # blank lines inside unknown multiline values. Only tags are managed here.
+    merged_fm = re.sub(r"^tags:[^\n]*(?:\n[ \t]+[^\n]*)*", "", frontmatter_raw, flags=re.MULTILINE)
+    merged_fm += f"\ntags: {json.dumps(merged_tags, ensure_ascii=False)}"
     try:
-        tmp.write_text(merged_markdown, encoding="utf-8")
-        os.replace(tmp, canonical_abs)
+        _write_text_atomic(canonical_abs, f"---\n{merged_fm}\n---\n{merged_body}")
     except OSError as exc:
-        return {"canonical_path": canonical_path, "merged": False, "reason": f"write_error: {exc}"}
+        return {**result, "reason": f"write_error: {exc}"}
+    canonical_title = str(fields.get("title") or canonical_abs.stem)
+    canonical_project = fields.get("project")
 
     # --- Re-index the canonical note ---
     _index_note(canonical_path)
@@ -325,39 +321,6 @@ def _already_merged(canonical_body: str, incoming_title: str, incoming_body: str
             return True
 
     return False
-
-
-def _fm_value(frontmatter: str, key: str) -> str | None:
-    """Extract a single-line frontmatter value."""
-    match = re.search(rf"^{re.escape(key)}:\s*(.+)$", frontmatter, re.MULTILINE)
-    if not match:
-        return None
-    val = match.group(1).strip()
-    # Strip quotes
-    if val.startswith('"') and val.endswith('"'):
-        val = val[1:-1]
-    elif val.startswith("'") and val.endswith("'"):
-        val = val[1:-1]
-    return val if val else None
-
-
-def _fm_int(frontmatter: str, key: str) -> int | None:
-    """Extract an integer frontmatter value."""
-    val = _fm_value(frontmatter, key)
-    if val is None:
-        return None
-    try:
-        return int(val)
-    except (ValueError, TypeError):
-        return None
-
-
-def _fm_tags(frontmatter: str) -> list[str]:
-    """Extract tags list from frontmatter."""
-    match = re.search(r"^tags:\s*\[([^\]]*)\]", frontmatter, re.MULTILINE)
-    if not match:
-        return []
-    return [item.strip().strip("\"'") for item in match.group(1).split(",") if item.strip()]
 
 
 def _maybe_rekey_access_log(old_path: str, canonical_path: str) -> None:

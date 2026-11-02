@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from almanac.dedup_merge import find_merge_target, merge_into_canonical
 from almanac.store import write_note
 from almanac.search_backend import SearchBackend
@@ -178,8 +180,8 @@ def test_merge_unions_tags(tmp_vault, monkeypatch):
     assert "ttl" in merged
 
 
-def test_merge_takes_max_certainty(tmp_vault, monkeypatch):
-    """Merged note uses the higher certainty of the two."""
+def test_merge_preserves_established_certainty(tmp_vault, monkeypatch):
+    """Similarity and an incoming assertion do not establish stronger evidence."""
     monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
     monkeypatch.setattr("almanac.dedup_merge.load_access_log_stats", lambda: {})
     monkeypatch.setattr("almanac.dedup_merge.write_access_log_stats", lambda _: None)
@@ -198,7 +200,98 @@ def test_merge_takes_max_certainty(tmp_vault, monkeypatch):
     )
 
     merged = (tmp_vault / path).read_text(encoding="utf-8")
-    assert "certainty: 5" in merged
+    assert "certainty: 3" in merged
+
+
+def test_merge_round_trips_metadata_and_scopes_incoming_evidence(tmp_vault, monkeypatch):
+    monkeypatch.setattr("almanac.dedup_merge._index_note", lambda *a: None)
+    monkeypatch.setattr("almanac.dedup_merge._update_project_index", lambda *a: None)
+    path = _seed_note(tmp_vault, title="Redis cache", body="Original guidance.")
+    note = tmp_vault / path
+    original = note.read_text().replace("source: test", "source: human\norigin: original-decision")
+    metadata = """pinned: true
+synthesized_from:
+  - source-a
+last_resurfaced: 2026-11-01
+validity-context: Only for session caches
+project_path: /original/checkout
+citations: [{"file": "old.py", "anchor": "original"}]
+future-field: |
+  keep this multiline value
+  and this line
+"""
+    note.write_text(original.replace("---\n\n", metadata + "---\n\n", 1))
+    result = merge_into_canonical(
+        tmp_vault,
+        path,
+        "Redis cache detail",
+        "Use a bounded TTL.",
+        tags=["ttl"],
+        source="capture",
+        origin="new-session",
+        certainty=5,
+        citations=[{"file": "new.py", "anchor": "ttl"}],
+    )
+    assert result["merged"] is True
+    from almanac.frontmatter import split_frontmatter
+
+    fm, body = split_frontmatter(note.read_text())
+    assert metadata.strip() in fm
+    assert "source: human" in fm
+    assert "origin: original-decision" in fm
+    assert "new.py" not in fm
+    assert '"new.py"' in body
+    assert "origin: new-session" in body
+
+
+@pytest.mark.parametrize(
+    "extra,project",
+    [
+        ("invalidated_by: newer\n", None),
+        ("project: other-project\n", "almanac"),
+    ],
+)
+def test_merge_refuses_ineligible_note_without_changes(tmp_vault, extra, project):
+    path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")
+    note = tmp_vault / path
+    original = note.read_text().replace("---\n\n", extra + "---\n\n", 1)
+    note.write_text(original)
+    result = merge_into_canonical(tmp_vault, path, "Redis cache detail", "More detail.", project=project)
+    assert result["merged"] is False
+    assert note.read_text() == original
+
+
+def test_find_merge_target_skips_ineligible_best_hits(tmp_vault, monkeypatch):
+    paths = []
+    for title, extra in [
+        ("Invalid", "invalidated_by: newer\nproject: almanac\n"),
+        ("Other", "project: other\n"),
+        ("Eligible", "project: almanac\n"),
+    ]:
+        path = _seed_note(tmp_vault, title=title, body="Use TTL.")
+        note = tmp_vault / path
+        note.write_text(note.read_text().replace("---\n\n", extra + "---\n\n", 1))
+        paths.append(path)
+    backend = _FakeBackend([{"path": p, "score": 0.99 - i * 0.01} for i, p in enumerate(paths)])
+    monkeypatch.setattr("almanac.dedup_merge._is_embedding_backend", lambda _: True)
+    monkeypatch.setattr("almanac.dedup_merge._get_backend", lambda: backend)
+    monkeypatch.setattr("almanac.dedup_merge.get_vault", lambda: tmp_vault)
+    target = find_merge_target("TTL", "Use a bounded TTL.", project="/code/almanac")
+    assert target.path == paths[-1]
+
+
+def test_failed_atomic_merge_preserves_original(tmp_vault, monkeypatch):
+    path = _seed_note(tmp_vault, title="Redis cache", body="Use TTL.")
+    original = (tmp_vault / path).read_bytes()
+
+    def fail(*args):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("almanac.store.os.replace", fail)
+    result = merge_into_canonical(tmp_vault, path, "Redis detail", "Bound the TTL.")
+    assert result["merged"] is False
+    assert (tmp_vault / path).read_bytes() == original
+    assert not list((tmp_vault / "notes").glob(".tmp-*"))
 
 
 def test_merge_idempotent_no_double_append(tmp_vault, monkeypatch):
