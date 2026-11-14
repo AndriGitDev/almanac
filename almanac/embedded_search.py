@@ -631,7 +631,7 @@ class EmbeddedSearchBackend(SearchBackend):
             query_vec = self._provider.embed_query(query)
             query_blob = _vec_to_blob(query_vec)
         except Exception as exc:
-            logger.warning("Embedding query failed: %s", exc)
+            logger.warning("Embedding query failed (%s)", type(exc).__name__)
             return self._fts5_search(query, limit, min_score)
 
         conn = self._get_conn()
@@ -911,7 +911,7 @@ class EmbeddedSearchBackend(SearchBackend):
                     )
                 conn.execute("RELEASE embed_chunk")
             except Exception as exc:
-                logger.warning("Batch embedding chunk %d failed: %s", i, exc)
+                logger.warning("Batch embedding chunk %d failed (%s)", i, type(exc).__name__)
                 try:
                     conn.execute("ROLLBACK TO embed_chunk")
                     conn.execute("RELEASE embed_chunk")
@@ -964,7 +964,7 @@ class EmbeddedSearchBackend(SearchBackend):
                         (rel_path, blob),
                     )
                 except Exception as exc:
-                    logger.warning("Embedding note %s failed: %s", rel_path, exc)
+                    logger.warning("Note embedding failed (%s)", type(exc).__name__)
 
             conn.commit()
             return True

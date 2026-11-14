@@ -32,6 +32,7 @@ from almanac.store import (  # noqa: E402
 from almanac.adapters import parse_transcript, render_transcript_text, truncate_transcript  # noqa: E402
 from almanac.utils import normalize_note_tags, read_hook_input, sanitize_secrets  # noqa: E402
 from almanac import sync_ledger  # noqa: E402
+from almanac.private_files import append_private_text, write_private_text  # noqa: E402
 
 
 # --- Substantiality scoring ---
@@ -219,7 +220,7 @@ def append_session_to_project(project_file, session_id, summary, ticket=None):
     else:
         content = append_project_session_line(content, line)
 
-    project_file.write_text(content)
+    write_private_text(project_file, content)
 
 
 def write_fleeting(session_id, meta, project_slug):
@@ -260,8 +261,7 @@ def write_fleeting(session_id, meta, project_slug):
         line += f" → {meta['last_outcome']}"
     line += "\n"
 
-    with open(fleeting_file, "a") as f:
-        f.write(line)
+    append_private_text(fleeting_file, line)
 
 
 def build_session_summary(meta):
@@ -1187,7 +1187,7 @@ def run_remote_triage(hook_input):
                 "captured": ts,
             }
             fm_lines = "\n".join(f"{k}: {json.dumps(v)}" for k, v in fm.items())
-            spool_file.write_text(f"---\n{fm_lines}\n---\n\n{sanitized_summary}\n")
+            write_private_text(spool_file, f"---\n{fm_lines}\n---\n\n{sanitized_summary}\n")
             legacy_spool_path = str(spool_file)
             print(f"[almanac] spooled session to {spool_file} for later reconciliation", file=sys.stderr)
         except Exception as fallback_exc:

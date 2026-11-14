@@ -1,13 +1,13 @@
 """State, logging, note writing, and vault write coordination."""
 
 from almanac.env import get_env
+from almanac.private_files import append_private_text, write_private_text
 
 import hashlib
 import math
 import json
 import os
 import re
-import tempfile
 import threading
 import time
 from datetime import datetime, timezone
@@ -48,8 +48,7 @@ def _append_jsonl(path, entry, warn_attr):
     try:
         log_dir = os.path.dirname(path)
         os.makedirs(log_dir, exist_ok=True)
-        with open(path, "a") as f:
-            f.write(json.dumps(entry, separators=(",", ":")) + "\n")
+        append_private_text(path, json.dumps(entry, separators=(",", ":")) + "\n")
     except OSError as exc:
         if not getattr(_append_jsonl, warn_attr, False):
             import sys as _sys
@@ -1386,18 +1385,7 @@ def _write_text_atomic(target, text):
     concurrent writers aimed at the same target can never clobber or steal each
     other's in-flight tmp file, which slug-derived tmp names allowed (audit M6).
     """
-    target = Path(target)
-    fd, tmp_name = tempfile.mkstemp(dir=str(target.parent), prefix=f".tmp-{target.stem}-", suffix=target.suffix)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(text)
-        os.replace(tmp_name, target)
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+    write_private_text(target, text)
 
 
 # split_frontmatter() and the _frontmatter_*() typed accessors below are thin

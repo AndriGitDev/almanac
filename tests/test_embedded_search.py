@@ -783,3 +783,24 @@ class TestMCPEndToEnd:
 
         results = qmd_search_with_extras("quantum xylophone dinosaur", limit=5)
         assert results == []
+
+
+def test_embedding_failure_does_not_log_private_payload(backend, embedded_vault, caplog):
+    """Provider errors can include note text or credentials; log only the class."""
+
+    class SyntheticProviderError(Exception):
+        pass
+
+    class FailingProvider:
+        def embed(self, texts):
+            raise SyntheticProviderError("synthetic-private-provider-payload")
+
+    vault, _ = embedded_vault
+    note = vault / "notes" / "private-embedding-test.md"
+    note.write_text("---\ntitle: Private synthetic note\n---\n\nSynthetic note body.\n")
+    backend._vec_available = True
+    backend._provider = FailingProvider()
+    assert backend.index_note("notes/private-embedding-test.md")
+    assert "SyntheticProviderError" in caplog.text
+    assert "synthetic-private-provider-payload" not in caplog.text
+    assert "private-embedding-test.md" not in caplog.text
