@@ -167,8 +167,17 @@ def remote_env(env_file_path, remote_url, api_key):
     if api_key:
         env["ALMANAC_API_KEY"] = api_key
     lines = [f"{k}={json.dumps(v)}" for k, v in env.items()]
-    with open(env_file_path, "w") as f:
-        f.write("\n".join(lines) + "\n")
+    # The installer also chmods this path, but the credential must be private
+    # from its first byte, including when replacing an existing readable file.
+    directory = os.path.dirname(os.path.abspath(env_file_path))
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".almanac-remote-")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        os.replace(tmp, env_file_path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
 
 
 # --- Settings.json merge ---

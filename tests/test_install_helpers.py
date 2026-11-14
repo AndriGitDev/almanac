@@ -1,6 +1,7 @@
 """Tests for lib/install_helpers.py — warmup, clear-auth-cache, and mcp-config."""
 
 import http.server
+import importlib.util
 import json
 import os
 import re
@@ -34,6 +35,57 @@ def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file permission contract")
+@pytest.mark.parametrize("existing", [False, True])
+def test_remote_env_is_private_even_with_permissive_umask(tmp_path, existing):
+    path = tmp_path / "remote.env"
+    if existing:
+        path.write_text("old configuration\n")
+        path.chmod(0o644)
+    old_umask = os.umask(0)
+    try:
+        rc, stdout, stderr = _run_helper(
+            "remote-env", str(path), "https://vault.example.test", "synthetic-installer-test-key"
+        )
+    finally:
+        os.umask(old_umask)
+    assert rc == 0, stderr
+    assert stdout == ""
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert "synthetic-installer-test-key" in path.read_text()
+    assert not list(tmp_path.glob(".almanac-remote-*"))
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX symlink replacement contract")
+def test_remote_env_replaces_symlink_without_writing_its_target(tmp_path):
+    target = tmp_path / "unrelated.env"
+    target.write_text("unrelated configuration\n")
+    path = tmp_path / "remote.env"
+    path.symlink_to(target)
+    rc, _, stderr = _run_helper("remote-env", str(path), "https://vault.example.test", "synthetic-installer-test-key")
+    assert rc == 0, stderr
+    assert not path.is_symlink()
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert target.read_text() == "unrelated configuration\n"
+
+
+def test_remote_env_failed_replacement_preserves_existing_file(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location("install_helpers_under_test", HELPERS)
+    helpers = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helpers)
+    path = tmp_path / "remote.env"
+    path.write_text("old configuration\n")
+
+    def refuse_replace(*_args):
+        raise PermissionError("synthetic replacement failure")
+
+    monkeypatch.setattr(helpers.os, "replace", refuse_replace)
+    with pytest.raises(PermissionError, match="synthetic replacement failure"):
+        helpers.remote_env(str(path), "https://vault.example.test", "synthetic-installer-test-key")
+    assert path.read_text() == "old configuration\n"
+    assert not list(tmp_path.glob(".almanac-remote-*"))
 
 
 def test_install_help_documents_safe_reinstall_and_dangerous_force():
