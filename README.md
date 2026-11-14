@@ -304,3 +304,7 @@ The uninstaller leaves your vault and notes in place. See [installation](docs/in
 Almanac is an independent fork of [Memento Vault](https://github.com/sandsower/memento-vault), originally created by Victor Valenzuela. It retains the upstream Git history and MIT copyright notice. Almanac uses its own CLI, Python package, MCP tools, configuration, and environment variables; Memento compatibility has been retired.
 
 Released under the [MIT license](LICENSE).
+
+### Private operational files
+
+Operational JSONL appends, failed-sync payloads and session-index updates use owner-only files (0600). Atomic replacements keep sensitive content private while it is written; append paths refuse symlinks and special files. Embedding failures log the exception class rather than provider error text, which may contain note content or credentials. These safeguards do not encrypt the vault or alter deliberate CLI output, and do not retroactively scrub existing files.

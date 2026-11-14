@@ -37,6 +37,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from almanac.private_files import append_private_text, write_private_text
+
 
 def content_hash(text: str) -> str:
     """Stable hash of the payload we would send to remote.
@@ -71,8 +73,7 @@ def append(vault: Path, entry: dict) -> None:
     """
     ledger_dir(vault).mkdir(parents=True, exist_ok=True)
     line = json.dumps(entry, separators=(",", ":"), sort_keys=True)
-    with open(ledger_path(vault), "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    append_private_text(ledger_path(vault), line + "\n")
 
 
 def iter_entries(vault: Path):
@@ -150,7 +151,7 @@ def spool_payload(vault: Path, kind: str, source: str, payload: str) -> Path:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     dest = spool_dir(vault) / kind / f"{ts}-{safe}.payload"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(payload, encoding="utf-8")
+    write_private_text(dest, payload)
     return dest
 
 

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from almanac.env import get_env
 
+from almanac.private_files import write_private_text
+
 import inspect
 import json
 import os
@@ -1688,7 +1690,7 @@ def almanac_capture(
                 content = project_file.read_text()
                 if session_id not in content:
                     content = append_project_session_line(content, session_line)
-                    project_file.write_text(content)
+                    write_private_text(project_file, content)
 
             log_retrieval("mcp", "capture_fleeting", session_id=session_id, agent=agent, project=project_slug)
             return {
