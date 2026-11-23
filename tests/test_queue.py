@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import fcntl
 import os
+import stat
 import threading
 
 import pytest
@@ -161,3 +162,73 @@ def test_queue_lock_blocks_a_second_thread_until_the_first_releases(tmp_path, mo
 
     assert not errors
     assert second_acquired.is_set()
+
+
+def test_queue_lock_creates_a_private_regular_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
+    with queue_lock():
+        path = capture_queue._queue_lock_file()
+        info = path.stat()
+        assert stat.S_ISREG(info.st_mode)
+        assert stat.S_IMODE(info.st_mode) == 0o600
+
+
+def test_queue_lock_tightens_an_existing_readable_lock(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
+    path = capture_queue._queue_lock_file()
+    path.parent.mkdir(parents=True)
+    path.write_text("")
+    path.chmod(0o644)
+
+    with queue_lock():
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="requires no-follow opens")
+def test_queue_lock_refuses_a_symlink_without_changing_its_target(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
+    target = tmp_path / "unrelated"
+    target.write_text("preserve unrelated content")
+    target.chmod(0o644)
+    path = capture_queue._queue_lock_file()
+    path.parent.mkdir(parents=True)
+    path.symlink_to(target)
+
+    with pytest.raises(QueueLockUnavailable):
+        with queue_lock():
+            pytest.fail("must not acquire a lock through a symlink")
+
+    assert target.read_text() == "preserve unrelated content"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
+
+
+def test_queue_lock_refuses_a_fifo(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
+    path = capture_queue._queue_lock_file()
+    path.parent.mkdir(parents=True)
+    os.mkfifo(path, 0o600)
+
+    with pytest.raises(QueueLockUnavailable, match="regular file"):
+        with queue_lock():
+            pytest.fail("must not acquire a lock on a special file")
+
+
+def test_queue_lock_closes_the_descriptor_when_permission_hardening_fails(tmp_path, monkeypatch):
+    monkeypatch.setenv("ALMANAC_PI_STATE_HOME", str(tmp_path / "state"))
+    closed = []
+    original_close = os.close
+
+    def counting_close(fd):
+        closed.append(fd)
+        return original_close(fd)
+
+    def failing_fchmod(fd, mode):
+        raise PermissionError("simulated permission hardening failure")
+
+    monkeypatch.setattr(os, "close", counting_close)
+    monkeypatch.setattr(os, "fchmod", failing_fchmod)
+    with pytest.raises(QueueLockUnavailable):
+        with queue_lock():
+            pytest.fail("must not continue with an unprotected lock")
+
+    assert len(closed) == 1
