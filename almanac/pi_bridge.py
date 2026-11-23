@@ -79,9 +79,32 @@ def _json_default(value: Any) -> Any:
     raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
+def _redact_error_fields(value: Any, *, diagnostic: bool = False) -> Any:
+    """Redact diagnostic fields without truncating or rewriting retrieved notes."""
+    if isinstance(value, dict):
+        return {
+            key: _redact_error_fields(item, diagnostic=diagnostic or key in {"error", "errors", "traceback"})
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_redact_error_fields(item, diagnostic=diagnostic) for item in value]
+    if diagnostic and isinstance(value, str):
+        return sanitize_secrets(value)
+    return value
+
+
 def _emit(payload: dict[str, Any]) -> int:
-    print(json.dumps(payload, ensure_ascii=False, default=_json_default))
+    print(json.dumps(_redact_error_fields(payload), ensure_ascii=False, default=_json_default))
     return 0
+
+
+def _print_error_diagnostic(message: str) -> None:
+    print(sanitize_secrets(message), file=sys.stderr)
+
+
+def _print_error_traceback(error: Exception) -> None:
+    formatted = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    print(sanitize_secrets(formatted), file=sys.stderr, end="")
 
 
 def _env_bool(name: str) -> bool | None:
@@ -137,7 +160,7 @@ def _log_bridge_health(
         "cwd": cwd,
         "project": details.pop("project", _bridge_project_slug(cwd)),
         "session_id": session_id,
-        "error": str(error),
+        "error": sanitize_secrets(str(error)),
         "error_type": type(error).__name__ if isinstance(error, BaseException) else "Error",
     }
     payload.update(details)
@@ -148,7 +171,7 @@ def _log_bridge_health(
 
 
 def _emit_error(operation: str, error: Exception) -> int:
-    traceback.print_exc(file=sys.stderr)
+    _print_error_traceback(error)
     return _emit(_error_payload(operation, error))
 
 
@@ -160,7 +183,7 @@ def _error_payload(source: str, exc: Exception) -> dict[str, Any]:
         "results": [],
         "reason": "error",
         "metadata": {
-            "error": str(exc),
+            "error": sanitize_secrets(str(exc)),
             "error_type": type(exc).__name__,
         },
     }
@@ -175,7 +198,7 @@ def _run_lifecycle(
     try:
         return _emit(fn(*args).to_dict())
     except Exception as exc:  # pragma: no cover - traceback branch asserted by payload shape
-        traceback.print_exc(file=sys.stderr)
+        _print_error_traceback(exc)
         metadata = dict(health_metadata or {})
         _log_bridge_health(source, error=exc, **metadata)
         return _emit(_error_payload(source, exc))
@@ -219,7 +242,7 @@ def _write_capture_session_state(session_id: str, cwd: str, state: dict[str, Any
         _atomic_write_text(path, json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
     except OSError as exc:
         # Session state is an optimization for lifecycle queue suppression; capture commands must still succeed.
-        print(f"[almanac] warning: could not write pi capture session state: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] warning: could not write pi capture session state: {exc}")
 
 
 def _triage_payload_dir() -> Path:
@@ -307,7 +330,7 @@ def _append_capture_audit(record: dict[str, Any], vault: Path | None = None) -> 
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError as exc:
-        print(f"[almanac] warning: could not write pi capture audit: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] warning: could not write pi capture audit: {exc}")
 
 
 def _capture_lifecycle_metadata(raw: object) -> dict[str, Any]:
@@ -689,7 +712,7 @@ def _status(cwd: str = "") -> dict[str, Any]:
         # Read-only status lookup: skip rather than crash the whole status
         # payload over a contended queue lock (narrow window, only possible
         # while a legacy queue migration is pending).
-        print(f"[almanac] status queue lookup skipped: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] status queue lookup skipped: {exc}")
         queued_capture_count = {"skipped": "lock_unavailable"}
         queue_path_value = None
     return {
@@ -938,7 +961,7 @@ def _get(path: str) -> dict[str, Any]:
                 if remote is not None:
                     return remote
         if exc.reason != "missing_file" or "#" in path:
-            return {"error": str(exc), "reason": exc.reason}
+            return {"error": sanitize_secrets(str(exc)), "reason": exc.reason}
     vault = get_vault()
     note_path = path.strip()
     if not note_path.endswith(".md"):
@@ -1018,7 +1041,7 @@ def _dead_letter_capture(vault: Path, capture: dict[str, Any], error: Exception)
     try:
         spool_path = str(sync_ledger.spool_payload(vault, _DEAD_LETTER_ENQUEUE_KIND, capture_id, payload))
     except OSError as spool_exc:
-        print(f"[almanac] pi capture {capture_id} spool failed: {spool_exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] pi capture {capture_id} spool failed: {spool_exc}")
     try:
         sync_ledger.record(
             vault,
@@ -1030,11 +1053,10 @@ def _dead_letter_capture(vault: Path, capture: dict[str, Any], error: Exception)
             spool_path=spool_path,
         )
     except OSError as ledger_exc:
-        print(f"[almanac] pi capture {capture_id} dead-letter ledger record failed: {ledger_exc}", file=sys.stderr)
-    print(
+        _print_error_diagnostic(f"[almanac] pi capture {capture_id} dead-letter ledger record failed: {ledger_exc}")
+    _print_error_diagnostic(
         f"[almanac] pi capture {capture_id} dead-lettered: queue lock unavailable after "
-        f"{_QUEUE_LOCK_RETRY_ATTEMPTS} attempts: {error}",
-        file=sys.stderr,
+        f"{_QUEUE_LOCK_RETRY_ATTEMPTS} attempts: {error}"
     )
     return {
         "id": capture_id,
@@ -1514,7 +1536,7 @@ def _triage(
         )
     except Exception as exc:
         log_triage_health("triage_spawn_failed", hook="pi-bridge", error=exc, transcript_path=str(resolved), **metadata)
-        return {"queued": False, "error": str(exc), "reason": "spawn_failed"}
+        return {"queued": False, "error": sanitize_secrets(str(exc)), "reason": "spawn_failed"}
 
     state.update(
         {
@@ -1731,7 +1753,7 @@ def _queue_list(
     try:
         captures = _load_queue()
     except QueueLockUnavailable as exc:
-        print(f"[almanac] queue list skipped: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] queue list skipped: {exc}")
         return {"skipped": "lock_unavailable"}
     visible = []
     cache = _read_summary_cache() if include_generated_summaries else None
@@ -1857,7 +1879,7 @@ def _queue_cleanup(
     try:
         captures = _load_queue(vault)
     except QueueLockUnavailable as exc:
-        print(f"[almanac] queue cleanup skipped: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] queue cleanup skipped: {exc}")
         return {"skipped": "lock_unavailable", "queue_path": str(queue_path)}
 
     by_class, sample_by_class, retained, discarded = _classify_captures_for_cleanup(captures, discard_set, samples)
@@ -1906,7 +1928,7 @@ def _queue_cleanup(
                     handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
             _write_queue(current_retained, vault)
     except QueueLockUnavailable as exc:
-        print(f"[almanac] queue cleanup skipped: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] queue cleanup skipped: {exc}")
         result["skipped"] = "lock_unavailable"
         result["dry_run"] = True
         return result
@@ -1967,7 +1989,7 @@ def _queue_discard(
     try:
         captures = _load_queue(vault)
     except QueueLockUnavailable as exc:
-        print(f"[almanac] queue discard skipped: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] queue discard skipped: {exc}")
         return {"skipped": "lock_unavailable", "queue_path": str(queue_path)}
     capture_id_set = set(capture_ids)
     found = [capture for capture in captures if str(capture.get("id")) in capture_id_set]
@@ -2020,7 +2042,7 @@ def _queue_discard(
                     handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
             _write_queue(retained, vault)
     except QueueLockUnavailable as exc:
-        print(f"[almanac] queue discard skipped: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] queue discard skipped: {exc}")
         result["skipped"] = "lock_unavailable"
         result["dry_run"] = True
         return result
@@ -2663,7 +2685,7 @@ def _queue_process_start(
             )
         )
     except QueueLockUnavailable as exc:
-        print(f"[almanac] queue process start skipped: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] queue process start skipped: {exc}")
         return {"skipped": "lock_unavailable"}
 
 
@@ -2875,7 +2897,7 @@ def _queue_process_finalize(run_id: str) -> dict[str, Any]:
     try:
         return _capture_runtime().finalize(run_id)
     except QueueLockUnavailable as exc:
-        print(f"[almanac] queue process finalize skipped: {exc}", file=sys.stderr)
+        _print_error_diagnostic(f"[almanac] queue process finalize skipped: {exc}")
         return {"skipped": "lock_unavailable", "run_id": run_id}
 
 
@@ -2892,10 +2914,12 @@ def _run_json(
             _log_bridge_health(source, error=payload.get("error"), reason=payload.get("reason", "error"), **metadata)
         return _emit(payload)
     except Exception as exc:  # pragma: no cover - defensive CLI boundary
-        traceback.print_exc(file=sys.stderr)
+        _print_error_traceback(exc)
         metadata = dict(health_metadata or {})
         _log_bridge_health(source, error=exc, **metadata)
-        return _emit({"error": str(exc), "source": source, "reason": "error", "error_type": type(exc).__name__})
+        return _emit(
+            {"error": sanitize_secrets(str(exc)), "source": source, "reason": "error", "error_type": type(exc).__name__}
+        )
 
 
 def _build_pi_briefing(cwd: str, session_id: str) -> Any:

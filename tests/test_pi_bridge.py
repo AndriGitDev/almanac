@@ -3487,3 +3487,90 @@ def test_pi_bridge_queue_process_finalize_skips_with_structured_result_when_lock
     manifest_path = tmp_path / "state" / "processing" / run_id / "manifest.json"
     manifest = json.loads(manifest_path.read_text())
     assert manifest["status"] == "running"
+
+
+@pytest.mark.parametrize("boundary", ["emit_error", "lifecycle", "json"])
+def test_bridge_exception_boundaries_redact_credentials(boundary, capsys, monkeypatch):
+    marker = "sk-" + "a" * 32
+    message = f"service unavailable with credential {marker}; retry later"
+    monkeypatch.setattr(pi_bridge, "_log_bridge_health", lambda *args, **kwargs: None)
+
+    def fail():
+        raise RuntimeError(message)
+
+    if boundary == "emit_error":
+        try:
+            fail()
+        except RuntimeError as exc:
+            result = pi_bridge._emit_error("synthetic", exc)
+    else:
+        runner = pi_bridge._run_lifecycle if boundary == "lifecycle" else pi_bridge._run_json
+        result = runner("synthetic", fail)
+
+    captured = capsys.readouterr()
+    assert result == 0
+    assert marker not in captured.out
+    assert marker not in captured.err
+    assert "[REDACTED_API_KEY]" in captured.out
+    assert "[REDACTED_API_KEY]" in captured.err
+    assert "RuntimeError" in captured.err
+    assert "service unavailable" in captured.err
+    assert "retry later" in captured.err
+    payload = json.loads(captured.out)
+    assert payload.get("error_type", payload.get("metadata", {}).get("error_type")) == "RuntimeError"
+
+
+def test_bridge_emit_redacts_only_diagnostics_and_does_not_mutate_payload(capsys):
+    marker = "ghp_" + "b" * 36
+    content = "Full retrieval content " * 100 + marker
+    payload = {
+        "content": content,
+        "results": [{"body": content, "metadata": {"error": f"backend rejected {marker}"}}],
+        "metadata": {"errors": [{"detail": f"backend rejected {marker}"}]},
+    }
+    original = json.loads(json.dumps(payload))
+
+    assert pi_bridge._emit(payload) == 0
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["content"] == content
+    assert result["results"][0]["body"] == content
+    assert marker not in result["results"][0]["metadata"]["error"]
+    assert marker not in result["metadata"]["errors"][0]["detail"]
+    assert payload == original
+
+
+def test_bridge_error_payload_sanitizes_before_emit():
+    marker = "sk-" + "c" * 32
+    result = pi_bridge._error_payload("synthetic", RuntimeError(f"connection rejected {marker}"))
+    assert marker not in result["metadata"]["error"]
+    assert "connection rejected" in result["metadata"]["error"]
+    assert result["metadata"]["error_type"] == "RuntimeError"
+
+
+def test_bridge_health_boundary_sanitizes_exception_text(monkeypatch):
+    marker = "sk-" + "d" * 32
+    recorded = []
+    monkeypatch.setattr(pi_bridge, "_bridge_config_summary", lambda: {})
+    monkeypatch.setattr(pi_bridge, "_bridge_project_slug", lambda cwd: "test-project")
+    monkeypatch.setattr(pi_bridge, "log_triage_health", lambda *args, **kwargs: recorded.append(kwargs))
+
+    pi_bridge._log_bridge_health("synthetic", error=RuntimeError(f"upstream refused {marker}"))
+
+    assert len(recorded) == 1
+    assert marker not in recorded[0]["error"]
+    assert recorded[0]["error_type"] == "RuntimeError"
+    assert "upstream refused" in recorded[0]["error"]
+
+
+def test_bridge_stderr_diagnostic_preserves_useful_nonsecret_detail(capsys):
+    marker = "sk-" + "e" * 32
+    useful_detail = "retry connection; " * 100
+
+    pi_bridge._print_error_diagnostic(f"{useful_detail}{marker}")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert useful_detail in captured.err
+    assert marker not in captured.err
+    assert "[REDACTED_API_KEY]" in captured.err

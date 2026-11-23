@@ -18,6 +18,7 @@ import contextlib
 import fcntl
 import json
 import os
+import stat
 import threading
 import uuid
 from datetime import datetime, timezone
@@ -121,10 +122,19 @@ def queue_lock(vault: Path | None = None) -> Generator[None, None, None]:
         return
 
     path.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_CREAT | os.O_RDWR | os.O_NONBLOCK
+    flags |= getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
+    fd = None
     try:
-        fd = os.open(str(path), os.O_CREAT | os.O_RDWR, 0o644)
+        fd = os.open(str(path), flags, 0o600)
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError("Capture-queue lock must be a regular file")
+        # Tighten existing locks too; the creation mode does not change them.
+        os.fchmod(fd, 0o600)
     except OSError as exc:
-        raise QueueLockUnavailable(f"cannot open capture-queue lock file {path}: {exc}") from exc
+        if fd is not None:
+            os.close(fd)
+        raise QueueLockUnavailable(f"cannot open private capture-queue lock file {path}: {exc}") from exc
 
     try:
         try:
